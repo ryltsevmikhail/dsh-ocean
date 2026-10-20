@@ -481,9 +481,26 @@ async fn owned_group_stop_worker() {
         // Only reap the exact adopted descendant, never waitpid(-1).
         let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
         let mut status = 0;
+        let mut reaped_here = false;
         loop {
             let result = unsafe { libc::waitpid(descendant, &mut status, libc::WNOHANG) };
             if result == descendant {
+                reaped_here = true;
+                break;
+            }
+            // When both processes are killed together, the shell can reap its
+            // terminated child before its own SIGKILL is delivered. Adoption is
+            // not required in that legal ordering, but disappearance still is.
+            if !kill_leader_first
+                && result == -1
+                && std::io::Error::last_os_error().raw_os_error() == Some(libc::ECHILD)
+            {
+                let gone = unsafe { libc::kill(descendant, 0) } == -1
+                    && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
+                assert!(
+                    gone,
+                    "a non-adopted descendant must be absent, not inaccessible"
+                );
                 break;
             }
             assert_eq!(
@@ -496,8 +513,10 @@ async fn owned_group_stop_worker() {
             );
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
-        assert!(libc::WIFSIGNALED(status));
-        assert_eq!(libc::WTERMSIG(status), libc::SIGKILL);
+        if reaped_here {
+            assert!(libc::WIFSIGNALED(status));
+            assert_eq!(libc::WTERMSIG(status), libc::SIGKILL);
+        }
         assert!(!alive(leader));
         assert!(!alive(descendant));
         // No cached PID/PGID is reused after reaping.

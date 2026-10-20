@@ -51,8 +51,7 @@ struct BootstrapState {
 }
 
 pub struct AppState {
-    server: Mutex<Option<Server>>,
-    child: Mutex<Option<Child>>,
+    pub runtime: crate::runtime_lifecycle::Lifecycle<Server, Child>,
     phase: Mutex<Phase>,
     logs: Mutex<VecDeque<String>>,
     tray: Mutex<Option<TrayIcon>>,
@@ -71,7 +70,6 @@ pub struct AppState {
     pub bootstrap_pgid: Mutex<Option<i32>>,
     pub zoom: Mutex<f64>,
     pub quitting: AtomicBool,
-    updating: AtomicBool,
 }
 
 pub struct BootstrapGuard(std::sync::Arc<Mutex<BootstrapState>>);
@@ -84,18 +82,14 @@ impl Drop for BootstrapGuard {
     }
 }
 
-pub struct UpdateGuard<'a>(&'a AtomicBool);
-impl Drop for UpdateGuard<'_> {
-    fn drop(&mut self) {
-        self.0.store(false, Ordering::SeqCst);
-    }
-}
+pub type RuntimePermit = crate::runtime_lifecycle::Permit<Server, Child>;
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            server: Mutex::new(None),
-            child: Mutex::new(None),
+            runtime: crate::runtime_lifecycle::Lifecycle::new(
+                crate::managed_child::kill_owned_child,
+            ),
             phase: Mutex::new(Phase::Idle),
             logs: Mutex::new(VecDeque::new()),
             tray: Mutex::new(None),
@@ -111,17 +105,14 @@ impl Default for AppState {
             bootstrap_pgid: Mutex::new(None),
             zoom: Mutex::new(1.0),
             quitting: AtomicBool::new(false),
-            updating: AtomicBool::new(false),
         }
     }
 }
 
 impl AppState {
-    pub fn begin_update(&self) -> Option<UpdateGuard<'_>> {
-        self.updating
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .ok()
-            .map(|_| UpdateGuard(&self.updating))
+    pub fn begin_update(&self) -> Result<RuntimePermit, crate::runtime_lifecycle::Refused> {
+        self.runtime
+            .try_begin(crate::runtime_lifecycle::Operation::Update)
     }
 
     /// One-shot ownership of a whole runtime-install command (installer plus
@@ -199,7 +190,7 @@ impl AppState {
     }
 
     pub fn is_updating(&self) -> bool {
-        self.updating.load(Ordering::SeqCst)
+        self.runtime.is_updating()
     }
 
     pub fn log(&self, message: impl Into<String>) {
@@ -212,13 +203,20 @@ impl AppState {
         }
     }
 
-    pub fn begin_prepare(&self) -> bool {
+    pub fn begin_prepare(
+        &self,
+    ) -> Result<Option<RuntimePermit>, crate::runtime_lifecycle::Refused> {
+        // Keep no-op preparation from advancing the revision of a queued window.
+        // Lock order is phase -> lifecycle; lifecycle never locks phase or GTK.
         let mut phase = self.phase.lock().expect("phase mutex");
         if matches!(*phase, Phase::Preparing | Phase::Ready) {
-            return false;
+            return Ok(None);
         }
+        let permit = self
+            .runtime
+            .try_begin(crate::runtime_lifecycle::Operation::Prepare)?;
         *phase = Phase::Preparing;
-        true
+        Ok(Some(permit))
     }
 
     pub fn ready(&self) {
@@ -235,24 +233,13 @@ impl AppState {
         *self.tray.lock().expect("tray mutex") = Some(tray);
     }
 
-    pub fn set_server(&self, server: Server) {
-        *self.server.lock().expect("server mutex") = Some(server);
-    }
-
     pub fn server(&self) -> Option<Server> {
-        self.server.lock().expect("server mutex").clone()
-    }
-
-    pub fn set_child(&self, child: Child) {
-        *self.child.lock().expect("child mutex") = Some(child);
-    }
-
-    pub fn take_child(&self) -> Option<Child> {
-        self.child.lock().expect("child mutex").take()
+        self.runtime.server()
     }
 
     pub fn shutdown(&self) {
         self.quitting.store(true, Ordering::SeqCst);
+        self.runtime.close();
         // Ask a running installer to stop cooperatively so its traps can remove
         // staged work and release the runtime lock.
         if let Some(pgid) = self.bootstrap_pgid().filter(|pgid| *pgid > 1) {
@@ -267,18 +254,6 @@ impl AppState {
                     libc::kill(-pgid, libc::SIGTERM);
                 }
             }
-        }
-        if let Some(mut child) = self.take_child() {
-            // Kill the child's whole group, not just node: a harness that started
-            // shells or tools would otherwise leave them running after Quit.
-            #[cfg(unix)]
-            if let Some(pid) = child.id() {
-                // SAFETY: negative pid targets only the group this child leads.
-                unsafe {
-                    libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
-                }
-            }
-            let _ = child.start_kill();
         }
     }
 
@@ -407,10 +382,44 @@ mod tests {
         let state = AppState::default();
         let guard = state.begin_update().unwrap();
         assert!(state.is_updating());
-        assert!(state.begin_update().is_none());
+        assert!(state.begin_update().is_err());
         drop(guard);
         assert!(!state.is_updating());
-        assert!(state.begin_update().is_some());
+        assert!(state.begin_update().is_ok());
+    }
+
+    #[test]
+    fn no_op_preparation_does_not_invalidate_its_queued_window() {
+        let state = AppState::default();
+        let permit = state.begin_prepare().unwrap().unwrap();
+        let window = permit.stamp();
+        assert!(state.begin_prepare().unwrap().is_none());
+        assert!(window.is_current());
+        assert_eq!(
+            state.begin_update().err(),
+            Some(crate::runtime_lifecycle::Refused::Busy(
+                crate::runtime_lifecycle::Operation::Prepare
+            ))
+        );
+        state.ready();
+        drop(permit);
+        assert!(state.begin_prepare().unwrap().is_none());
+        assert!(window.is_current());
+    }
+
+    #[test]
+    fn refused_preparation_leaves_phase_retryable_and_reuses_the_common_gate() {
+        let state = AppState::default();
+        let update = state.begin_update().unwrap();
+        assert!(state.begin_prepare().is_err());
+        assert!(matches!(*state.phase.lock().unwrap(), Phase::Idle));
+        drop(update);
+        let prepare = state.begin_prepare().unwrap().unwrap();
+        state.fail("synthetic window failure");
+        drop(prepare);
+        let retry = state.begin_prepare().unwrap().unwrap();
+        assert!(state.begin_update().is_err());
+        drop(retry);
     }
 
     #[test]

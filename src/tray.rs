@@ -253,15 +253,6 @@ pub fn install(app: &tauri::App) -> tauri::Result<TrayIcon> {
 }
 
 fn restart_server(app: &AppHandle) {
-    if app.state::<AppState>().is_updating() {
-        ui::message(
-            app,
-            "Update in progress",
-            "Wait for the runtime transaction to finish before restarting.",
-            gtk::MessageType::Warning,
-        );
-        return;
-    }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         if let Err(error) = service::restart_and_reload(&app).await {

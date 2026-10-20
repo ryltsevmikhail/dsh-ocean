@@ -62,6 +62,44 @@ created with `kill_on_drop(true)`.
 5. **Ready.** The setup window is hidden, the tray remains available, and a
    health monitor probes the server every 10 seconds.
 
+## In-process runtime operation admission
+
+Service preparation, manual restart, health recovery (child and systemd) and GUI
+runtime updates share a fail-fast exclusive reservation. The short metadata mutex
+holds only admission/revision/server/child ownership transitions: no mutex guard
+crosses an `await`, subprocess call or GTK operation. Repeated clicks return busy;
+there is no backlog of queued restarts. The update reservation covers preparation,
+worker completion and success/rollback reauthentication without nested admission.
+
+Each admitted operation advances a revision, even if it later fails. Health needs
+two failed observations from the same idle revision, then atomically admits recovery
+against that revision and probes again before acting. Healthy, busy, missing-server
+and stale observations reset the counter. Attached servers remain untouched by
+health recovery; inactive systemd units are started, active wedged units restarted.
+
+Child ownership and shutdown share the same metadata lock. A temporary lease keeps
+admission and restores the old handle on stop error/task unwind; replacement is
+refused while that lease exists. Successful stopping/reaping explicitly retires
+the old handle. Server/child publication is paired, rejects occupied ownership and
+refuses late publication after terminal close. A rejected child is stopped outside
+the lock. Window-only Retry validates/reuses an already owned child's actual origin
+and token, rather than probing the configured fixed port and provisioning again.
+
+GTK reload dispatch uses a revision stamp and a bounded ten-second acknowledgement.
+Admission remains owned while the async caller waits; GTK itself never waits for
+admission. A stale/closed callback skips navigation. This acknowledges dispatch,
+not page rendering/authentication success. A timeout is not rollback: if no newer
+operation/shutdown intervened, an already queued callback may still complete.
+No-op setup preparation does not advance the revision or invalidate its own window.
+
+This is not distributed arbitration: external CLI/service controllers and a detached
+worker that outlives the GUI are not locked by this in-memory reservation. Bootstrap
+installation keeps its existing installer gate/file lock; the service-preparation
+phase joins runtime admission, not the whole download transaction. Nor does RAII
+undo external side effects on cancellation: unpublished startup processes and
+independent workers still require their own supervision/cleanup. Existing group
+cleanup limits and data-migration rollback limits remain unchanged.
+
 ## Private runtime generations
 
 A candidate generation contains Node, the DSH npm prefix and pnpm together.
