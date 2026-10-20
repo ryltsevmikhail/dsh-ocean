@@ -9,6 +9,13 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+- Source builds select a checksum-verified local backport of the upstream
+  RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g iterator fix for GTK3-compatible
+  `glib 0.18.5`. The version is not disguised as 0.20; version-based alerts may
+  remain. CI verifies the exact source delta and actual optimized iterator values.
+  Crates.io publication is disabled because root Cargo patches do not propagate
+  to registry consumers. This is not a complete dependency/license audit.
+
 - Service preparation, manual restart, health recovery and runtime update now share
   one in-process admission gate. Overlapping requests are refused as busy rather
   than queued; stale health observations and obsolete window reloads are discarded.

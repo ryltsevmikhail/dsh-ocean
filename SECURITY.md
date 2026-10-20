@@ -57,6 +57,22 @@ a signed or audited release. See [release verification](docs/RELEASE_VERIFICATIO
 See [architecture](docs/ARCHITECTURE.md), [downloads](docs/DOWNLOADS.md) and
 [update testing](docs/UPDATE_TESTING.md) for precise contracts and acceptance limits.
 
+## GTK3 GLib binding backport
+
+Root source builds select a verified local `glib 0.18.5` backport of the two-line
+upstream fix for [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html)
+/ GHSA-wrw7-89jp-8q8g. GTK3/Tauri's Rust wrapper types require the 0.18 family;
+adding 0.20 alongside it would not remove the vulnerable instance. CI verifies all
+121 published files against a checksum-pinned archive, permits only that fix,
+preserves its MIT license and checks actual iterator values under optimization.
+
+A version-only scanner may still report 0.18.5. Do not disguise the version or
+silently dismiss the alert. No observed affected call-site is not a proof of
+non-reachability. The override applies at this Cargo workspace root only; registry
+publication is disabled until a strategy preserving the fix is reviewed. This
+backport does not certify other dependencies, system libraries or binary license
+redistribution; those remain separate review/release gates.
+
 ## Maintainer handling
 
 Acknowledge privately when possible, reproduce in isolation, assess affected
