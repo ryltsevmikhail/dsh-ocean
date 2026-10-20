@@ -1,0 +1,3 @@
+# Preserve the published crate bytes; the archive verifier, not reformatting,
+# enforces their integrity. The separate two-line patch remains reviewable.
+vendor/glib/** linguist-vendored -whitespace
