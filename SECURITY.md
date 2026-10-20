@@ -50,7 +50,9 @@ a signed or audited release. See [release verification](docs/RELEASE_VERIFICATIO
   Review the runtime manifest and third-party licenses. No production Ocean signing
   key, signed update feed or automatic shell updater is supplied.
 - Process-group cleanup does not contain descendants that deliberately escape the
-  group. Concurrent restart operations are a known follow-up, not an isolation guarantee.
+  group. Runtime operation admission is exclusive inside one Ocean process, not a
+  sandbox or a cross-process lock. Async cancellation is not rollback of external
+  effects; an independent update worker can outlive the GUI.
 
 See [architecture](docs/ARCHITECTURE.md), [downloads](docs/DOWNLOADS.md) and
 [update testing](docs/UPDATE_TESTING.md) for precise contracts and acceptance limits.

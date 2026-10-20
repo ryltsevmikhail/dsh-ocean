@@ -9,6 +9,13 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+- Service preparation, manual restart, health recovery and runtime update now share
+  one in-process admission gate. Overlapping requests are refused as busy rather
+  than queued; stale health observations and obsolete window reloads are discarded.
+  Update ownership includes reauthentication after success or rollback. Window-only
+  retries reuse an already owned healthy child instead of spawning a second one.
+  This is not cross-process coordination or rollback of cancelled external work.
+
 - Managed-child restart stops the owned process group before reaping its leader,
   including when the server leader has already died. This prevents same-group
   tools from surviving automatic recovery. If stopping cannot be confirmed, the

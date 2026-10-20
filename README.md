@@ -120,8 +120,9 @@ Read the [security policy](SECURITY.md) before exposing a server or sharing logs
 - The shell does not implement telemetry collection. DSH, providers, plugins and
   package/download services have their own network behavior and privacy policies.
 - Runtime rollback does **not** undo profile/session data migrations. Keep separate
-  backups. Existing restart operations are not serialized end-to-end; concurrent
-  manual and health-monitor restarts remain a known follow-up.
+  backups. In-process preparation, restart, recovery and update use an exclusive
+  admission gate; overlapping requests are refused as busy, not queued. This does
+  not coordinate separate CLI processes or undo an external worker's side effects.
 
 Report suspected vulnerabilities privately using [SECURITY.md](SECURITY.md), not
 an ordinary issue. This volunteer project does not promise a security-response SLA.

@@ -23,9 +23,12 @@ review for every change; do not claim it as an enforced control.
 ## Access and releases
 
 Grant the least repository permission needed, protect credentials and remove
-access that is no longer required. Prefer review branches and protected default
-branches. Actual GitHub protection settings must be checked separately from this
-policy; this document does not enable them.
+access that is no longer required. All ongoing changes, including documentation
+and automation, use a focused review branch and pull request, never a direct push
+to `main`. Each PR states its purpose, tests, risks and deliberate non-goals.
+Green CI or opening a PR does not authorize an agent to merge it: merging requires
+an explicit maintainer decision. Keep the default branch protected; actual GitHub
+settings must be checked separately from this policy, which does not enable them.
 
 Only maintainers authorize versions, release assets, signing keys and publication.
 Follow [RELEASING](docs/RELEASING.md). Never present local unsigned artifacts as

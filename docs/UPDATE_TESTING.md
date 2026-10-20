@@ -1,5 +1,33 @@
 # Runtime lifecycle and update validation
 
+## In-process admission regression tests
+
+```bash
+cargo test --locked --test runtime_lifecycle
+cargo test --locked --lib state::tests
+```
+
+The production coordinator is tested with fake server/child resources and Tokio
+oneshot barriers, not timing sleeps: all operation pairs are mutually exclusive,
+including the empty child slot during replacement and the refresh acknowledgement
+phase. Cases cover stop failure/unwind, task abort retaining a leased old handle,
+occupied/leased publication rejection, close before/after publication, a late
+update launch check, stale probes/callback stamps and same-revision health failures.
+State tests ensure no-op setup requests do not invalidate their pending window.
+
+These are resource/admission tests, not concurrent clicks in an actual Tauri app,
+real systemd update rollback or a real GTK ten-second timeout. Existing native
+Xvfb recovery and managed-child process-group tests supply separate end-to-end/OS
+coverage. The group-stop fixture permits a descendant to be reaped by its original
+shell when both are killed together; if adopted, its SIGKILL status is checked.
+The dead-leader-first case still requires adoption and exact reaping. Both cases
+require the leader and descendant to be gone, not merely a successful signal call.
+
+The in-memory gate does not roll back external side effects on task cancellation
+or coordinate a detached worker with another Ocean/CLI process. Bootstrap download
+ownership remains its existing separate lifecycle. Do not run opt-in service tests
+against the real user runtime merely to validate this admission change.
+
 The opt-in [integration test](../tests/real_service_update.rs) exercises actual
 npm runtime generations and the real user systemd manager. It is separate from
 the fast mock/fault tests in [generation_update.rs](../tests/generation_update.rs).
