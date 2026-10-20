@@ -155,6 +155,19 @@ pub async fn stop_child(child: &mut Child) -> Result<()> {
     Ok(())
 }
 
+/// Best-effort synchronous shutdown for an owned, unpublished/leased child.
+/// Async restart paths use stop_child so they can report failures and reap.
+pub(crate) fn kill_owned_child(mut child: Child) {
+    #[cfg(unix)]
+    if let Some(pgid) = child.id().and_then(|pid| libc::pid_t::try_from(pid).ok()) {
+        // SAFETY: start owns this group; an unreaped child reserves its identity.
+        unsafe {
+            libc::kill(-pgid, libc::SIGKILL);
+        }
+    }
+    let _ = child.start_kill();
+}
+
 async fn failed_start(child: &mut Child, message: &str) -> Result<ManagedChild> {
     if let Err(error) = stop_child(child).await {
         // Still attempt leader cleanup if group signalling failed; kill_on_drop

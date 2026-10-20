@@ -147,9 +147,6 @@ pub fn close_pairing(window: tauri::WebviewWindow, app: AppHandle) {
 #[tauri::command]
 pub async fn restart_service(window: tauri::WebviewWindow, app: AppHandle) -> Result<(), String> {
     require_window(&window, &["setup"])?;
-    if app.state::<AppState>().is_updating() {
-        return Err("A runtime update is in progress; wait before restarting.".to_owned());
-    }
     service::restart_and_reload(&app)
         .await
         .map_err(|error| format!("{error:#}"))

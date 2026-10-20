@@ -5,7 +5,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
 use crate::bootstrap::{self, Runtime};
-use crate::state::AppState;
+use crate::state::{AppState, RuntimePermit};
 use crate::{auth, config, runtime_update, service, systemd, ui};
 
 #[derive(Clone, Debug)]
@@ -154,7 +154,12 @@ fn present_update(app: &AppHandle, runtime: Runtime, info: UpdateInfo) {
     });
 }
 
-async fn perform_generation_update(app: AppHandle, runtime: Runtime, target: String) {
+async fn perform_generation_update(
+    app: AppHandle,
+    runtime: Runtime,
+    target: String,
+    permit: &RuntimePermit,
+) {
     let Some(base) = managed_update_base(&app) else {
         show_message(
             &app,
@@ -177,10 +182,16 @@ async fn perform_generation_update(app: AppHandle, runtime: Runtime, target: Str
         }
     };
     app.state::<AppState>().log(format!(
-        "Starting background transaction {}; log: {}",
+        "Prepared background transaction {}; log: {}",
         task.unit,
         task.log.display()
     ));
+    // Preparation may run while Quit closes admission on GTK's thread.
+    if let Err(error) = permit.ensure_open() {
+        app.state::<AppState>()
+            .log(format!("DSH update launch refused: {error}"));
+        return;
+    }
     let result = task.command.output().await;
     let tail = runtime_update::log_tail(&task.log);
     for line in tail.lines() {
@@ -188,7 +199,7 @@ async fn perform_generation_update(app: AppHandle, runtime: Runtime, target: Str
     }
     match result {
         Ok(output) if output.status.success() => {
-            let refresh = service::refresh_after_update(&app).await;
+            let refresh = service::refresh_after_update(&app, permit).await;
             let extra = refresh
                 .err()
                 .map(|e| {
@@ -201,7 +212,7 @@ async fn perform_generation_update(app: AppHandle, runtime: Runtime, target: Str
             // A failed activation may have restarted the restored old unit.
             // Reauthenticate only; never trigger another restart here.
             if systemd::is_active() {
-                let _ = service::refresh_after_update(&app).await;
+                let _ = service::refresh_after_update(&app, permit).await;
             }
             let detail = match other {
                 Ok(output) => format!(
@@ -227,20 +238,23 @@ async fn perform_generation_update(app: AppHandle, runtime: Runtime, target: Str
 
 async fn perform_update(app: AppHandle, runtime: Runtime, target: String) {
     let state = app.state::<AppState>();
-    let Some(_guard) = state.begin_update() else {
-        show_message(
-            &app,
-            "Update already in progress",
-            "Wait for the current transaction to finish.",
-            gtk::MessageType::Warning,
-        );
-        return;
+    let permit = match state.begin_update() {
+        Ok(permit) => permit,
+        Err(error) => {
+            show_message(
+                &app,
+                "Runtime busy",
+                &error.to_string(),
+                gtk::MessageType::Warning,
+            );
+            return;
+        }
     };
     if !runtime.is_generation_managed() {
         show_message(&app, "External installation", "Ocean does not overwrite external npm prefixes. Update with the original package manager; safe migration to private generations is not implemented yet.", gtk::MessageType::Warning);
         return;
     }
-    perform_generation_update(app.clone(), runtime, target).await;
+    perform_generation_update(app.clone(), runtime, target, &permit).await;
 }
 
 fn show_message(app: &AppHandle, title: &'static str, body: &str, kind: gtk::MessageType) {
