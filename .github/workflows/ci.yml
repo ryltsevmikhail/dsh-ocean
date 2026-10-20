@@ -26,6 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      - name: Verify exact vendored GLib source and Cargo selection
+        run: python3 -B scripts/check-glib-backport.py
+
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -62,6 +65,9 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      - name: Verify exact vendored GLib source and Cargo selection
+        run: python3 -B scripts/check-glib-backport.py
+
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -84,6 +90,15 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      - name: Verify GLib against checksum-pinned published archive
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --tlsv1.2 --max-time 60 --retry 2 \
+            https://static.crates.io/crates/glib/glib-0.18.5.crate \
+            --output "$RUNNER_TEMP/glib-0.18.5.crate"
+          python3 -B scripts/check-glib-backport.py --archive "$RUNNER_TEMP/glib-0.18.5.crate"
+          python3 -B -m unittest discover -s tests -p 'test_glib_backport.py' -v
 
       - name: Format
         run: cargo fmt --check
@@ -228,6 +243,9 @@ jobs:
 
       - name: Release build
         run: cargo build --locked --release
+
+      - name: Optimized GLib iterator security regression (headless)
+        run: cargo run --locked --release --example glib_variant_iter_regression
 
       - name: CLI smoke
         run: ./target/release/dsh-ocean --version
