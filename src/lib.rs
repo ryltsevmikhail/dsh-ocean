@@ -1,0 +1,60 @@
+//! DSH Ocean — a native desktop shell for DeepSeek Harness.
+//!
+//! The library target keeps the service, authentication and bootstrap logic
+//! testable without starting a Tauri window. The binary target owns the GTK
+//! event loop and the webview.
+
+pub mod auth;
+pub mod backup_export;
+pub mod backup_export_ui;
+pub mod backup_staging;
+pub mod bootstrap;
+pub mod bootstrap_supervisor;
+pub mod commands;
+pub mod config;
+pub mod data_backup;
+pub mod data_snapshot_ui;
+pub mod diagnostics;
+pub mod doctor;
+pub mod download_chooser;
+pub mod download_engine;
+pub mod download_history;
+pub mod download_ui;
+pub mod downloads;
+pub mod exposure_plan;
+pub mod http;
+pub mod managed_child;
+pub mod navigation;
+pub mod notification_ui;
+pub mod notifications;
+pub mod pairing_plan;
+pub mod pairing_proxy;
+pub mod plugins_ui;
+pub mod profile_backup;
+pub mod profile_cli;
+pub mod profile_history_ui;
+pub mod profile_ui;
+pub mod profile_verify_ui;
+pub mod release_cli;
+pub mod release_draft_cli;
+pub mod release_feed;
+pub mod release_state;
+pub mod remote;
+pub mod runtime_maintenance;
+pub mod runtime_update;
+pub mod service;
+pub mod session_inventory;
+pub mod shell_apply;
+pub mod shell_status;
+pub mod shell_status_ui;
+pub mod single_instance;
+pub mod state;
+pub mod storage_ui;
+pub mod systemd;
+pub mod task_notifications;
+pub mod tray;
+pub mod ui;
+pub mod update;
+pub mod util;
+pub mod webkit_abi;
+pub mod windows;

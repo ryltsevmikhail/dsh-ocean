@@ -1,0 +1,261 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# GTK/WebKit plus many integration binaries can exhaust a hosted runner when
+# debug symbols and incremental state are kept alongside the release build.
+# Keep assertions/checks enabled; only omit debugger data and incremental caches.
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  # The declared MSRV in Cargo.toml is a promise to users who build from
+  # source; check it separately so a stable-only feature cannot sneak in.
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            pkg-config \
+            patchelf
+
+      - name: Read the declared MSRV
+        id: msrv
+        run: |
+          version="$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+          test -n "$version" || { echo "Cargo.toml has no rust-version" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master (explicit MSRV below)
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: msrv-${{ steps.msrv.outputs.version }}
+
+      - name: Build every target on the declared MSRV
+        run: cargo check --locked --all-targets
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            pkg-config \
+            patchelf \
+            xvfb \
+            dbus-x11 \
+            x11-utils
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --locked
+
+      - name: Build disk usage
+        if: always()
+        run: |
+          df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+          if [ -d target ]; then du -sh target; fi
+
+      - name: Native packaging, X11 fixture and pinned tool intake tests
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_package_*.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_x11_close.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_source_install.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_make_targets.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_gui_child_fixture.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_child_recovery_smoke.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_branding.py' -v
+
+      - name: Shell script lint
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck -x -S warning scripts/*.sh packaging/*.sh
+
+      - name: Changelog covers the current version
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+          test -n "$version"
+          grep -q "^## $version$" CHANGELOG.md || {
+            echo "CHANGELOG.md has no '## $version' section" >&2
+            exit 1
+          }
+
+      - name: Task observer and offline signer tests
+        run: node --test tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs
+
+      - name: Private desktop notification bus
+        run: timeout --kill-after=5s 45s bash scripts/test-native.sh cargo test --locked --test desktop_notifications -- --ignored --test-threads=1 --nocapture
+
+      - name: Native app launch smoke
+        run: |
+          cargo build --locked --bin dsh-ocean
+          timeout --kill-after=5s 60s bash scripts/test-native.sh xvfb-run -a bash scripts/smoke-app-launch.sh target/debug/dsh-ocean
+        env:
+          SMOKE_EXPECT_WINDOW: "1"
+
+      - name: Managed-child GUI fallback recovery and cleanup (controlled HTTP fixture)
+        env:
+          DSH_OCEAN_TEST_XVFB: "1"
+          GDK_BACKEND: x11
+          NO_AT_BRIDGE: "1"
+          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          # Only this private Xvfb fixture disables the WebKit sandbox.
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
+        run: |
+          ulimit -c 0
+          timeout --kill-after=15s 150s bash scripts/test-native.sh xvfb-run -a \
+            python3 -B scripts/smoke-child-recovery.py "$PWD/target/debug/dsh-ocean"
+
+      - name: Actual GTK download, shell and backup verification dialogs
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_DIALOGS: "1"
+        run: |
+          timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui -- --ignored --test-threads=1 --nocapture
+          # Fresh private display/data per run. A failed first run is not retried/ignored.
+          for attempt in 1 2; do
+            timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test profile_verify_ui -- --ignored --test-threads=1 --nocapture
+          done
+
+      - name: Shipped setup and pairing pages
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_DIALOGS: "1"
+          # The page fixtures realize the webview in a real window: WebKit script
+          # execution is unreliable on a CI display for an unmapped view, which is
+          # what made these binaries intermittently time out.
+          DSH_OCEAN_TEST_MAP_WEBVIEW: "1"
+          NO_AT_BRIDGE: "1"
+          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
+        run: |
+          # One private display, D-Bus session and Xvfb process per page test: a
+          # shared session leaves the second WebKit process without a usable web
+          # process and it never finishes loading.
+          #
+          # WebKit's first load on a fresh CI runner is intermittently slow; each
+          # binary therefore runs in a fresh native session and a second, identical
+          # attempt runs only after a first failure (a real failure fails twice).
+          run_page_test() {
+            for attempt in 1 2; do
+              if timeout --kill-after=5s 60s bash scripts/test-native.sh xvfb-run -a \
+                cargo test --locked --test "$1" -- --ignored --test-threads=1 --nocapture; then
+                return 0
+              fi
+              echo "attempt $attempt of $1 failed" >&2
+            done
+            return 1
+          }
+          run_page_test ui_assets
+          run_page_test setup_contract
+          run_page_test pairing_contract
+
+      - name: Native WebKit downloads and cross-context cancellation
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_MAP_WEBVIEW: "1"
+          DSH_OCEAN_TEST_DIALOGS: "1"
+          NO_AT_BRIDGE: "1"
+          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+          # Controlled ephemeral fixture only; never set by the shipped client.
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
+        run: |
+          ulimit -c 0
+          timeout --kill-after=5s 90s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test webkit_downloads --test webkit_multi_downloads -- --ignored --test-threads=1 --nocapture
+          # Repeat the nested/concurrent regression without a debugger in a
+          # fresh private XDG/D-Bus/Xvfb process, not by ignoring a first failure.
+          timeout --kill-after=5s 60s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test webkit_multi_downloads -- --ignored --test-threads=1 --nocapture
+
+      - name: Native task status notification smoke
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_MAP_WEBVIEW: "1"
+          DSH_OCEAN_TEST_PRIVATE_BUS: "1"
+          NO_AT_BRIDGE: "1"
+          GIO_USE_VFS: local
+          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+          # Isolated fixture only, not a production setting.
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
+        run: timeout --kill-after=5s 60s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test task_notifications -- --ignored --test-threads=1 --nocapture
+
+      - name: Release build
+        run: cargo build --locked --release
+
+      - name: CLI smoke
+        run: ./target/release/dsh-ocean --version
+
+      - name: Actual portable tar allowlist and headless smoke
+        run: python3 -B tests/test_package_tar.py --real-smoke
+
+      - name: Actual Debian metadata and headless smoke (no install)
+        run: |
+          command -v ar
+          command -v dpkg-deb
+          python3 -B tests/test_package_deb.py --real-smoke
+
+      - name: Actual AppDir headless smoke (no external tool or image)
+        run: python3 -B tests/test_package_appimage.py --real-appdir-smoke
+
+      - name: Trusted tar fresh install in disposable private HOME (no services)
+        run: python3 -B tests/test_package_install.py --real-smoke
+
+      - name: Validate runtime manifest
+        run: jq -e '.schema == 1 and .node.archives["linux-x64"].sha256 and .dsh.version' runtime-manifest.json
+
+      - name: Bootstrap check
+        run: |
+          tmp="$(mktemp -d)"
+          export DSH_NODE_VERSION="$(jq -r '.node.version' runtime-manifest.json)"
+          export DSH_NODE_SHA256="$(jq -r '.node.archives["linux-x64"].sha256' runtime-manifest.json)"
+          export DSH_VERSION="$(jq -r '.dsh.version' runtime-manifest.json)"
+          export DSH_PNPM_VERSION="$(jq -r '.pnpm.version' runtime-manifest.json)"
+          DSH_OCEAN_DATA_DIR="$tmp" bash scripts/bootstrap-runtime.sh --check
+          rm -rf "$tmp"

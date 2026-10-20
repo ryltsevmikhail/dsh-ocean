@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=DSH Ocean
+GenericName=AI coding agent
+Comment=Native desktop client for DeepSeek Harness
+Exec=dsh-ocean
+Icon=dsh-ocean
+Terminal=false
+Categories=Development;
+Keywords=DeepSeek;Harness;AI;Agent;Coding;
+StartupWMClass=dsh-ocean
+StartupNotify=true

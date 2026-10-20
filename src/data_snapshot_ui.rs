@@ -1,0 +1,443 @@
+//! Tray flow for creating a whole-data snapshot (sessions + shared stores).
+//!
+//! Snapshotting is read-only with respect to the source tree but can copy
+//! gigabytes, so it asks first, shows what will be copied (counts/bytes only),
+//! refuses a second concurrent run, and reports the result without exposing file
+//! names or contents. Restoring stays an explicit offline CLI operation.
+use std::os::unix::fs::DirBuilderExt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+
+use gtk::glib;
+use gtk::prelude::*;
+use tauri::{AppHandle, Manager};
+
+use crate::session_inventory::{self, Summary};
+
+pub const TITLE: &str = "DSH Ocean data snapshot";
+
+/// Confirmation body: counts and bytes only, never a file name.
+pub fn confirmation_text(summary: &Summary) -> String {
+    let total = summary.session_bytes + summary.storage_bytes;
+    format!(
+        "Copy sessions and shared stores into a new snapshot?\n\n\
+         Sessions: {} file(s), {} bytes\n\
+         Shared stores: {} file(s), {} bytes\n\
+         Total to copy: {} bytes\n\n\
+         The copies go to the configured backup folder and can be several gigabytes; \
+         make sure that folder has free space. The live data is only read, never moved \
+         or deleted, and DSH may keep writing while the copy runs, so this is a \
+         point-in-time best-effort copy rather than a frozen one.\n\n\
+         Restoring a snapshot is an explicit offline command and is not offered here.",
+        summary.session_files,
+        summary.session_bytes,
+        summary.storage_files,
+        summary.storage_bytes,
+        total
+    )
+}
+
+pub fn result_text(files: usize, bytes: u64) -> String {
+    format!(
+        "Snapshot created: {files} file(s), {bytes} bytes.\n\n\
+         Verify it with `dsh-ocean --verify-data-backup <snapshot>`; the snapshot may \
+         contain conversation content, so keep the backup folder private."
+    )
+}
+
+/// Shown in addition to [`result_text`] when the source changed during the copy.
+pub const INCONSISTENT_TEXT: &str =
+    "Note: sessions or stores changed while the copy ran, so this is a best-effort point-in-time copy. Stop DSH writers for a frozen snapshot.";
+
+/// Terminal outcome computed by the worker.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    Created {
+        files: usize,
+        bytes: u64,
+        consistent: bool,
+    },
+    Cancelled,
+    Failed,
+}
+
+/// Mutable progress shared between the worker and the GTK timer.
+///
+/// The worker never touches a GTK object: it only records counters, the outcome
+/// and whether cancellation was requested. The timer owns all widget updates.
+#[derive(Default)]
+pub struct ProgressState {
+    pub copied_files: usize,
+    pub copied_bytes: u64,
+    pub total_bytes: u64,
+    pub cancel_requested: bool,
+    pub outcome: Option<Outcome>,
+}
+
+pub const FAILURE_TEXT: &str =
+    "The snapshot could not be created. Existing snapshots and live data were not changed.";
+pub const CANCELLED_TEXT: &str = "The snapshot was cancelled. Live data was not changed; an incomplete staging copy was removed.";
+
+struct Gate(Arc<AtomicBool>);
+impl Drop for Gate {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+fn begin(flag: &Arc<AtomicBool>) -> Option<Gate> {
+    flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .ok()
+        .map(|_| Gate(flag.clone()))
+}
+
+pub struct Window {
+    pub dialog: gtk::Dialog,
+    pub label: gtk::Label,
+    pub accept: gtk::Button,
+}
+
+pub struct ProgressWindow {
+    pub dialog: gtk::Dialog,
+    pub label: gtk::Label,
+    pub cancel: gtk::Button,
+}
+
+/// Progress dialog with an explicit cancel action; counts only.
+pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
+    let dialog = gtk::Dialog::with_buttons(
+        Some(TITLE),
+        parent,
+        gtk::DialogFlags::MODAL,
+        &[("Cancel snapshot", gtk::ResponseType::Cancel)],
+    );
+    dialog.set_default_size(520, 180);
+    let label = gtk::Label::new(Some(&data_backup_progress_text(&ProgressState::default())));
+    label.set_use_markup(false);
+    label.set_selectable(true);
+    label.set_line_wrap(true);
+    label.set_xalign(0.0);
+    label.set_margin_start(18);
+    label.set_margin_end(18);
+    label.set_margin_top(18);
+    dialog.content_area().pack_start(&label, false, false, 0);
+    let cancel = dialog
+        .widget_for_response(gtk::ResponseType::Cancel)
+        .expect("cancel button")
+        .downcast::<gtk::Button>()
+        .expect("cancel button is a gtk button");
+    ProgressWindow {
+        dialog,
+        label,
+        cancel,
+    }
+}
+
+fn data_backup_progress_text(state: &ProgressState) -> String {
+    let progress = crate::data_backup::SnapshotProgress {
+        copied_files: state.copied_files,
+        copied_bytes: state.copied_bytes,
+        total_bytes: state.total_bytes,
+    };
+    let mut text = progress.text();
+    if state.cancel_requested {
+        text.push_str(
+            "\n\nCancellation requested; the copy stops after the current file and the staging copy is removed.",
+        );
+    }
+    text
+}
+
+/// Confirmation dialog with an explicit Accept button (no default action).
+pub fn build_confirm(parent: Option<&gtk::Window>, body: &str) -> Window {
+    let dialog = gtk::Dialog::with_buttons(
+        Some(TITLE),
+        parent,
+        gtk::DialogFlags::MODAL,
+        &[
+            ("Cancel", gtk::ResponseType::Cancel),
+            ("Create snapshot", gtk::ResponseType::Accept),
+        ],
+    );
+    dialog.set_default_size(620, 380);
+    let label = gtk::Label::new(Some(body));
+    label.set_use_markup(false);
+    label.set_selectable(true);
+    label.set_line_wrap(true);
+    label.set_max_width_chars(78);
+    label.set_xalign(0.0);
+    label.set_yalign(0.0);
+    label.set_margin_start(18);
+    label.set_margin_end(18);
+    label.set_margin_top(18);
+    label.set_margin_bottom(18);
+    let scroll = gtk::ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
+    scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+    scroll.add(&label);
+    dialog.content_area().pack_start(&scroll, true, true, 0);
+    let accept = dialog
+        .widget_for_response(gtk::ResponseType::Accept)
+        .expect("accept button")
+        .downcast::<gtk::Button>()
+        .expect("accept button is a gtk button");
+    Window {
+        dialog,
+        label,
+        accept,
+    }
+}
+
+pub fn show(app: &AppHandle) {
+    let parent = app
+        .get_webview_window("main")
+        .and_then(|window| window.gtk_window().ok());
+    let summary = session_inventory::inventory(&crate::config::dsh_home());
+    let window = build_confirm(
+        parent.as_ref().map(|parent| parent.upcast_ref()),
+        &confirmation_text(&summary),
+    );
+    let handle = app.clone();
+    let accept = window.accept.clone();
+    window.dialog.connect_response(move |dialog, response| {
+        if response != gtk::ResponseType::Accept {
+            dialog.close();
+            return;
+        }
+        accept.set_sensitive(false);
+        let Some(gate) = begin(&handle.state::<crate::state::AppState>().data_snapshot) else {
+            crate::ui::message(
+                &handle,
+                "Snapshot already running",
+                "A data snapshot is already being created in this session.",
+                gtk::MessageType::Info,
+            );
+            dialog.close();
+            return;
+        };
+        dialog.close();
+        // The worker only touches this shared state; the timer below owns every
+        // widget, so no GTK object ever crosses a thread boundary.
+        let shared = Arc::new(Mutex::new(ProgressState::default()));
+        let progress_window = build_progress(parent.as_ref().map(|parent| parent.upcast_ref()));
+        progress_window.dialog.show_all();
+        let cancel_state = shared.clone();
+        // Cancelling requests a stop but keeps the progress window alive: the timer
+        // renders the terminal outcome there, and closing it would discard the
+        // final "staging copy removed" message.
+        progress_window
+            .dialog
+            .connect_response(move |dialog, response| {
+                if response == gtk::ResponseType::Cancel {
+                    let mut state = cancel_state
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner());
+                    if state.outcome.is_none() {
+                        state.cancel_requested = true;
+                    }
+                    if let Some(button) = dialog.widget_for_response(gtk::ResponseType::Cancel) {
+                        button.set_sensitive(false);
+                    }
+                }
+            });
+        // Closing the window with the WM button asks for the same cooperative stop
+        // instead of destroying the only view of a running copy.
+        {
+            let cancel_state = shared.clone();
+            progress_window.dialog.connect_delete_event(move |_, _| {
+                let mut state = cancel_state
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                if state.outcome.is_none() {
+                    state.cancel_requested = true;
+                }
+                gtk::glib::Propagation::Stop
+            });
+        }
+        let weak_dialog = progress_window.dialog.downgrade();
+        let weak_label = progress_window.label.downgrade();
+        let timer_state = shared.clone();
+        let timer_app = handle.clone();
+        glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
+            let (Some(dialog), Some(label)) = (weak_dialog.upgrade(), weak_label.upgrade()) else {
+                return glib::ControlFlow::Break;
+            };
+            let outcome = {
+                let state = timer_state
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                label.set_text(&data_backup_progress_text(&state));
+                state.outcome
+            };
+            let Some(outcome) = outcome else {
+                return glib::ControlFlow::Continue;
+            };
+            dialog.close();
+            match outcome {
+                Outcome::Created {
+                    files,
+                    bytes,
+                    consistent,
+                } => {
+                    let mut body = result_text(files, bytes);
+                    if !consistent {
+                        body.push_str("\n\n");
+                        body.push_str(INCONSISTENT_TEXT);
+                    }
+                    crate::ui::message(
+                        &timer_app,
+                        "Snapshot created",
+                        &body,
+                        if consistent {
+                            gtk::MessageType::Info
+                        } else {
+                            gtk::MessageType::Warning
+                        },
+                    )
+                }
+                Outcome::Cancelled => crate::ui::message(
+                    &timer_app,
+                    "Snapshot cancelled",
+                    CANCELLED_TEXT,
+                    gtk::MessageType::Info,
+                ),
+                Outcome::Failed => crate::ui::message(
+                    &timer_app,
+                    "Snapshot not created",
+                    FAILURE_TEXT,
+                    gtk::MessageType::Warning,
+                ),
+            }
+            glib::ControlFlow::Break
+        });
+
+        let worker_state = shared.clone();
+        // Copying can take a long time; never do it on the GTK thread.
+        tauri::async_runtime::spawn_blocking(move || {
+            let _gate = gate;
+            let backups = crate::config::profile_backup_dir();
+            let result = std::fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&backups)
+                .map_err(anyhow::Error::from)
+                .and_then(|()| {
+                    crate::data_backup::snapshot_with_progress(
+                        &crate::config::dsh_home(),
+                        &backups,
+                        crate::bootstrap::detect().map(|runtime| runtime.version),
+                        &mut |update| {
+                            let mut state = worker_state
+                                .lock()
+                                .unwrap_or_else(|error| error.into_inner());
+                            state.copied_files = update.copied_files;
+                            state.copied_bytes = update.copied_bytes;
+                            state.total_bytes = update.total_bytes;
+                            anyhow::ensure!(!state.cancel_requested, "snapshot cancelled");
+                            Ok(())
+                        },
+                    )
+                })
+                .and_then(|path| {
+                    crate::data_backup::manifest(&path).map(|manifest| {
+                        (
+                            manifest.files.len(),
+                            manifest.total_bytes(),
+                            manifest.consistent,
+                        )
+                    })
+                });
+            let outcome = match result {
+                Ok((files, bytes, consistent)) => Some(Outcome::Created {
+                    files,
+                    bytes,
+                    consistent,
+                }),
+                Err(error) => {
+                    let cancelled = format!("{error:#}").contains("cancelled");
+                    Some(if cancelled {
+                        Outcome::Cancelled
+                    } else {
+                        Outcome::Failed
+                    })
+                }
+            };
+            let mut state = worker_state
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            if state.cancel_requested {
+                state.outcome = Some(Outcome::Cancelled);
+            } else {
+                state.outcome = outcome;
+            }
+        });
+    });
+    window.dialog.show_all();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn summary(
+        session_files: usize,
+        session_bytes: u64,
+        storage_files: usize,
+        storage_bytes: u64,
+    ) -> Summary {
+        Summary {
+            session_files,
+            session_bytes,
+            storage_files,
+            storage_bytes,
+            skipped: 2,
+            truncated: false,
+            error: None,
+        }
+    }
+
+    #[test]
+    fn confirmation_is_count_only_and_warns_about_space_and_freeze() {
+        let text = confirmation_text(&summary(3, 1_000, 2, 500));
+        assert!(text.contains("Sessions: 3 file(s), 1000 bytes"), "{text}");
+        assert!(
+            text.contains("Shared stores: 2 file(s), 500 bytes"),
+            "{text}"
+        );
+        assert!(text.contains("Total to copy: 1500 bytes"), "{text}");
+        assert!(text.contains("several gigabytes"), "{text}");
+        assert!(text.contains("point-in-time best-effort"), "{text}");
+        assert!(text.contains("only read, never moved"), "{text}");
+        assert!(text.contains("not offered here"), "{text}");
+        // No file names, paths or delete affordances.
+        assert!(!text.contains("/home") && !text.contains("session.jsonl"));
+        assert!(!text.contains("Delete"));
+    }
+
+    #[test]
+    fn progress_state_renders_counts_and_cancellation_honestly() {
+        let mut state = ProgressState::default();
+        assert!(data_backup_progress_text(&state).contains("Copying"));
+        state.total_bytes = 1_000;
+        state.copied_bytes = 500;
+        state.copied_files = 3;
+        let text = data_backup_progress_text(&state);
+        assert!(text.contains("500 of 1000 bytes (50%)"), "{text}");
+        assert!(text.contains("3 file(s)"), "{text}");
+        state.cancel_requested = true;
+        let text = data_backup_progress_text(&state);
+        assert!(text.contains("Cancellation requested"), "{text}");
+        assert!(text.contains("staging copy is removed"), "{text}");
+        // No GTK object is needed to render progress, and no path leaks.
+        assert!(!text.contains('/'));
+    }
+
+    #[test]
+    fn result_and_failure_texts_never_forward_paths_or_backend_errors() {
+        let text = result_text(4, 2_048);
+        assert!(text.contains("4 file(s), 2048 bytes"), "{text}");
+        assert!(!text.contains("/home") && !text.contains("dsh/sessions"));
+        assert!(FAILURE_TEXT.contains("not changed"));
+        assert!(CANCELLED_TEXT.contains("removed"));
+        assert!(!FAILURE_TEXT.contains('/') && !CANCELLED_TEXT.contains('/'));
+    }
+}

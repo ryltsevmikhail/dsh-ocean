@@ -1,0 +1,43 @@
+# Maintainer: DSH Ocean contributors
+pkgname=dsh-ocean
+pkgver=0.1.1
+pkgrel=1
+pkgdesc="DSH Ocean — native desktop client for the DeepSeek Harness web UI"
+arch=('x86_64' 'aarch64')
+url="https://github.com/ryltsevmikhail/dsh-ocean"
+license=('MIT')
+depends=('gtk3' 'webkit2gtk-4.1' 'libayatana-appindicator')
+makedepends=('cargo')
+options=('!lto')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  cargo build --release --locked
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  install -Dm755 target/release/dsh-ocean "$pkgdir/usr/bin/dsh-ocean"
+
+  for size in 32 64 128 256 512; do
+    case "$size" in
+      32) icon="icons/32x32.png" ;;
+      64) icon="icons/64x64.png" ;;
+      128) icon="icons/128x128.png" ;;
+      256) icon="icons/128x128@2x.png" ;;
+      512) icon="icons/icon.png" ;;
+    esac
+    install -Dm644 "$icon" \
+      "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/dsh-ocean.png"
+  done
+
+  install -Dm644 packaging/dsh-ocean.desktop \
+    "$pkgdir/usr/share/applications/dev.dsh.ocean.desktop"
+  sed -i 's|^Exec=.*|Exec=/usr/bin/dsh-ocean|' \
+    "$pkgdir/usr/share/applications/dev.dsh.ocean.desktop"
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 NOTICE "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+}

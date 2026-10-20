@@ -1,0 +1,20 @@
+name: Feature request
+description: Propose a focused improvement to the Ocean desktop shell.
+title: "[Feature]: "
+body:
+  - type: textarea
+    attributes:
+      label: Problem to solve
+      description: Explain the user need without private data. Please search existing requests first.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed solution
+      description: Include alternatives and explain why this belongs in Ocean rather than upstream DSH or a plugin.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Scope and trade-offs
+      description: Consider permissions, security, platforms, compatibility and maintenance cost.

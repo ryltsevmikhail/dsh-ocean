@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DSH Ocean</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d12;
+        --panel: #121620;
+        --panel-2: #171c28;
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #eef1f7;
+        --muted: #99a3b7;
+        --accent: #6d86ff;
+        --ok: #45d19a;
+        --warn: #f1b45d;
+        --err: #ff7b8a;
+        font-family: "Inter", "Cantarell", "Segoe UI", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        color: var(--text);
+        background:
+          radial-gradient(900px 500px at 50% -20%, rgba(77, 107, 254, 0.26), transparent 70%),
+          var(--bg);
+        overflow: hidden;
+      }
+      .app {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 28px 32px 22px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .logo {
+        width: 54px;
+        height: 54px;
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.38);
+      }
+      h1 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+      header p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+      .spacer { flex: 1; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.035);
+        border-radius: 999px;
+        padding: 7px 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+      .dot.preparing { background: var(--warn); animation: breathe 1s ease-in-out infinite alternate; }
+      .dot.ready { background: var(--ok); }
+      .dot.failed { background: var(--err); }
+      @keyframes breathe { from { opacity: 0.4; } to { opacity: 1; } }
+      .status {
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent), var(--panel);
+        border-radius: 16px;
+        padding: 18px 20px;
+      }
+      .status h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+      .status p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+      .status .details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin-top: 12px;
+        color: #7f8aa3;
+        font-size: 11.5px;
+        font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace;
+      }
+      .status.error { border-color: rgba(255, 123, 138, 0.35); background: linear-gradient(180deg, rgba(255, 123, 138, 0.08), transparent), var(--panel); }
+      .logwrap {
+        flex: 1;
+        min-height: 90px;
+        border: 1px solid var(--line);
+        background: #0e1118;
+        border-radius: 14px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .loghead {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      pre {
+        margin: 0;
+        padding: 12px 14px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #aab4c8;
+        font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace;
+        font-size: 11.5px;
+        line-height: 1.55;
+      }
+      .actions { display: flex; flex-wrap: wrap; gap: 9px; }
+      button {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 9px 13px;
+        font-size: 12.5px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 140ms ease, border-color 140ms ease, opacity 140ms ease;
+      }
+      button:hover { background: #1d2434; border-color: rgba(255, 255, 255, 0.16); }
+      button.primary {
+        background: var(--accent);
+        border-color: transparent;
+        color: white;
+      }
+      button.primary:hover { background: #7d94ff; }
+      button.ghost { background: transparent; color: var(--muted); }
+      button:disabled { opacity: 0.45; cursor: default; }
+      .hidden { display: none !important; }
+      footer { color: #6f7a91; font-size: 11px; display: flex; gap: 14px; }
+      @media (max-width: 620px) {
+        .app { padding: 20px; gap: 14px; }
+        .logo { width: 44px; height: 44px; }
+        h1 { font-size: 18px; }
+        .pill { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <img class="logo" src="./dsh-icon.svg" alt="" />
+        <div>
+          <h1>DSH Ocean</h1>
+          <p>DeepSeek Harness desktop client</p>
+        </div>
+        <div class="spacer"></div>
+        <div class="pill"><span id="dot" class="dot"></span><span id="phase">Starting</span></div>
+      </header>
+
+      <section id="status" class="status">
+        <h2 id="status-title">Connecting to DSH…</h2>
+        <p id="status-text">Looking for a running DeepSeek Harness server and its launch token.</p>
+        <div class="details">
+          <span id="runtime">runtime: detecting…</span>
+          <span id="server">server: —</span>
+        </div>
+      </section>
+
+      <section class="logwrap">
+        <div class="loghead"><span>Startup log</span><span id="log-count">0 lines</span></div>
+        <pre id="log" aria-live="polite"></pre>
+      </section>
+
+      <div class="actions">
+        <button id="retry" class="primary hidden" type="button">Retry</button>
+        <button id="install" class="primary hidden" type="button">Install runtime</button>
+        <button id="cancel-install" class="hidden" type="button">Cancel install</button>
+        <button id="diagnostics" type="button">Save diagnostics</button>
+        <button id="folder" class="ghost" type="button">Open diagnostics folder</button>
+        <div class="spacer"></div>
+        <button id="quit" class="ghost" type="button">Quit</button>
+      </div>
+
+      <footer>
+        <span id="config">config: —</span>
+        <span id="diagnostics-path"></span>
+      </footer>
+    </main>
+
+    <script>
+      const invoke = (cmd, args = {}) => {
+        if (!window.__TAURI_INTERNALS__ || !window.__TAURI_INTERNALS__.invoke) {
+          return Promise.reject(new Error("Tauri IPC is unavailable"));
+        }
+        return window.__TAURI_INTERNALS__.invoke(cmd, args);
+      };
+
+      const el = (id) => document.getElementById(id);
+      let autoStarted = false;
+      let lastLogText = null;
+      let busy = false;
+      // True while start_bootstrap is in flight in this webview.
+      let installing = false;
+
+      function setPhase(phase, message) {
+        const labels = { idle: "Waiting", preparing: "Starting", ready: "Ready", failed: "Needs attention" };
+        el("phase").textContent = labels[phase] || phase;
+        el("dot").className = "dot " + phase;
+        const status = el("status");
+        status.classList.toggle("error", phase === "failed");
+        const title = el("status-title");
+        const text = el("status-text");
+        if (phase === "preparing") {
+          title.textContent = "Starting DSH…";
+          text.textContent = message || "Preparing the local harness server and authenticating the desktop webview.";
+        } else if (phase === "ready") {
+          title.textContent = "Ready";
+          text.textContent = "Opening the DeepSeek Harness workspace…";
+        } else if (phase === "failed") {
+          title.textContent = "DSH Ocean needs attention";
+          text.textContent = message || "The desktop client could not start the local DSH server.";
+        } else {
+          title.textContent = "Connecting to DSH…";
+          text.textContent = "Looking for a running DeepSeek Harness server and its launch token.";
+        }
+      }
+
+      function render(state) {
+        setPhase(state.phase, state.message);
+        const runtime = state.runtime;
+        el("runtime").textContent = runtime
+          ? `DSH ${runtime.version} · node ${runtime.node.split("/").pop()}`
+          : "runtime: not installed";
+        el("server").textContent = state.server
+          ? `server: ${state.server.baseUrl} (${state.server.mode})`
+          : "server: —";
+        el("config").textContent = `config: ${state.configPath}`;
+        el("diagnostics-path").textContent = state.diagnosticsPath;
+
+        // Compare the text, not its length: the ring buffer is capped, so the
+        // length stops changing once it is full and later lines would never show.
+        const log = (state.logs || []).join("\n");
+        if (log !== lastLogText) {
+          el("log").textContent = log;
+          el("log-count").textContent = `${(state.logs || []).length} lines`;
+          el("log").scrollTop = el("log").scrollHeight;
+          lastLogText = log;
+        }
+
+        const canInstall = Boolean(state.canInstall);
+        el("install").classList.toggle("hidden", !canInstall || state.phase === "ready" || state.phase === "preparing");
+        el("retry").disabled = busy;
+        const installingNow = Boolean(state.installing);
+        el("install").disabled = busy || installingNow;
+        el("cancel-install").classList.toggle("hidden", !installingNow);
+        el("cancel-install").disabled = !installingNow || Boolean(state.cancelRequested);
+        el("cancel-install").textContent = state.cancelRequested
+          ? "Cancelling… (may wait for I/O)"
+          : "Cancel install";
+        // A cancelled install can still leave a retryable state, so keep Retry
+        // reachable when no runtime is available even in the idle phase.
+        el("retry").classList.toggle(
+          "hidden",
+          state.phase !== "failed" && !(state.phase === "idle" && !canInstall && !installingNow),
+        );
+        el("diagnostics").disabled = busy;
+        el("folder").disabled = busy;
+
+        if (state.phase === "idle" && !autoStarted) {
+          autoStarted = true;
+          setTimeout(() => runPrepare(), 350);
+        }
+      }
+
+      let refreshTimer = null;
+      let refreshPending = null;
+
+      function stopPolling() {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+
+      function refresh() {
+        stopPolling();
+        if (document.hidden) return Promise.resolve();
+        // Share the state request, not installer/prepare requests: cancellation
+        // and progress must continue updating while those operations await IPC.
+        if (refreshPending) return refreshPending;
+        refreshPending = (async () => {
+          try {
+            const state = await invoke("get_setup_state");
+            render(state);
+          } catch (error) {
+            el("phase").textContent = "Error";
+            el("dot").className = "dot failed";
+            el("status").classList.add("error");
+            el("status-title").textContent = "Desktop IPC unavailable";
+            el("status-text").textContent = String(error);
+          }
+        })().finally(() => {
+          refreshPending = null;
+          if (!document.hidden) refreshTimer = setTimeout(refresh, 700);
+        });
+        return refreshPending;
+      }
+
+      async function runPrepare() {
+        if (busy) return;
+        busy = true;
+        try {
+          await invoke("prepare_service");
+        } catch (error) {
+          console.error(error);
+        } finally {
+          busy = false;
+          await refresh();
+        }
+      }
+
+      async function runInstall() {
+        // Deliberately not the shared `busy` flag: the cancel control must stay
+        // usable while start_bootstrap is still awaiting the installer.
+        if (installing) return;
+        installing = true;
+        el("install").disabled = true;
+        el("retry").disabled = true;
+        try {
+          await invoke("start_bootstrap");
+        } catch (error) {
+          console.error(error);
+        } finally {
+          installing = false;
+          await refresh();
+        }
+      }
+
+      async function runCancelInstall() {
+        if (!installing) return;
+        el("cancel-install").disabled = true;
+        try {
+          const accepted = await invoke("cancel_bootstrap");
+          if (!accepted) {
+            el("cancel-install").textContent = "Already finished";
+          }
+        } catch (error) {
+          console.error(error);
+        } finally {
+          await refresh();
+        }
+      }
+
+      el("retry").addEventListener("click", runPrepare);
+      el("install").addEventListener("click", runInstall);
+      el("cancel-install").addEventListener("click", runCancelInstall);
+      el("diagnostics").addEventListener("click", () => invoke("save_diagnostics").catch(console.error));
+      el("folder").addEventListener("click", () => invoke("open_diagnostics_folder").catch(console.error));
+      el("quit").addEventListener("click", () => invoke("quit_app").catch(console.error));
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) stopPolling();
+        else refresh();
+      });
+      refresh();
+    </script>
+  </body>
+</html>

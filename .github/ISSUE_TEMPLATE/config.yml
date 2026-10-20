@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security reporting instructions
+    url: https://github.com/ryltsevmikhail/dsh-ocean/blob/main/SECURITY.md
+    about: Do not disclose vulnerabilities or credentials in a public issue.
+  - name: Support and troubleshooting
+    url: https://github.com/ryltsevmikhail/dsh-ocean/blob/main/SUPPORT.md
+    about: Read the diagnostic redaction and upstream-routing guidance first.

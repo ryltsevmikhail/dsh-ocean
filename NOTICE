@@ -1,0 +1,31 @@
+DSH Ocean — attribution and component boundaries
+================================================
+
+Original Ocean code and the Ocean "Ice" artwork are covered by LICENSE
+(MIT, Copyright (c) 2026 DSH Ocean contributors).
+
+Ocean artwork
+-------------
+
+The two-flow "Ice" mark was selected and supplied for this project. Its editable
+vector master is assets/ocean-ice.svg; icons/ and the other shipped SVGs are
+rendered derivatives. See docs/BRANDING.md for palette and reproduction details.
+This source snapshot includes no DeepSeek-derived favicon/whale artwork and no
+historical runtime patches. It does not import private Git development history.
+
+Separate third-party software
+-----------------------------
+
+DeepSeek Harness is separately discovered or downloaded at runtime from
+https://github.com/deepseek-ai/deepseek-harness. Node.js, DSH, pnpm and optional
+plugins retain their upstream licenses; Ocean's MIT license does not relicense
+those components. Their names describe compatibility, not an endorsement or a
+trademark license. Ocean is an independent community client.
+
+Cargo.lock records Rust dependencies, including Tauri, GTK/WebKit bindings and
+qrcodegen. Their copyright and license terms remain applicable. GTK, WebKitGTK,
+OpenSSL and other native libraries also have their own terms. Any redistributed
+binary must include the notices, license texts or source offers required by the
+actual components included in that artifact, including any AppImage runtime.
+This NOTICE is not a complete transitive binary-dependency license inventory;
+maintainers must complete that inventory before publishing binary artifacts.

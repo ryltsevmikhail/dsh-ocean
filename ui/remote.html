@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pair a device</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d12;
+        --panel: #121620;
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #eef1f7;
+        --muted: #99a3b7;
+        --accent: #6d86ff;
+        --warn: #f1b45d;
+        font-family: "Inter", "Cantarell", "Segoe UI", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        color: var(--text);
+        background: radial-gradient(800px 440px at 50% -10%, rgba(77,107,254,.22), transparent 70%), var(--bg);
+        overflow: auto;
+      }
+      main { padding: 26px 30px; display: flex; flex-direction: column; gap: 16px; }
+      header { display: flex; align-items: center; gap: 13px; }
+      .logo { width: 44px; height: 44px; border-radius: 12px; }
+      h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+      header p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+      .card { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 16px; }
+      .qr { display: grid; place-items: center; padding: 12px; background: white; border-radius: 12px; min-height: 260px; }
+      .qr svg { width: 100%; max-width: 300px; height: auto; display: block; }
+      .placeholder { color: #55607a; text-align: center; font-size: 13px; line-height: 1.5; max-width: 320px; }
+      .note { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+      .warn { color: var(--warn); }
+      code { font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace; font-size: 11px; word-break: break-all; color: #bec7db; }
+      .url { margin-top: 10px; padding: 10px; border-radius: 9px; background: #0e1118; border: 1px solid var(--line); }
+      .actions { display: flex; gap: 9px; }
+      button { appearance: none; border: 1px solid var(--line); background: #171c28; color: var(--text); border-radius: 9px; padding: 8px 12px; font-size: 12px; cursor: pointer; }
+      button.primary { background: var(--accent); border-color: transparent; color: white; }
+      button:disabled { opacity: .45; cursor: default; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img class="logo" src="./dsh-icon.svg" alt="" />
+        <div><h1>Pair a device</h1><p>Scan this code from a phone on the same reachable network</p></div>
+      </header>
+
+      <section class="card">
+        <div id="qr" class="qr"><div class="placeholder">Loading pairing state…</div></div>
+        <p id="note" class="note"></p>
+        <div id="url-box" class="url hidden"><code id="url"></code></div>
+      </section>
+
+      <section class="card">
+        <h2 style="margin: 0 0 8px; font-size: 14px;">Temporary LAN forwarder</h2>
+        <p class="note" style="margin: 0 0 10px;">
+          While the server stays on loopback, forward a separate port for a short window.
+          Anyone who can reach that port still needs the launch token; there is no TLS and
+          no per-client authentication. Stop it as soon as you are done.
+        </p>
+        <div class="actions">
+          <button id="proxy-5" type="button">Forward 5 min</button>
+          <button id="proxy-15" type="button">Forward 15 min</button>
+          <button id="proxy-60" type="button">Forward 60 min</button>
+          <button id="proxy-stop" type="button" disabled>Stop forwarder</button>
+        </div>
+        <p id="proxy-status" class="note" style="margin: 10px 0 0;">Forwarder: off</p>
+      </section>
+
+      <div class="actions">
+        <button id="refresh" class="primary" type="button">Refresh</button>
+        <button id="close" type="button">Close</button>
+      </div>
+    </main>
+    <script>
+      const invoke = (cmd, args = {}) => window.__TAURI_INTERNALS__.invoke(cmd, args);
+      const el = (id) => document.getElementById(id);
+
+      async function refresh() {
+        el("qr").innerHTML = '<div class="placeholder">Loading pairing state…</div>';
+        try {
+          const state = await invoke("get_remote_state");
+          if (state.qrSvg) {
+            el("qr").innerHTML = state.qrSvg;
+          } else {
+            el("qr").innerHTML = '<div class="placeholder">No LAN pairing code yet.</div>';
+          }
+          el("note").textContent = state.note;
+          el("note").className = state.qrSvg ? "note warn" : "note";
+          if (state.pairingUrl) {
+            el("url").textContent = state.pairingUrl;
+            el("url-box").classList.remove("hidden");
+          } else {
+            el("url-box").classList.add("hidden");
+          }
+        } catch (error) {
+          el("qr").innerHTML = '<div class="placeholder">The harness is not running yet.</div>';
+          el("note").textContent = String(error);
+          el("url-box").classList.add("hidden");
+        }
+      }
+
+      let proxyTimer = null;
+      function renderProxy(status) {
+        const stop = el("proxy-stop");
+        if (!status) {
+          stop.disabled = true;
+          el("proxy-status").textContent = "Forwarder: off";
+          return;
+        }
+        stop.disabled = false;
+        el("proxy-status").textContent =
+          "Forwarder: " + status.listen + " → " + status.target +
+          " · stops in " + status.remainingSeconds + "s · " + status.activeConnections +
+          " live connection(s)";
+      }
+
+      async function refreshProxy() {
+        try {
+          renderProxy(await invoke("pairing_proxy_status"));
+        } catch (error) {
+          renderProxy(null);
+        }
+      }
+
+      async function startProxy(seconds) {
+        try {
+          const status = await invoke("start_pairing_proxy", { ttlSeconds: seconds });
+          renderProxy(status);
+        } catch (error) {
+          el("proxy-status").textContent = "Forwarder: " + String(error);
+        }
+      }
+
+      async function stopProxy() {
+        try {
+          await invoke("stop_pairing_proxy");
+        } finally {
+          renderProxy(null);
+        }
+      }
+
+      el("proxy-5").addEventListener("click", () => startProxy(300));
+      el("proxy-15").addEventListener("click", () => startProxy(900));
+      el("proxy-60").addEventListener("click", () => startProxy(3600));
+      el("proxy-stop").addEventListener("click", stopProxy);
+      proxyTimer = setInterval(refreshProxy, 1000);
+      // The window is only hidden when closed from the window manager, so the page
+      // must stop polling itself or the timer would run for the whole session.
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          if (proxyTimer) { clearInterval(proxyTimer); proxyTimer = null; }
+        } else if (!proxyTimer) {
+          proxyTimer = setInterval(refreshProxy, 1000);
+          refreshProxy();
+        }
+      });
+      window.addEventListener("pagehide", () => {
+        if (proxyTimer) { clearInterval(proxyTimer); proxyTimer = null; }
+      });
+      el("refresh").addEventListener("click", refresh);
+      el("close").addEventListener("click", () => {
+        if (proxyTimer) { clearInterval(proxyTimer); proxyTimer = null; }
+        invoke("close_pairing").catch(console.error);
+      });
+      refresh();
+      refreshProxy();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+/target
+/dist
+/release
+*.log
+.DS_Store
+/gen
+
+# Local Python/Node tooling and editor state
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+.idea/
+.vscode/
+
+# Local credentials and runtime data (never an alternative to secret scanning)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+/.dsh/
+/.agents/
+/.local/
+/core
+/core.*

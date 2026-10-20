@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "node": {
+    "version": "26.12.0",
+    "archives": {
+      "linux-x64": {
+        "sha256": "d9f88af72ad34f7ddf8e67289829f1698f54b6254f7d4f54b7453117ff1a3d2c"
+      },
+      "linux-arm64": {
+        "sha256": "ec53c915c3fdd8786c5685abd25ae3fe9fba0692307f9811d7caaadea1bcaf03"
+      }
+    }
+  },
+  "dsh": {
+    "package": "@deepseek-ai/dsh",
+    "version": "0.2.0-rc.2"
+  },
+  "pnpm": {
+    "version": "10.34.7"
+  }
+}
