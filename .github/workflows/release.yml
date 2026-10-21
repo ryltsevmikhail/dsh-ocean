@@ -1,0 +1,245 @@
+name: manual signed release candidate
+
+# Never runs on a push/PR/tag. Dry runs do not read production signing secrets,
+# upload binaries or create releases. Non-dry runs create a DRAFT only.
+on:
+  workflow_dispatch:
+    inputs:
+      product:
+        type: choice
+        options: [shell, runtime]
+        required: true
+      channel:
+        type: choice
+        options: [stable, next]
+        default: stable
+        required: true
+      release_version:
+        description: Exact repository shell version or pinned DSH runtime version
+        type: string
+        required: true
+      sequence:
+        description: Owner-assigned positive monotonic product/channel counter
+        type: string
+        required: true
+      dry_run:
+        description: Build and independently validate only; no production keys or binary upload
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.product }}-${{ inputs.channel }}
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  PRODUCT: ${{ inputs.product }}
+  CHANNEL: ${{ inputs.channel }}
+  RELEASE: ${{ inputs.release_version }}
+  SEQUENCE: ${{ inputs.sequence }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: linux-x86_64
+            arch: x86_64
+            node_arch: linux-x64
+          - runner: ubuntu-24.04-arm
+            target: linux-aarch64
+            arch: aarch64
+            node_arch: linux-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate public release inputs without mutation
+        run: |
+          python3 -B scripts/release-artifacts.py plan --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" > "$RUNNER_TEMP/release-plan.json"
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev pkg-config patchelf build-essential python3 jq
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # pinned action, exact compiler below
+        with:
+          toolchain: 1.90.0
+      - name: Check source inventories and build independent verifier
+        run: |
+          python3 -B scripts/license-inventory.py --check
+          python3 -B scripts/check-glib-backport.py
+          python3 -B scripts/check-toolchain-source-evidence.py
+          cargo build --locked --bin dsh-ocean
+      - name: Assemble native product from repository pins
+        id: package
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
+          NODE_ARCH: ${{ matrix.node_arch }}
+        run: |
+          set -euo pipefail
+          SEQUENCE="$(jq -r '.sequence' "$RUNNER_TEMP/release-plan.json")"
+          out="$RUNNER_TEMP/release-artifacts"
+          mkdir -m 700 "$out"
+          if [ "$PRODUCT" = runtime ]; then
+            # Publisher only. Installed clients never run npm/rebuild here.
+            home="$RUNNER_TEMP/publisher-home"
+            prefix="$RUNNER_TEMP/publisher-runtime"
+            mkdir -m 700 "$home"
+            node_version="$(jq -r '.node.version' runtime-manifest.json)"
+            dsh_version="$(jq -r '.dsh.version' runtime-manifest.json)"
+            pnpm_version="$(jq -r '.pnpm.version' runtime-manifest.json)"
+            node_sha="$(jq -r --arg arch "$NODE_ARCH" '.node.archives[$arch].sha256' runtime-manifest.json)"
+            env -u NODE_OPTIONS -u NODE_PATH HOME="$home" DSH_HOME="$home/.dsh" XDG_CONFIG_HOME="$home/config" XDG_STATE_HOME="$home/state" XDG_CACHE_HOME="$home/cache" DSH_OCEAN_DATA_DIR="$prefix" DSH_NODE_VERSION="$node_version" DSH_NODE_SHA256="$node_sha" DSH_VERSION="$dsh_version" DSH_PNPM_VERSION="$pnpm_version" bash scripts/bootstrap-runtime.sh
+            selected="$(realpath "$prefix/current")"
+            case "$selected" in "$prefix"/generations/gen.*) ;; *) echo 'unexpected publisher generation' >&2; exit 1;; esac
+            python3 -B scripts/package-runtime.py --root "$selected" --output-dir "$out/native" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" --target "$TARGET"
+            echo "$selected/runtime/node/bin" >> "$GITHUB_PATH"
+          else
+            # A source version mismatch is a refusal, not a renamed old binary.
+            actual="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["package"]["version"])')"
+            test "$actual" = "$RELEASE"
+            python3 -B scripts/package-tar.py --output-dir "$out/native"
+            original="$out/native/dsh-ocean-$RELEASE-linux-$ARCH.tar.gz"
+            canonical="$out/native/dsh-ocean-$RELEASE-$ARCH.tar.gz"
+            test -f "$original" && test ! -e "$canonical"
+            # Verification inputs must have a single link; do not alias the tar.
+            cp --no-clobber --reflink=auto -- "$original" "$canonical"
+          fi
+          file="$(python3 -c 'import json,os; p=json.load(open(os.environ["RUNNER_TEMP"]+"/release-plan.json")); a=os.environ["ARCH"]; print(("dsh-ocean-runtime-"+p["channel"]+"-"+p["release"]+"-"+str(p["sequence"])+"-"+a if p["product"]=="runtime" else "dsh-ocean-"+p["release"]+"-"+a)+".tar.gz")')"
+          # Recompute metadata from the actual canonical archive, not a caller hash.
+          python3 -B scripts/release-artifacts.py artifact --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" --target "$TARGET" --file "$out/native/$file" > "$out/native/artifact.checked.json"
+          if [ "$PRODUCT" = runtime ]; then cmp "$out/native/artifact.json" "$out/native/artifact.checked.json" >/dev/null || python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))==json.load(open(sys.argv[2]))' "$out/native/artifact.json" "$out/native/artifact.checked.json"; fi
+          cp "$out/native/artifact.checked.json" "$out/native/artifact.json"
+          printf 'archive=%s\n' "$out/native/$file" >> "$GITHUB_OUTPUT"
+          python3 -B scripts/release-artifacts.py manifest --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" --artifact "$out/native/artifact.json" --single-target-validation > "$RUNNER_TEMP/validation-manifest.json"
+      - name: Sign with disposable validation key and check the actual native archive
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          node scripts/sign-publisher-release.mjs --manifest "$RUNNER_TEMP/validation-manifest.json" --product "$PRODUCT" --output-dir "$RUNNER_TEMP/validation-signature"
+          archive="$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/release-artifacts/native/artifact.json"))["url"].rsplit("/",1)[1])')"
+          verifier="$GITHUB_WORKSPACE/target/debug/dsh-ocean"
+          home="$RUNNER_TEMP/artifact-check-home"
+          mkdir -m 700 "$home"
+          export HOME="$home" DSH_HOME="$home/.dsh" XDG_STATE_HOME="$home/state" XDG_CONFIG_HOME="$home/config" XDG_CACHE_HOME="$home/cache"
+          args=("$RUNNER_TEMP/validation-manifest.json" "$RUNNER_TEMP/validation-signature/signature.json" "$RUNNER_TEMP/validation-signature/public-key.json" --channel "$CHANNEL" --target "$TARGET" --min-sequence "$SEQUENCE" --artifact "$RUNNER_TEMP/release-artifacts/native/$archive")
+          if [ "$PRODUCT" = runtime ]; then
+            "$verifier" --check-runtime-bundle "${args[@]}" --current-runtime-version 0.0.0-0 --prefix "$RUNNER_TEMP/checked-runtime" --confirm-check yes
+          else
+            "$verifier" --apply-release "${args[@]}" --kind tar.gz --prefix "$RUNNER_TEMP/checked-shell" --confirm-apply yes
+          fi
+      - name: Collect candidate bytes only for an explicitly requested draft
+        if: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ inputs.product }}-${{ matrix.target }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ runner.temp }}/release-artifacts/native/artifact.json
+          retention-days: 2
+          if-no-files-found: error
+
+  draft:
+    needs: build
+    if: ${{ !inputs.dry_run && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Owner must configure required reviewers on BOTH product environments.
+    environment: release-${{ inputs.product }}
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install verifier dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev pkg-config jq
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.90.0
+      - name: Reassemble both architectures and verify the owner-assigned plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -B scripts/release-artifacts.py plan --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" > "$RUNNER_TEMP/release-plan.json"
+          SEQUENCE="$(jq -r '.sequence' "$RUNNER_TEMP/release-plan.json")"
+          for target in linux-x86_64 linux-aarch64; do
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "release-$PRODUCT-$target" --dir "$RUNNER_TEMP/final-$target"
+          done
+          python3 -B scripts/release-artifacts.py manifest --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" --artifact "$RUNNER_TEMP/final-linux-x86_64/artifact.json" --artifact "$RUNNER_TEMP/final-linux-aarch64/artifact.json" > "$RUNNER_TEMP/manifest.json"
+          cargo build --locked --bin dsh-ocean
+      - name: Require explicit owner clearance and an existing release tag before accessing keys
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CLEARANCE: ${{ vars.OCEAN_RELEASE_CLEARANCE }}
+        run: |
+          set -euo pipefail
+          test "$RELEASE_CLEARANCE" = owner-reviewed-native-and-license-clearance
+          tag="$(jq -r '.tag' "$RUNNER_TEMP/release-plan.json")"
+          # GetCommit resolves both annotated and lightweight tags to a commit.
+          tag_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
+          python3 -B scripts/release-artifacts.py plan --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" --source-commit "$GITHUB_SHA" --tag-commit "$tag_commit" > "$RUNNER_TEMP/release-source.json"
+      - name: Sign runtime draft with its independent protected key
+        if: ${{ inputs.product == 'runtime' }}
+        env:
+          OCEAN_RELEASE_DRAFT_APPROVED: "yes"
+          OCEAN_RELEASE_SIGNING_KEY_PEM: ${{ secrets.OCEAN_RUNTIME_SIGNING_KEY_PEM }}
+          OCEAN_RELEASE_KEY_ID: ${{ vars.OCEAN_RUNTIME_KEY_ID }}
+          OCEAN_RELEASE_PUBLIC_KEY_SHA256: ${{ vars.OCEAN_RUNTIME_PUBLIC_KEY_SHA256 }}
+        run: node scripts/sign-publisher-release.mjs --manifest "$RUNNER_TEMP/manifest.json" --product runtime --mode publisher --output-dir "$RUNNER_TEMP/production-signature"
+      - name: Sign shell draft with its independent protected key
+        if: ${{ inputs.product == 'shell' }}
+        env:
+          OCEAN_RELEASE_DRAFT_APPROVED: "yes"
+          OCEAN_RELEASE_SIGNING_KEY_PEM: ${{ secrets.OCEAN_SHELL_SIGNING_KEY_PEM }}
+          OCEAN_RELEASE_KEY_ID: ${{ vars.OCEAN_SHELL_KEY_ID }}
+          OCEAN_RELEASE_PUBLIC_KEY_SHA256: ${{ vars.OCEAN_SHELL_PUBLIC_KEY_SHA256 }}
+        run: node scripts/sign-publisher-release.mjs --manifest "$RUNNER_TEMP/manifest.json" --product shell --mode publisher --output-dir "$RUNNER_TEMP/production-signature"
+      - name: Independently verify final production signatures and exact bytes
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/final-check-home"
+          mkdir -m 700 "$home"
+          verifier="$GITHUB_WORKSPACE/target/debug/dsh-ocean"
+          export HOME="$home" DSH_HOME="$home/.dsh" XDG_STATE_HOME="$home/state" XDG_CONFIG_HOME="$home/config"
+          for target in linux-x86_64 linux-aarch64; do
+            archive="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["url"].rsplit("/",1)[1])' "$RUNNER_TEMP/final-$target/artifact.json")"
+            args=("$RUNNER_TEMP/manifest.json" "$RUNNER_TEMP/production-signature/signature.json" "$RUNNER_TEMP/production-signature/public-key.json" --channel "$CHANNEL" --target "$target" --min-sequence "$SEQUENCE" --artifact "$RUNNER_TEMP/final-$target/$archive")
+            if [ "$PRODUCT" = runtime ]; then
+              "$verifier" --import-runtime-release "${args[@]}" --current-runtime-version 0.0.0-0 --prefix "$RUNNER_TEMP/final-check-$target" --confirm-import yes
+            else
+              "$verifier" --verify-release "${args[@]}" --kind tar.gz
+            fi
+          done
+      - name: Create draft only after protected owner release clearance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CLEARANCE: ${{ vars.OCEAN_RELEASE_CLEARANCE }}
+        run: |
+          set -euo pipefail
+          # Passing inventory is NOT compiler/native ABI/licensing clearance.
+          test "$RELEASE_CLEARANCE" = owner-reviewed-native-and-license-clearance
+          tag="$(jq -r '.tag' "$RUNNER_TEMP/release-plan.json")"
+          assets=("$RUNNER_TEMP/manifest.json" "$RUNNER_TEMP/production-signature/signature.json" "$RUNNER_TEMP/production-signature/public-key.json")
+          for target in linux-x86_64 linux-aarch64; do
+            file="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["url"].rsplit("/",1)[1])' "$RUNNER_TEMP/final-$target/artifact.json")"
+            assets+=("$RUNNER_TEMP/final-$target/$file")
+          done
+          # Tag must already exist; publication remains a separate owner action.
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$PRODUCT $RELEASE ($CHANNEL)" --notes 'Signed release candidate; owner acceptance/publication is still required.' "${assets[@]}"
