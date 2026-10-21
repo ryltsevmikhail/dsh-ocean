@@ -129,6 +129,25 @@ fn handle_cli() -> bool {
             }
             true
         }
+        "--update-settings"
+        | "--configure-updates"
+        | "--set-update-channel"
+        | "--check-shell-update" => {
+            match dsh_ocean::update_cli::run(&args) {
+                Ok(value) => println!(
+                    "{}",
+                    serde_json::to_string_pretty(&value).expect("serialize updater result")
+                ),
+                Err(error) => {
+                    eprintln!(
+                        "dsh-ocean: {}",
+                        dsh_ocean::auth::redact(&format!("{error:#}"))
+                    );
+                    std::process::exit(1);
+                }
+            }
+            true
+        }
         "--verify-release"
         | "--stage-release"
         | "--download-release"
@@ -261,6 +280,10 @@ fn handle_cli() -> bool {
                    --restore-data SNAPSHOT --confirm-offline  replace sessions/stores; retained copies kept\n  \
                    --prune-data-backups --keep N --confirm-prune  delete older whole-data snapshots\n  \
                    --restore-profile NAME SNAPSHOT --confirm-offline  restore configuration\n  \
+                   --update-settings  show updater channels/trust fingerprints (no network or keys)\n  \
+                   --configure-updates CONFIG --confirm-shell-key SHA256 [--confirm-runtime-key SHA256] [--confirm-replace-trust yes]  provision independently authenticated public trust\n  \
+                   --set-update-channel shell|runtime stable|next  change only the selected updater channel\n  \
+                   --check-shell-update [--kind appimage|tar.gz]  authenticate configured feed metadata only\n  \
                    --verify-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target TARGET --kind KIND --min-sequence N [--artifact FILE]  offline verification only\n  \
                    --accept-release ...  the same checks, then remember the accepted sequence locally\n  \
                    --release-state  print remembered per-channel release sequences\n  \

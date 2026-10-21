@@ -225,6 +225,15 @@ cover authenticated download → explicit two-version apply → rollback, tamper
 truncation/excess bytes, HTTP/timeout exit, overwrite and pre-network replay refusal.
 Real production feed/keys and GUI delivery remain pending.
 
+**Configured feed/trust foundation:** updater settings are stored separately from
+Harness/npm configuration, with independent shell/runtime trust and stable/next
+channels. Public-key fingerprint confirmation is required for import and explicit
+extra confirmation for replacement. Bounded metadata fetches authenticate exact
+bytes before policy, never fetch a key or advance a floor. Existing invalid or
+unsafe settings fail closed; channel/key changes invalidate held candidates and
+expiry/floor are rechecked at use. The native GUI and runtime verifier remain the
+next integration steps; no production source is silently configured.
+
 **Local activation foundation:** `--apply-release` activates an already verified
 local AppImage into a private owned prefix (no download; tar.gz activation is
 refused until extraction is implemented), re-verifying bytes after

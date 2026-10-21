@@ -1,5 +1,77 @@
 # Signed shell release verification, download and local activation
 
+## Configured feeds, trust and channels
+
+`--update-settings` reports read-only status, channel selections and public-key
+fingerprints, never key bytes. Missing configuration means **unconfigured**, not
+an automatic trust/download fallback. Settings are separate from Harness and npm:
+`$XDG_CONFIG_HOME/dsh-ocean/updates.json` (owned atomic mode-0600 writes).
+
+An operator imports a reviewed settings document and confirms every configured
+product's public-key fingerprint from an independent authenticated channel. The
+fingerprint is SHA-256 of the raw 32-byte Ed25519 public key (64 lowercase hex
+characters), not a hash of PEM/DER formatting:
+
+```bash
+dsh-ocean --configure-updates reviewed-updates.json \
+  --confirm-shell-key INDEPENDENT_RAW_ED25519_PUBLIC_KEY_SHA256
+# Add --confirm-runtime-key FINGERPRINT when configuring a runtime source too.
+# Replacing an existing key additionally requires --confirm-replace-trust yes.
+dsh-ocean --set-update-channel shell stable
+dsh-ocean --set-update-channel runtime next
+dsh-ocean --check-shell-update --kind appimage
+```
+
+This example is schema documentation, **not published production configuration**;
+replace the public-key placeholder with independently authenticated public data.
+The illustrated feed locations have not been provisioned by these tests:
+
+```json
+{
+  "schema": 1,
+  "shellChannel": "stable",
+  "runtimeChannel": "stable",
+  "shell": {
+    "key": {"version": 1, "keyId": "operator-provisioned-id", "publicKeyHex": "INDEPENDENT_PUBLIC_KEY_LOWERCASE_HEX"},
+    "stable": {
+      "manifestUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-stable/manifest.json",
+      "signatureUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-stable/manifest.sig.json",
+      "minimumSequence": 1
+    },
+    "next": {
+      "manifestUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-next/manifest.json",
+      "signatureUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-next/manifest.sig.json",
+      "minimumSequence": 1
+    }
+  },
+  "runtime": null
+}
+```
+
+Runtime configuration has a separate source/confirmation; its verifier must use
+a separate signed product domain/floor. Runtime workflow wiring remains M2 work.
+Selecting its channel never changes npm `latest`/`next` settings. A null source
+disables that updater without resetting any accepted floor. Private keys do not
+belong in this document or application. Confirming a fingerprint copied from the
+same untrusted feed is **not** independent publisher authentication.
+
+Feed URLs must be canonical public HTTPS assets in this repository, with no
+credentials, query, fragment, port override, encoded path aliases or other hosts.
+Current settings/import files must be bounded, regular, single-link, owned and
+not writable by others; directory symlinks/untrusted writable ancestors fail
+closed. Existing unsafe/invalid settings are never silently treated as defaults.
+
+A configured check uses bounded curl transport (64 KiB manifest, 4 KiB signature),
+authenticates the exact bytes before parsing policy, checks native architecture,
+channel/expiry/version and remembered floor, then reports metadata only. It does
+not fetch a key/artifact, advance state, install or access the Harness profile.
+Candidates retain exact signed bytes and a settings digest: changes to trust or
+channels invalidate them, and expiry/floor must be rechecked at use. Configured
+activation must hold the settings operation guard across final revalidation and
+the state/prefix transaction so trust replacement cannot race that commit. Manual
+`--verify-release`/`--apply-release` with an explicitly supplied key remain advanced
+operator-selected trust, not an implicit use of configured publisher authority.
+
 ## Signed artifact download (explicit, no install)
 
 ```bash
@@ -439,11 +511,11 @@ cargo test --lib staging_tests
 ```
 
 Implemented CLI foundations now include persisted sequence/downgrade protection,
-authenticated artifact download and explicit local AppImage activation/selector
-rollback. These are not a complete automatic updater. Production key custody/
-provisioning/rotation/revocation, manifest/signature feed retrieval, signed
-publishing CI, tar extraction, package-manager behavior, GUI orchestration and
-real published-feed acceptance remain open. Core/bootstrap updates are still
+operator-provisioned trust and channel settings, bounded authenticated shell-feed
+checks, artifact download and journaled AppImage activation/selector rollback.
+These are not a complete automatic updater. Production key custody/provisioning/
+rotation/revocation, signed publishing CI, tar extraction, package-manager behavior,
+GUI/runtime orchestration and real published-feed acceptance remain open. Core/bootstrap updates are still
 unsigned; local apply/rollback retain the recovery/durability/health limits
 described above. M2 remains incomplete.
 

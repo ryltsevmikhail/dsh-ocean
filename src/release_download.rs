@@ -40,10 +40,7 @@ impl Drop for CurlSource {
     }
 }
 
-/// No key discovery, manifest download, execution, acceptance or installation.
-/// The caller must authenticate the manifest and enforce its remembered floor.
-/// The selected URL comes only from Verified's canonical GitHub artifact policy.
-pub fn download(release: &Verified, destination: &Path) -> Result<Staged> {
+fn source(url: &str, limit: u64) -> Result<CurlSource> {
     let mut child = Command::new("curl")
         // Must be the first argument: ignore user/system curl configuration.
         .args(["--disable", "--fail", "--silent", "--location"])
@@ -58,9 +55,9 @@ pub fn download(release: &Verified, destination: &Path) -> Result<Staged> {
             "30",
         ])
         .arg("--max-filesize")
-        .arg(release.artifact().size.to_string())
+        .arg(limit.to_string())
         .arg("--url")
-        .arg(&release.artifact().url)
+        .arg(url)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         // Never publish curl's stderr (URLs, proxy data, paths or credentials).
@@ -68,10 +65,37 @@ pub fn download(release: &Verified, destination: &Path) -> Result<Staged> {
         .spawn()
         .context("start trusted curl downloader")?;
     let stdout = child.stdout.take().expect("piped curl stdout");
-    let mut source = CurlSource {
+    Ok(CurlSource {
         child,
         stdout,
         finished: false,
-    };
+    })
+}
+
+/// No key discovery, execution, acceptance or installation. Caller authenticates
+/// metadata and enforces its floor; URL comes only from Verified's artifact policy.
+pub fn download(release: &Verified, destination: &Path) -> Result<Staged> {
+    let mut source = source(&release.artifact().url, release.artifact().size)?;
     release_feed::stage_reader(&mut source, destination, release)
+}
+
+/// Bounded untrusted metadata, never authority until the independent signature
+/// verifier accepts it. No disk publication, key retrieval or persistent state.
+pub(crate) fn fetch_metadata(url: &str, limit: u64) -> Result<Vec<u8>> {
+    crate::update_settings::validate_feed_url(url)?;
+    anyhow::ensure!(
+        limit > 0 && limit <= release_feed::MAX_MANIFEST,
+        "invalid update metadata bound"
+    );
+    let mut source = source(url, limit)?;
+    let mut bytes = Vec::new();
+    (&mut source)
+        .take(limit + 1)
+        .read_to_end(&mut bytes)
+        .context("read update metadata")?;
+    anyhow::ensure!(
+        !bytes.is_empty() && bytes.len() as u64 <= limit,
+        "update metadata size refused"
+    );
+    Ok(bytes)
 }

@@ -66,18 +66,25 @@ struct Detached {
     key_id: String,
     signature_hex: String,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct KeyFile {
-    version: u32,
-    key_id: String,
-    public_key_hex: String,
+pub struct PublicKeyDocument {
+    pub version: u32,
+    pub key_id: String,
+    pub public_key_hex: String,
 }
 pub struct TrustedKey {
     id: String,
     key: VerifyingKey,
 }
 impl TrustedKey {
+    pub fn fingerprint(&self) -> String {
+        hex(&Sha256::digest(self.key.as_bytes()))
+    }
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
     /// This file must be provisioned independently of the feed. Parsing it does
     /// not establish publisher trust; that is the operator/caller's decision.
     pub fn from_json(bytes: &[u8]) -> Result<Self> {
@@ -85,7 +92,7 @@ impl TrustedKey {
             bytes.len() as u64 <= MAX_AUXILIARY,
             "trusted key file exceeds limit"
         );
-        let value: KeyFile =
+        let value: PublicKeyDocument =
             serde_json::from_slice(bytes).map_err(|_| anyhow!("invalid trusted key file"))?;
         anyhow::ensure!(
             value.version == 1 && valid_id(&value.key_id),
