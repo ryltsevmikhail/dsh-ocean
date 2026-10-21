@@ -1,8 +1,9 @@
 # Signed complete runtime metadata — M2 boundary
 
 This checkpoint implements runtime **metadata authentication/check/explicit
-acceptance and authenticated complete-generation import**, not live runtime
-switch/restart or data rollback. Existing bootstrap/core installer paths remain
+acceptance, authenticated complete-generation import, isolated candidate health
+and transaction-only exact home snapshot/restore primitives**, not yet a wired
+live runtime switch/restart/data-rollback controller. Existing bootstrap/core installer paths remain
 separate and unsigned until their M2 replacement is wired.
 Do not describe an npm version pin as authentication of its dependency closure.
 
@@ -66,9 +67,10 @@ silently overwrite one another's assets.
 
 `stateScope` is a publisher compatibility declaration, not filesystem confinement
 or proof of consistent backups. The identifier is bounded/recognized at this
-checkpoint; exact stopped-writer snapshot/absence inventory/restore enforcement
-and supported migration acceptance are still M2 implementation/owner gates. No
-whole-home/global-credential rollback or excluded-plugin rollback is implied.
+checkpoint. The separate transaction snapshot primitive below can retain the full
+controlled home, but actual owned-writer stop/orchestration, restore-before-old-start
+ordering and supported migration acceptance remain M2 implementation/owner gates.
+The declaration alone never establishes data rollback or write confinement.
 
 ## Complete-generation import (no activation)
 
@@ -132,6 +134,54 @@ orchestration, not real DSH/native-addon/production acceptance:
 DSH_OCEAN_TEST_RUNTIME_NODE=/usr/bin/node cargo test --locked \
   --test runtime_feed_cli signed_runtime_bundle_health -- --ignored
 ```
+
+## Transaction-only managed-home snapshots (controller not wired yet)
+
+Unlike manual profile exports, the new internal transaction primitive captures
+**all supported files within the controlled DSH_HOME**, including plugin modules,
+configuration, sessions/storage and local credential files. This is conservative
+rollback coverage beyond the declared minimal writable-state scope, not a claim
+that arbitrary migrations/outside paths are supported. It does not read external
+credential locations or follow links outside that home. Production update consent
+must explicitly explain that a sensitive private local backup is being retained.
+Snapshots are **not encrypted or exported**; directories are owned mode 0700 and
+metadata is 0600, including on reopen. They must stay outside the managed home.
+
+The stopped-writer callback is mandatory before capture/restore and at bounded
+copy/publication checkpoints. Hash/size/mode/mtime/internal-link inventories are
+checked after copying and before publication. Originally absent home is recorded
+without creating it; an initially absent storage/config subtree is naturally absent
+after full-tree restore. Reappearing roots/changed data refuse publication rather
+than calling a concurrent snapshot consistent. This is not global exclusion of
+unknown same-UID writers: the future controller must actually stop its owned
+writer, hold its lifecycle/prefix guards, and require other clients/CLI writers
+closed.
+
+The implementation refuses outside links, nested devices, hard-linked regular
+files, special files/bits, other-writable source state, non-UTF8/oversized trees,
+files above 512 MiB, total data above 2 GiB, over 200000 entries or excessive
+path/depth. It never silently skips such state. Byte/mode/mtime/link restoration is
+not restoration of inode identity, hard-link topology, ACLs or extended attributes.
+Those unsupported forms require an operator-managed migration, not a partial
+automatic rollback disguised as success.
+
+Restore first verifies the private snapshot and builds a verified replacement in
+a private sibling container. Linux atomic directory exchange switches a present
+home; an absent original home is reestablished as absent. Candidate-created state
+is moved into a **private retained container**, never silently deleted, including
+after a post-exchange error. A failed offline guard before publication leaves live
+state unchanged; corruption refuses replacement. The future transaction controller
+must keep the runtime stopped and the recovery journal/backups on **any** incomplete
+restore, and only restart the old runtime after restoration succeeds. Existing
+manual backup/restore formats and their intentional omitted-root behavior do not
+change.
+
+[Private filesystem tests](../tests/runtime_snapshot.rs) cover full config/plugin/
+credential/session restoration, internal links, missing home/new storage removal,
+retention of candidate data, writer-guard failures, corrupt snapshots, other-writable
+state and absence/publication consistency. All contents are synthetic; no running
+user profile or service participates. No live update controller/automatic rollback
+is claimed by these primitives alone.
 
 ## Headless commands
 

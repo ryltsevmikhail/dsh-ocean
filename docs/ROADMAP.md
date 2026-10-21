@@ -209,8 +209,13 @@ inventory and holds the shared installer lock without executing/selecting runtim
 or advancing the floor. Separate explicit isolated candidate checking validates
 native Node, exact signed versions/native bindings and authenticated server health,
 with clean disposable state and bounded cancellable process-group ownership.
-Owned controller integration and exact data rollback are still pending; the old
-bootstrap/core installer is not made signed by metadata/import/health alone. See
+A separate stopped-writer transaction snapshot primitive now captures/restores
+supported full managed-home bytes/modes/mtime/internal links, plugin dependencies
+and original absence; sensitive snapshots/candidate retention stay private. It is
+not a manual export or a wired automatic rollback. Actual owned systemd/child
+stop/switch/restart, restore-before-old-start ordering and pending recovery are
+still required; the old bootstrap/core installer is not made signed by these
+independent primitives alone. See
 [runtime boundary](RUNTIME_RELEASES.md).
 
 **Native shell updater:** distinct tray entries separate core from shell updates.

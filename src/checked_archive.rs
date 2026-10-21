@@ -165,6 +165,10 @@ impl NewDirectory {
         guard.check()?;
         Ok(guard)
     }
+    /// Retain this private directory intentionally for transaction recovery.
+    pub(crate) fn preserve(mut self) {
+        self.remove = false;
+    }
     pub(crate) fn check(&self) -> Result<()> {
         let m = fs::symlink_metadata(&self.path)?;
         anyhow::ensure!(
