@@ -124,6 +124,64 @@ impl Drop for Fixture {
 }
 
 #[test]
+fn snapshot_hashes_keep_exact_sha256_encoding_across_dependency_updates() {
+    let fixture = Fixture::new();
+    // Fixed expectations are independent of the Rust digest crate/hex helper.
+    // Empty/abc/million-a are standard vectors; 286 checks leading zero bytes,
+    // all-bytes checks binary input, and million-a spans the 64 KiB copy buffer.
+    let cases = [
+        (
+            "empty.bin",
+            Vec::new(),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        ),
+        (
+            "abc.bin",
+            b"abc".to_vec(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        ),
+        (
+            "leading-zero.bin",
+            b"286".to_vec(),
+            "00328ce57bbc14b33bd6695bc8eb32cdf2fb5f3a7d89ec14a42825e15d39df60",
+        ),
+        (
+            "binary.bin",
+            (0..=255).collect::<Vec<u8>>(),
+            "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+        ),
+        (
+            "multi-chunk.bin",
+            vec![b'a'; 1_000_000],
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+        ),
+    ];
+    for (name, bytes, _) in &cases {
+        fs::write(fixture.profile.join("resources").join(name), bytes).unwrap();
+    }
+    let snapshot = fixture.snapshot();
+    let manifest = profile_backup::verify(&snapshot).unwrap();
+    for (name, bytes, expected) in &cases {
+        let path = format!("resources/{name}");
+        let entry = manifest
+            .files
+            .iter()
+            .find(|file| file.path == path)
+            .unwrap();
+        assert_eq!(entry.sha256, *expected, "{name}");
+        assert_eq!(entry.sha256.len(), 64);
+        assert!(entry
+            .sha256
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
+        assert_eq!(entry.size, bytes.len() as u64);
+        assert_eq!(fs::read(snapshot.join("data").join(path)).unwrap(), *bytes);
+    }
+    fixture.assert_global_unchanged();
+    fixture.assert_clean_staging();
+}
+
+#[test]
 fn snapshot_is_private_bounded_and_explicitly_profile_only() {
     let f = Fixture::new();
     let snapshot = f.snapshot();

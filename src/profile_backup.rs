@@ -451,7 +451,7 @@ pub(crate) fn digest_copy_controlled(
     if let Some(file) = destination {
         file.sync_all()?;
     }
-    Ok((size, format!("{:x}", hash.finalize())))
+    Ok((size, crate::release_feed::hex(&hash.finalize())))
 }
 
 fn destination_path(path: &Path) -> Result<PathBuf> {
