@@ -22,7 +22,7 @@ jobs:
             git ca-certificates curl jq tar gzip util-linux \
             python3 make g++
 
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Real bootstrap and repeat install without system Node
         run: bash scripts/test-bootstrap-clean.sh
