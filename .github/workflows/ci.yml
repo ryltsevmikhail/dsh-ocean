@@ -274,6 +274,12 @@ jobs:
             candidate="$sysroot/$relative"
             if [ -f "$candidate" ] && [ ! -L "$candidate" ]; then
               n=$((n+1))
+              # Only fixed public candidate names and byte counts, never sysroot paths.
+              if ! bytes="$(stat --format=%s -- "$candidate" 2>/dev/null)"; then
+                echo 'public notice candidate stat failed' >&2
+                exit 1
+              fi
+              printf 'public notice candidate %s bytes=%s\n' "$relative" "$bytes"
               cp -- "$candidate" "$stage/COPYRIGHT-distribution-$n.html"
               args+=(--notice "distribution-$n=$stage/COPYRIGHT-distribution-$n.html")
             fi

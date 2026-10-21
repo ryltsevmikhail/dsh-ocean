@@ -2,6 +2,7 @@
 import hashlib
 import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -46,6 +47,49 @@ class EvidenceTests(unittest.TestCase):
         self.compiler = self.root / 'fake-rustc'
         self.compiler.write_text('#!' + sys.executable + '\nimport sys\nassert sys.argv[1:] == ["-vV"]\nprint("rustc 1.80.0")\nprint("release: 1.80.0")\nprint("host: x86_64-unknown-linux-gnu")\nprint("commit-hash: ' + 'a' * 40 + '")\nprint("LLVM version: 18.1.7")\nprint("private: /home/private-person")\n')
         self.compiler.chmod(0o700)
+
+    def test_cli_refusal_diagnostics_do_not_disclose_paths(self):
+        # Catch regressions to opaque diagnostics or arbitrary exception text.
+        notice = self.root / 'COPYRIGHT-private-marker.html'
+        with notice.open('wb') as stream:
+            stream.truncate(4 * 1024**2 + 1)
+        output = self.root / 'output-private-marker'
+        args = ['--binary', str(self.binary), '--output-dir', str(output),
+                '--notice', 'public=' + str(notice)]
+        result = subprocess.run([sys.executable, '-B', str(SCRIPT), *args],
+                                capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, '')
+        self.assertEqual(result.stderr, 'artifact evidence refused: input size exceeds limit\n')
+        self.assertFalse(output.exists())
+        notice.unlink()
+        result = subprocess.run([sys.executable, '-B', str(SCRIPT), *args],
+                                capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stderr, 'artifact evidence failed: filesystem errno 2\n')
+        self.assertFalse(output.exists())
+
+    def test_open_regular_fixed_refusal_reasons(self):
+        fifo = self.root / 'fifo-private-marker'
+        os.mkfifo(fifo)
+        with self.assertRaisesRegex(evidence.EvidenceError, '^nonregular input$'):
+            evidence.open_regular(fifo, 1024)
+        # Only spoof the file owner comparison, after the real ancestor walk.
+        parent = evidence.directory_fd(self.root)
+        with mock.patch.object(evidence, 'directory_fd', return_value=parent), mock.patch.object(evidence.os, 'getuid', return_value=os.getuid() + 1):
+            with self.assertRaisesRegex(evidence.EvidenceError, '^input owner mismatch$'):
+                evidence.open_regular(self.binary, 1024)
+        os.link(self.binary, self.root / 'alias')
+        with self.assertRaisesRegex(evidence.EvidenceError, '^input hardlink refused$'):
+            evidence.open_regular(self.binary, 1024)
+
+    def test_cli_unexpected_exception_text_is_not_published(self):
+        for error in (ValueError('private-marker'), subprocess.SubprocessError('private-marker')):
+            stderr = io.StringIO()
+            with mock.patch.object(evidence, 'create_evidence', side_effect=error), contextlib.redirect_stderr(stderr):
+                status = evidence.main(['--binary', str(self.binary), '--output-dir', str(self.root / 'out')])
+            self.assertEqual(status, 1)
+            self.assertEqual(stderr.getvalue(), 'artifact evidence failed: unsupported input or compiler observation; private partial output retained\n')
 
     def test_known_bytes_direct_dependencies_and_privacy(self):
         result = evidence.inspect_elf(self.binary)
