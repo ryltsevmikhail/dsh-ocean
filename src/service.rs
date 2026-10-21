@@ -140,6 +140,9 @@ pub fn attach_existing(base: &Url) -> Result<Option<Server>> {
 async fn prepare(app: &AppHandle, permit: &RuntimePermit) -> Result<Server> {
     let state = app.state::<AppState>();
     let base = config::checked_server_url()?;
+    if permits_local_start(&base) {
+        crate::runtime_switch::ensure_no_pending(&config::data_dir())?;
+    }
     // Retrying window dispatch must not provision a second child on the fixed
     // configured origin: an owned child listens on its own ephemeral port.
     if let Some(server) = permit.owned_server()? {
@@ -292,7 +295,9 @@ pub fn start_health_monitor(app: AppHandle) {
                 failures.reset();
                 continue;
             };
-            if server.mode == ServerMode::Attached {
+            if server.mode == ServerMode::Attached
+                || crate::runtime_switch::ensure_no_pending(&config::data_dir()).is_err()
+            {
                 failures.reset();
                 continue;
             }
@@ -318,6 +323,7 @@ pub fn start_health_monitor(app: AppHandle) {
 }
 
 async fn recover_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result<()> {
+    crate::runtime_switch::ensure_no_pending(&config::data_dir())?;
     let Some(server) = permit.server()? else {
         return Ok(());
     };
@@ -350,6 +356,7 @@ pub async fn restart_and_reload(app: &AppHandle) -> Result<()> {
 }
 
 async fn restart_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result<()> {
+    crate::runtime_switch::ensure_no_pending(&config::data_dir())?;
     let state = app.state::<AppState>();
     let server = permit
         .server()?

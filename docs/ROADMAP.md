@@ -212,10 +212,12 @@ with clean disposable state and bounded cancellable process-group ownership.
 A separate stopped-writer transaction snapshot primitive now captures/restores
 supported full managed-home bytes/modes/mtime/internal links, plugin dependencies
 and original absence; sensitive snapshots/candidate retention stay private. It is
-not a manual export or a wired automatic rollback. Actual owned systemd/child
-stop/switch/restart, restore-before-old-start ordering and pending recovery are
-still required; the old bootstrap/core installer is not made signed by these
-independent primitives alone. See
+not a manual export. A durable shared switch engine now orders stop/snapshot/
+selection/live-health/floor and stop/restore-before-old-start recovery; real private
+filesystem tests inject an owned controller, and ordinary local starts refuse
+pending records. Actual Systemd/Child ownership adapters, native consent/apply/
+recovery and legacy/post-success rollback wiring are still required; the old
+bootstrap/core installer is not made signed by these separate APIs alone. See
 [runtime boundary](RUNTIME_RELEASES.md).
 
 **Native shell updater:** distinct tray entries separate core from shell updates.

@@ -617,6 +617,66 @@ fn signed_runtime_bundle_health_uses_real_node_but_only_disposable_synthetic_sta
 }
 
 #[test]
+fn runtime_download_uses_only_authenticated_url_and_exact_bytes_before_publication() {
+    use std::os::unix::fs::PermissionsExt;
+    for (bad_signature, transport_failure, bad_payload) in [
+        (false, false, false),
+        (true, false, false),
+        (false, true, false),
+        (false, false, true),
+    ] {
+        let mut f = Fixture::new();
+        f.bundle(None);
+        fs::create_dir_all(f.root.join("tools")).unwrap();
+        let curl = f.root.join("tools/curl");
+        fs::write(&curl,format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > '{root}/curl-args'\n/bin/cat '{root}/bundle.tar.gz'\nexit {code}\n",root=f.root.display(),code=if transport_failure{28}else{0})).unwrap();
+        fs::set_permissions(&curl, fs::Permissions::from_mode(0o700)).unwrap();
+        if bad_payload {
+            let path = f.root.join("bundle.tar.gz");
+            let mut bytes = fs::read(&path).unwrap();
+            bytes[0] ^= 1;
+            fs::write(path, bytes).unwrap();
+        }
+        if bad_signature {
+            f.write(dsh_ocean::release_feed::DOMAIN, &f.key);
+        }
+        let mut args = f.args(false);
+        args[0] = "--download-runtime-release".into();
+        args.extend([
+            "--output".into(),
+            f.root
+                .join("downloaded.tar.gz")
+                .to_string_lossy()
+                .into_owned(),
+            "--confirm-download".into(),
+            "yes".into(),
+        ]);
+        let output = f.run(&args);
+        if bad_signature || transport_failure || bad_payload {
+            assert!(!output.status.success(), "{}", describe(&output));
+            assert!(!f.root.join("downloaded.tar.gz").exists());
+            if bad_signature {
+                assert!(
+                    !f.root.join("curl-args").exists(),
+                    "bad product/domain signature must not start a transport"
+                );
+            }
+        } else {
+            assert!(output.status.success(), "{}", describe(&output));
+            assert_eq!(
+                fs::read(f.root.join("downloaded.tar.gz")).unwrap(),
+                fs::read(f.root.join("bundle.tar.gz")).unwrap()
+            );
+            let args = fs::read_to_string(f.root.join("curl-args")).unwrap();
+            assert_eq!(args.lines().next(), Some("--disable"));
+            assert!(args.contains(f.manifest["artifacts"][0]["url"].as_str().unwrap()));
+            assert!(!f.root.join("state").exists());
+            assert!(!f.root.join("home/.dsh").exists());
+        }
+    }
+}
+
+#[test]
 fn runtime_accept_requires_explicit_confirmation() {
     let f = Fixture::new();
     let mut args = f.args(true);

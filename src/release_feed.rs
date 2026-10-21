@@ -514,10 +514,26 @@ pub(crate) fn stage_reader_guarded(
     progress: impl FnMut(u64) -> Result<()>,
     before_publish: impl FnOnce() -> Result<()>,
 ) -> Result<Staged> {
-    stage_reader_hooks(
+    stage_artifact_guarded(
         input,
         destination,
-        release,
+        release.artifact(),
+        progress,
+        before_publish,
+    )
+}
+/// Crate-private bytes primitive; public product APIs still require Verified.
+pub(crate) fn stage_artifact_guarded(
+    input: &mut impl Read,
+    destination: &Path,
+    artifact: &Artifact,
+    progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
+) -> Result<Staged> {
+    stage_artifact_hooks(
+        input,
+        destination,
+        artifact,
         |file, bytes| file.write_all(bytes),
         File::sync_all,
         progress,

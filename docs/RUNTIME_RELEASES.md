@@ -1,9 +1,9 @@
 # Signed complete runtime metadata — M2 boundary
 
 This checkpoint implements runtime **metadata authentication/check/explicit
-acceptance, authenticated complete-generation import, isolated candidate health
-and transaction-only exact home snapshot/restore primitives**, not yet a wired
-live runtime switch/restart/data-rollback controller. Existing bootstrap/core installer paths remain
+acceptance, authenticated complete-generation download/import, isolated candidate
+health, exact home snapshots and a durable switch/rollback engine**. Proven-owned
+Systemd/Child adapters and native consent/update/recovery wiring are not finished. Existing bootstrap/core installer paths remain
 separate and unsigned until their M2 replacement is wired.
 Do not describe an npm version pin as authentication of its dependency closure.
 
@@ -71,6 +71,18 @@ checkpoint. The separate transaction snapshot primitive below can retain the ful
 controlled home, but actual owned-writer stop/orchestration, restore-before-old-start
 ordering and supported migration acceptance remain M2 implementation/owner gates.
 The declaration alone never establishes data rollback or write confinement.
+
+## Authenticated complete artifact download
+
+`--download-runtime-release` uses the same authenticated inputs/policy as Verify,
+with `--output ARCHIVE --confirm-download yes`. Runtime-domain verification and
+its independent floor precede transport; only the canonical URL from the selected
+Verified runtime artifact reaches the existing bounded HTTPS-only curl source.
+Exact size/SHA and successful transport exit are required before no-overwrite
+private publication. Shell signatures cannot authorize runtime bytes. A failed
+transport, including exit failure after all expected bytes, publishes nothing.
+No code runs, generation is selected or floor advances. This ends that transfer's
+publication/cancellation boundary; later preparation/apply starts a fresh operation.
 
 ## Complete-generation import (no activation)
 
@@ -182,6 +194,42 @@ retention of candidate data, writer-guard failures, corrupt snapshots, other-wri
 state and absence/publication consistency. All contents are synthetic; no running
 user profile or service participates. No live update controller/automatic rollback
 is claimed by these primitives alone.
+
+## Durable switch engine (production adapters still pending)
+
+[The shared engine](../src/runtime_switch.rs) accepts typed Prepared/Verified and
+runs the native candidate check before entering a noncancellable local commit.
+The narrow trusted controller boundary must represent **proven owned** Systemd
+or Child, not Attached/loopback guesses; production adapters/native entrypoints
+remain to be implemented. Callers must retain the settings, Runtime floor guard,
+Prepared prefix lock and lifecycle permit, and supply the exact atomic floor
+record callback. A controller health result must mean authenticated live health.
+
+The engine fsyncs a private pending journal before stopping, proves the controller
+stopped, captures the real full-home snapshot and persists its pointer before
+changing the relative generation selector/unit. It starts/checks the candidate
+and records the monotonic floor only on success. Candidate failure stops it first,
+restores data/absence before old selector/unit and **only then** starts/checks the
+old runtime. Restore/stop/unknown selector or unit failures retain pending recovery
+and backups; they never intentionally restart old against unrestored data.
+Explicit recovery uses the private home/backup-bound journal and refuses foreign
+selector/unit images or a new selector without a durable snapshot. Current engine
+support requires an existing `generations/gen.<alphanumeric>` selector; legacy
+layout migration and explicit post-success history/rollback are separate work.
+
+Ordinary local prepare/restart/health-monitor recovery now refuse pending entries,
+even corrupt/dangling ones; remote attachment is not made an update authority.
+Only explicit transaction recovery may proceed with a pending record. No new
+remote-webview updater API/capability is exposed.
+
+[Filesystem transaction tests](../tests/runtime_switch.rs) use real snapshots,
+selectors and synthetic data with a fake owned OS controller, not mocked backups.
+They exercise failure ordering, restore refusal, original absence, interrupted
+recovery, ownership interference, floor callback errors, cancellation commitment,
+changed recovery scope and local-start gates. This is not evidence that actual
+Systemd/Child production adapters or real publisher runtime acceptance are done.
+The existing installed core update UI still needs replacement; it is not signed
+merely because these separately tested engine/transport APIs now exist.
 
 ## Headless commands
 

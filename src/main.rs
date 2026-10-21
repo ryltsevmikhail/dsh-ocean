@@ -164,7 +164,8 @@ fn handle_cli() -> bool {
         | "--accept-runtime-release"
         | "--check-runtime-update"
         | "--import-runtime-release"
-        | "--check-runtime-bundle" => {
+        | "--check-runtime-bundle"
+        | "--download-runtime-release" => {
             let result = if matches!(
                 args[0].as_str(),
                 "--verify-runtime-release"
@@ -172,6 +173,7 @@ fn handle_cli() -> bool {
                     | "--check-runtime-update"
                     | "--import-runtime-release"
                     | "--check-runtime-bundle"
+                    | "--download-runtime-release"
             ) {
                 dsh_ocean::runtime_cli::run(&args)
             } else {
@@ -326,6 +328,7 @@ fn handle_cli() -> bool {
                    --restore-profile NAME SNAPSHOT --confirm-offline  restore configuration\n  \
                    --verify-runtime-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target TARGET --min-sequence N --current-runtime-version VERSION  verify complete runtime metadata (no execution)\n  \
                    --accept-runtime-release ... --confirm-accept yes  remember a verified runtime floor separately from shell\n  \
+                   --download-runtime-release ... --output ARCHIVE --confirm-download yes  download only authenticated complete runtime bytes, no execution or floor change\n  \
                    --import-runtime-release ... --artifact ARCHIVE --prefix DIR --confirm-import yes  import complete signed bytes without executing/selecting runtime\n  \
                    --check-runtime-bundle ... --artifact ARCHIVE --prefix DIR --confirm-check yes  execute authenticated native candidate checks in disposable state (no activation)\n  \
                    --check-runtime-update --current-runtime-version VERSION  check configured signed runtime source without installation\n  \

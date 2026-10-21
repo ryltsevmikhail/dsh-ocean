@@ -139,6 +139,33 @@ pub fn download_controlled(
         || control.begin_commit(),
     )
 }
+/// Separate public product proof; a shell signature cannot authorize this API.
+/// Publication completes this transfer control; preparation/apply uses a new operation.
+pub fn download_runtime_controlled(
+    release: &crate::runtime_feed::Verified,
+    destination: &Path,
+    control: Arc<Control>,
+) -> Result<Staged> {
+    download_artifact(&release.artifact().artifact(), destination, control)
+}
+fn download_artifact(
+    artifact: &release_feed::Artifact,
+    destination: &Path,
+    control: Arc<Control>,
+) -> Result<Staged> {
+    control.phase(
+        crate::update_control::Phase::Downloading,
+        Some(artifact.size),
+    )?;
+    let mut source = source(&artifact.url, artifact.size, control.clone())?;
+    release_feed::stage_artifact_guarded(
+        &mut source,
+        destination,
+        artifact,
+        |bytes| control.observe(bytes),
+        || control.begin_commit(),
+    )
+}
 
 /// Bounded untrusted metadata, never authority until the independent signature
 /// verifier accepts it. No disk publication, key retrieval or persistent state.

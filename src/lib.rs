@@ -51,6 +51,7 @@ pub mod runtime_health;
 pub mod runtime_lifecycle;
 pub mod runtime_maintenance;
 pub mod runtime_snapshot;
+pub mod runtime_switch;
 pub mod runtime_update;
 pub mod service;
 pub mod session_inventory;
