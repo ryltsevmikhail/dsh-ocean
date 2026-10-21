@@ -19,6 +19,7 @@ Start with the [project README](../README.md) for status, requirements and sourc
 - [Update testing](UPDATE_TESTING.md): isolated fixture, native and real-runtime acceptance.
 - [Packaging](PACKAGING.md): tar/deb/AppImage builders and redistribution limitations.
 - [Binary license evidence](BINARY_LICENSE_AUDIT.md): collected Rust notices/source and unresolved release gates.
+- [Toolchain/native observations](TOOLCHAIN_NATIVE_AUDIT.md): ELF-bound reports, compiler source terms and provenance limits.
 - [Release checklist](RELEASING.md) and [release verification](RELEASE_VERIFICATION.md).
 - [Roadmap](ROADMAP.md) and [changelog](../CHANGELOG.md).
 - [Open-source publication checklist](OPEN_SOURCE_CHECKLIST.md): audit scope and approval gates.

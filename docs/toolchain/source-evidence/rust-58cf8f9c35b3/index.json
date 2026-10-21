@@ -1,0 +1,63 @@
+{
+  "compiler_source_commit": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+  "coverage": "Pinned source evidence only; not proof of compiled membership, distro patches or complete binary license compliance.",
+  "files": [
+    {
+      "file": "LICENSE-RUST-MIT",
+      "git_blob_sha1": "a2070c4be7acd5316f8d0357ca3c12419a2f3c62",
+      "sha256": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+      "upstream_path": "LICENSE-MIT",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/LICENSE-MIT"
+    },
+    {
+      "file": "LICENSE-RUST-APACHE",
+      "git_blob_sha1": "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+      "upstream_path": "LICENSE-APACHE",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/LICENSE-APACHE"
+    },
+    {
+      "file": "COPYRIGHT-RUST-GUIDE",
+      "git_blob_sha1": "4dad74f234eaaaa3c311ca031216e16fc9c4e940",
+      "sha256": "172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af",
+      "upstream_path": "COPYRIGHT",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/COPYRIGHT"
+    },
+    {
+      "file": "LICENSE-COMPILER-BUILTINS",
+      "git_blob_sha1": "00ae6140bd54e1b538d833f60438e11ed8be12cf",
+      "sha256": "ab6eec6caf0fa5775e411c7a8bc6a45c4ef2956b0980b157ab74fc5cd62a928b",
+      "upstream_path": "library/compiler-builtins/LICENSE.txt",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/library/compiler-builtins/LICENSE.txt"
+    },
+    {
+      "file": "LICENSE-COMPILER-BUILTINS-LIBM",
+      "git_blob_sha1": "2f8e41f147472510b05e0adeadf350df6f5a6b96",
+      "sha256": "3823dda7cf046602f4b4e77ec8e227863dc4736037cc85bb33d9f19febe16bb7",
+      "upstream_path": "library/compiler-builtins/libm/LICENSE.txt",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/library/compiler-builtins/libm/LICENSE.txt"
+    },
+    {
+      "file": "compiler-builtins.Cargo.toml",
+      "git_blob_sha1": "b2f1443f2eb09d297b62c7b44fce9e31d71b10a2",
+      "sha256": "d89e31fed70f2cad9c6e91b787bf4c0fb680c631196b2a7215c81745aaf7fb7e",
+      "upstream_path": "library/compiler-builtins/compiler-builtins/Cargo.toml",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/library/compiler-builtins/compiler-builtins/Cargo.toml"
+    },
+    {
+      "file": "unwind.Cargo.toml",
+      "git_blob_sha1": "628b9d5e8c3ec2b0101f4a99df8081e93ab12f80",
+      "sha256": "6c5d0e8cdb54971414d2aba0b361f05997a5e806354c7b8d3b15708238a906f0",
+      "upstream_path": "library/unwind/Cargo.toml",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/library/unwind/Cargo.toml"
+    },
+    {
+      "file": "unwind.lib.rs",
+      "git_blob_sha1": "69b5e81a392152805364d14182ec8dc448586f6a",
+      "sha256": "453f0ee523d693e4f4b057a79e384b656d3c94bb927dfc909766bb9b2cf270a0",
+      "upstream_path": "library/unwind/src/lib.rs",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/library/unwind/src/lib.rs"
+    }
+  ],
+  "schema": 1
+}

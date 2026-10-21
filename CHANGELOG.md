@@ -9,6 +9,11 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+- Add non-executing, SHA-256-bound ELF/toolchain observation reports and pinned
+  compiler-source license evidence. CI retains only reports and public candidate
+  notices, not binaries. Direct dependency names/current compiler observations
+  are not a linked SBOM, build attestation or complete std/native license clearance.
+
 - Collect reproducible Linux Rust dependency license evidence, full notices and
   five exact MPL covered-source archives. Package helpers and initial installers
   retain the explicit notice/source payload instead of discarding licenses after

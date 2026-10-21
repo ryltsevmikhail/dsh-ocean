@@ -41,7 +41,7 @@ Only these five exact published Cargo.lock-checksummed MPL covered-source archiv
 
 Recipients can extract each using `tar -xzf NAME-VERSION.crate`; the resulting `NAME-VERSION/` contains the complete published source and preserved headers, not merely a remote availability link. The package allowlist carries these archives alongside notices/inventory and the lead's binary-audit document. This is not a whole-application MPL relicense. If covered sources are modified in future, replace the release payload with corresponding complete modified covered source and review obligations; do not distribute stale published archives as if they covered modifications.
 
-The local glib backport is represented honestly as a path dependency at exactly `vendor/glib`; both COPYRIGHT and LICENSE are included. Its source availability points at the fixed public `86bb883` tree, and its upstream archive/fix and patched-file evidence are recorded from the existing provenance manifest. This collector checks the patched-file and license hashes, not the complete backport correctness; that has its separate review/checker.
+The local glib backport is represented honestly as a path dependency at exactly `vendor/glib`; both COPYRIGHT and LICENSE are included. Its source availability points at the fixed public `86bb883` tree, and its upstream archive/fix and patched-file evidence are recorded from the existing provenance manifest. The collector pins the provenance blob and validates the full 121-file tree (with the exact patched-file hash), not only the license or modified lines. Semantic backport correctness and optimized behavior still have separate review/regression checks.
 
 ## Still gated
 

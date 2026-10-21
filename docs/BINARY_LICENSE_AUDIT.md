@@ -64,6 +64,14 @@ uses its ownership ledger and preserves modified notice files. The Arch template
 also retains notices and documents; its mixed-license placeholder and source
 checksum template require distribution-specific review, not blind AUR publication.
 
+## Artifact-specific observations
+
+The source checkout now provides a separate [toolchain/native evidence guide](https://github.com/ryltsevmikhail/dsh-ocean/blob/main/docs/TOOLCHAIN_NATIVE_AUDIT.md)
+and bounded non-executing ELF report collector. CI retains the exact binary hash,
+observed compiler context and public notice candidates as report-only artifacts.
+These companions are not installed license payloads or build attestations, and do
+not clear any of the coverage/redistribution gates below.
+
 ## Not yet cleared by this inventory
 
 Before a binary release, the maintainer must record evidence for the **exact

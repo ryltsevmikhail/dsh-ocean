@@ -105,6 +105,12 @@ jobs:
           python3 -B scripts/license-inventory.py --check
           python3 -B -m unittest discover -s tests -p 'test_license_*.py' -v
 
+      - name: Verify toolchain source profile and artifact collector controls
+        run: |
+          python3 -B scripts/check-toolchain-source-evidence.py
+          python3 -B -m unittest discover -s tests -p 'test_toolchain_*.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_artifact_license_evidence.py' -v
+
       - name: Format
         run: cargo fmt --check
 
@@ -254,6 +260,54 @@ jobs:
           rustc -vV
           pkg-config --modversion gtk+-3.0 webkit2gtk-4.1 javascriptcoregtk-4.1 libsoup-3.0
           readelf --dynamic --program-headers target/release/dsh-ocean
+
+      - name: Capture artifact-bound observations and public notice candidates
+        run: |
+          stage="$RUNNER_TEMP/public-toolchain-notices"
+          mkdir -m 700 "$stage"
+          args=(--binary target/release/dsh-ocean --output-dir "$RUNNER_TEMP/native-license-evidence"
+                --notice ci-scope=docs/toolchain/NOTICE-ci-scope.txt)
+          # The installed compiler is trusted build tooling here. These exact
+          # distribution copyright names are candidates, never coverage proof.
+          sysroot="$(rustc --print sysroot)"
+          n=0
+          # Deliberately exclude compiler-wide COPYRIGHT.html (14,423,589 bytes
+          # in diagnostic run 39603165011); do not enlarge/truncate collector limits.
+          # The retained ci-scope notice makes this selection gap explicit.
+          for relative in share/doc/rust/COPYRIGHT-library.html share/licenses/rust/COPYRIGHT-library.html.rustc; do
+            candidate="$sysroot/$relative"
+            if [ -f "$candidate" ] && [ ! -L "$candidate" ]; then
+              n=$((n+1))
+              # Only fixed public candidate names and byte counts, never sysroot paths.
+              if ! bytes="$(stat --format=%s -- "$candidate" 2>/dev/null)"; then
+                echo 'public notice candidate stat failed' >&2
+                exit 1
+              fi
+              printf 'public notice candidate %s bytes=%s\n' "$relative" "$bytes"
+              cp -- "$candidate" "$stage/COPYRIGHT-distribution-$n.html"
+              args+=(--notice "distribution-$n=$stage/COPYRIGHT-distribution-$n.html")
+            fi
+          done
+          commit="$(rustc -vV | sed -n 's/^commit-hash: //p')"
+          if [ "$commit" = 58cf8f9c35b355199727627d07ae34a4e2846d67 ]; then
+            profile=docs/toolchain/source-evidence/rust-58cf8f9c35b3
+            for name in LICENSE-RUST-MIT LICENSE-RUST-APACHE LICENSE-COMPILER-BUILTINS LICENSE-COMPILER-BUILTINS-LIBM; do
+              args+=(--notice "source-58cf8f9c-$name=$profile/$name")
+            done
+            cp -- "$profile/index.json" "$stage/NOTICE-source-index.json"
+            args+=(--notice "source-58cf8f9c-index=$stage/NOTICE-source-index.json")
+          fi
+          python3 -B scripts/artifact-license-evidence.py "${args[@]}"
+          # Independent log cross-check for reviewers; never upload the ELF itself.
+          sha256sum target/release/dsh-ocean
+
+      - name: Retain reports and public notice text only (no ELF publication)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-license-evidence-${{ github.sha }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/native-license-evidence
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Optimized GLib iterator security regression (headless)
         run: cargo run --locked --release --example glib_variant_iter_regression
