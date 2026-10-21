@@ -677,6 +677,92 @@ fn runtime_download_uses_only_authenticated_url_and_exact_bytes_before_publicati
 }
 
 #[test]
+fn publisher_runtime_archive_is_accepted_by_independent_signed_client_import() {
+    let mut f = Fixture::new();
+    f.bundle(None);
+    let unpack = f.root.join("publisher-source");
+    fs::create_dir(&unpack).unwrap();
+    let input = fs::File::open(f.root.join("bundle.tar.gz")).unwrap();
+    tar::Archive::new(flate2::read::GzDecoder::new(input))
+        .unpack(&unpack)
+        .unwrap();
+    let source = unpack.join("dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64");
+    let long = source
+        .join("harness/node_modules/long")
+        .join("a".repeat(90))
+        .join("b".repeat(90))
+        .join("data.js");
+    fs::create_dir_all(long.parent().unwrap()).unwrap();
+    fs::write(&long, b"complete-long-dependency").unwrap();
+    let output = f.root.join("publisher-output");
+    let package = Command::new("/usr/bin/python3")
+        .arg("-B")
+        .arg(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/package-runtime.py"))
+        .arg("--root")
+        .arg(&source)
+        .arg("--output-dir")
+        .arg(&output)
+        .args([
+            "--channel",
+            "stable",
+            "--release",
+            "0.2.1",
+            "--sequence",
+            "9",
+            "--target",
+            "linux-x86_64",
+        ])
+        .env_clear()
+        .env("HOME", f.root.join("home"))
+        .env("PATH", "/usr/bin:/bin")
+        .output()
+        .unwrap();
+    assert!(package.status.success(), "{}", describe(&package));
+    f.manifest["artifacts"][0] =
+        serde_json::from_slice(&fs::read(output.join("artifact.json")).unwrap()).unwrap();
+    f.write(DOMAIN, &f.key);
+    let prefix = f.root.join("published-prefix");
+    let archive = output.join("dsh-ocean-runtime-stable-0.2.1-9-x86_64.tar.gz");
+    let mut args = f.args(false);
+    args[0] = "--import-runtime-release".into();
+    args.extend([
+        "--artifact".into(),
+        archive.to_string_lossy().into_owned(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-import".into(),
+        "yes".into(),
+    ]);
+    let imported = f.run(&args);
+    assert!(imported.status.success(), "{}", describe(&imported));
+    let summary: serde_json::Value = serde_json::from_slice(&imported.stdout).unwrap();
+    assert_eq!(summary["activated"], false);
+    assert_eq!(summary["healthChecked"], false);
+    let generations = fs::read_dir(prefix.join("generations"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect::<Vec<_>>();
+    assert_eq!(generations.len(), 1);
+    assert_eq!(
+        fs::read(generations[0].join("NOTICE")).unwrap(),
+        b"complete-runtime-license-evidence"
+    );
+    assert_eq!(
+        fs::read(
+            generations[0]
+                .join("harness/node_modules/long")
+                .join("a".repeat(90))
+                .join("b".repeat(90))
+                .join("data.js")
+        )
+        .unwrap(),
+        b"complete-long-dependency"
+    );
+    assert!(!prefix.join("current").exists());
+    assert!(!f.root.join("state").exists());
+}
+
+#[test]
 fn runtime_accept_requires_explicit_confirmation() {
     let f = Fixture::new();
     let mut args = f.args(true);

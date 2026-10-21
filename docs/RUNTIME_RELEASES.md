@@ -2,8 +2,9 @@
 
 This checkpoint implements runtime **metadata authentication/check/explicit
 acceptance, authenticated complete-generation download/import, isolated candidate
-health, exact home snapshots and a durable switch/rollback engine**. Proven-owned
-Systemd/Child adapters and native consent/update/recovery wiring are not finished. Existing bootstrap/core installer paths remain
+health, exact home snapshots, a durable switch/rollback engine and proven-owned
+Systemd/Child adapters**. Native consent/update/recovery orchestration remains
+unfinished; these APIs do not yet replace the old installed-update UI. Existing bootstrap/core installer paths remain
 separate and unsigned until their M2 replacement is wired.
 Do not describe an npm version pin as authentication of its dependency closure.
 
@@ -195,13 +196,13 @@ state and absence/publication consistency. All contents are synthetic; no runnin
 user profile or service participates. No live update controller/automatic rollback
 is claimed by these primitives alone.
 
-## Durable switch engine (production adapters still pending)
+## Durable switch engine and owned OS adapters (native wiring still pending)
 
 [The shared engine](../src/runtime_switch.rs) accepts typed Prepared/Verified and
 runs the native candidate check before entering a noncancellable local commit.
 The narrow trusted controller boundary must represent **proven owned** Systemd
-or Child, not Attached/loopback guesses; production adapters/native entrypoints
-remain to be implemented. Callers must retain the settings, Runtime floor guard,
+or Child, not Attached/loopback guesses. The real adapters below exist; configured
+native orchestration/consent/recovery entrypoints still need to be wired. Callers must retain the settings, Runtime floor guard,
 Prepared prefix lock and lifecycle permit, and supply the exact atomic floor
 record callback. A controller health result must mean authenticated live health.
 
@@ -226,10 +227,82 @@ remote-webview updater API/capability is exposed.
 selectors and synthetic data with a fake owned OS controller, not mocked backups.
 They exercise failure ordering, restore refusal, original absence, interrupted
 recovery, ownership interference, floor callback errors, cancellation commitment,
-changed recovery scope and local-start gates. This is not evidence that actual
-Systemd/Child production adapters or real publisher runtime acceptance are done.
-The existing installed core update UI still needs replacement; it is not signed
-merely because these separately tested engine/transport APIs now exist.
+changed recovery scope and local-start gates. Those engine tests do not prove real
+OS adapter behavior; that separate boundary is tested below. Genuine publisher
+runtime acceptance remains an owner gate. The installed core update UI still needs
+replacement; separate tested APIs do not make its legacy path signed.
+
+### Proven-owned Systemd and managed-child controllers
+
+[OwnedController](../src/runtime_controller.rs) retains the lifecycle permit,
+captures the explicit old runtime/root and fixes its mode before mutation.
+`owned(app, permit, old, candidate_root, expected_home)` runs on a blocking worker;
+`headless` uses the same lifecycle without navigating a window. Attached and
+external/legacy runtimes are refused; a local address alone is not ownership.
+
+Child mode leases only Ocean's actual child handle. Successful stop reaps it
+before discarding; failed stop restores the lease and refuses replacement. Start
+uses the explicitly requested root, never rediscovery through the new selector.
+Systemd requires the exact generated old unit bytes, exact manager FragmentPath
+and no DropIns. Checked replacements accept only known old/new images and reload
+and recheck the manager; unknown concurrent edits refuse rollback too. These are
+cooperative ownership/CAS checks, not hostile same-UID race exclusion.
+
+Before an owned Systemd transaction, the expected snapshot home must match the
+**effective user-manager** HOME/DSH_HOME scope, not merely the client environment.
+A bounded (64 KiB, five-second) manager query filters and retains only those two
+values, discards stderr and never reflects values in errors. Missing HOME falls
+back to the account home; absent DSH_HOME uses HOME/.dsh. Mismatched, duplicate,
+quoted/escaped, relative/empty or unavailable scope fails closed. Scope is checked
+again at ownership and start. Only exact ActiveState `inactive` proves stopped;
+failed/transitional/unknown states and query errors are not mistaken for stopped.
+
+After new start and old rollback, health requires anonymous 401 **and** a valid
+fresh token redirect (303). Server/token state is refreshed/published/cached, and
+`finish()` reloads the native app's window; headless `finish()` does no navigation.
+[Adapter tests](../tests/runtime_controller.rs) use private fake-manager fixtures
+and real owned private children, covering failed stops, lease restoration, explicit
+old roots, fresh tokens, manager provenance, scope divergence, inactive proof and
+bounded query failures. They do not operate the user's actual service/profile or
+constitute genuine publisher/system integration acceptance.
+
+## Publisher archive assembly (not release clearance)
+
+[The publisher-only packager](../scripts/package-runtime.py) assembles an already
+resolved, frozen per-architecture Node/DSH/pnpm tree. It never runs npm, resolves
+client dependencies, downloads, signs, changes trust or starts/stops a service.
+The supplied `.versions` must be the exact four-line component/source record with
+its final newline and DSH version matching `--release`.
+
+```bash
+python3 -B scripts/package-runtime.py --root PREPARED_RUNTIME_ROOT \
+  --output-dir NEW_ARCH_OUTPUT --channel stable --release VERSION \
+  --sequence COUNTER --target linux-x86_64
+```
+
+The output is the canonical complete archive and `artifact.json` (target, URL,
+size, SHA-256, original Node archive hash). Payload includes `runtime`, `harness`,
+`tools`, `.versions`, common root aggregate notices and all files inside these
+payload trees, including native binaries and dependency notices. GNU long-name
+records support bounded dependency paths. Files/directories have deterministic
+archive timestamps and no owner identities.
+
+Normal JS bin symlinks are converted into regular executable shims using pinned
+Node's `process.execve`: the real entry keeps its package-relative imports and
+main argv, and replaces the same PID rather than spawning an orphanable server.
+Other symlinks (including directory/outside links), special files, special mode
+bits and known credential/transaction metadata inside the payload are refused.
+Resolve unsupported supplier layouts explicitly in the controlled publisher build;
+never fall back to a client-side npm rebuild. Existing output is not overwritten.
+
+This is byte assembly, **not** proof that the supplier tree's `.versions` is true,
+that native ABI/dependency closure is compatible, or that licensing is cleared.
+A publisher must independently validate source provenance, actual native versions/
+bindings, the signed manifest and the resulting archive with the Rust verifier/
+importer and disposable native health before publication. Current tests exercise
+synthetic native bytes, real private JS shim behavior and independent signed Rust
+import (including long paths/notices); they are not genuine DSH bundle acceptance.
+The full pinned producer/guarded release workflow remains M2 work.
 
 ## Offline publisher signing
 
