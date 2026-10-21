@@ -231,6 +231,33 @@ Systemd/Child production adapters or real publisher runtime acceptance are done.
 The existing installed core update UI still needs replacement; it is not signed
 merely because these separately tested engine/transport APIs now exist.
 
+## Offline publisher signing
+
+The existing [offline signer](../scripts/sign-release.mjs) accepts explicit
+`--product runtime` to select **`DSH Ocean runtime manifest v1\n`**. Omitting the
+option retains the shell domain for compatibility; `--product shell` is explicit.
+Unknown/duplicate product options refuse signing. Runtime and shell signatures
+are not interchangeable, even with the same key/raw bytes. The signer emits only
+signature/public material and raw-manifest digest, never installs trust or
+publishes anything; manifest policy still requires the independent Rust verifier.
+
+```bash
+# Owner-operated publisher environment only; no production keys are in this repo.
+node scripts/sign-release.mjs --manifest MANIFEST \
+  --private-key OWNER_PEM --key-id OWNER_KEY_ID --product runtime
+```
+
+The private-key file must already exist with owned 0600/0400 permissions. Do not
+put it in artifacts, source control, logs or a request to an assistant. Production
+key/fingerprint provisioning and rotation remain independent owner inputs. An
+opt-in test cross-checks signer output with the Rust verifier using ephemeral
+**test-only** keys and private synthetic metadata:
+
+```bash
+DSH_OCEAN_TEST_VERIFIER="$PWD/target/debug/dsh-ocean" \
+  node --test tests/release_signer.mjs
+```
+
 ## Headless commands
 
 ```bash

@@ -32,6 +32,26 @@ test('signs exact domain plus raw bytes and exposes only public material', t => 
   const output = JSON.stringify(bundle); assert.ok(!output.includes('PRIVATE KEY') && !output.includes(f.pem.toString().split('\n')[1]));
   assert.deepEqual(fs.readFileSync(f.key), before); assert.equal(fs.statSync(f.key).mode & 0o777, 0o600); assert.equal(fs.readdirSync(f.root).length, 2);
 });
+test('runtime signing is an explicit separate domain and cannot authorize shell bytes',t=>{
+  const f=fixture(t);const bytes=fs.readFileSync(f.manifest);
+  const bundle=signRelease([...f.args,'--product','runtime']);const signature=Buffer.from(bundle.signature.signatureHex,'hex');
+  assert.ok(crypto.verify(null,Buffer.concat([Buffer.from('DSH Ocean runtime manifest v1\n'),bytes]),f.publicKey,signature));
+  assert.equal(crypto.verify(null,Buffer.concat([Buffer.from('DSH Ocean release manifest v1\n'),bytes]),f.publicKey,signature),false);
+  const shell=Buffer.from(signRelease(f.args).signature.signatureHex,'hex');
+  assert.equal(crypto.verify(null,Buffer.concat([Buffer.from('DSH Ocean runtime manifest v1\n'),bytes]),f.publicKey,shell),false);
+  const cli=spawnSync(process.execPath,[script,...f.args,'--product','runtime'],{encoding:'utf8',env:{HOME:f.root,PATH:'/nonexistent'}});assert.equal(cli.status,0,cli.stderr);
+  assert.ok(crypto.verify(null,Buffer.concat([Buffer.from('DSH Ocean runtime manifest v1\n'),bytes]),f.publicKey,Buffer.from(JSON.parse(cli.stdout).signature.signatureHex,'hex')));
+  assert.throws(()=>signRelease([...f.args,'--product','unknown']),/product/);
+  assert.throws(()=>signRelease([...f.args,'--product','runtime','--product','shell']),/duplicate/);
+});
+test('runtime publisher signature passes the independent Rust verifier offline', {skip:!process.env.DSH_OCEAN_TEST_VERIFIER}, t=>{
+  const f=fixture(t);const now=Date.now();
+  fs.writeFileSync(f.manifest,JSON.stringify({version:1,product:'dsh-ocean-runtime',channel:'stable',sequence:7,release:'0.2.1',publishedAt:new Date(now-60000).toISOString(),expiresAt:new Date(now+3600000).toISOString(),components:{node:'26.12.0',dsh:'0.2.1',pnpm:'10.34.7'},stateScope:'web-profile-sessions-storages-v1',artifacts:[{target:'linux-x86_64',kind:'tar.gz',url:'https://github.com/ryltsevmikhail/dsh-ocean/releases/download/runtime-stable-v0.2.1-r7/dsh-ocean-runtime-stable-0.2.1-7-x86_64.tar.gz',size:8,sha256:'ab'.repeat(32),nodeArchiveSha256:'cd'.repeat(32)}]}));
+  const signature=path.join(f.root,'signature.json');const publicKey=path.join(f.root,'public.json');
+  const verify=bundle=>{fs.writeFileSync(signature,JSON.stringify(bundle.signature));fs.writeFileSync(publicKey,JSON.stringify(bundle.publicKey));return spawnSync(process.env.DSH_OCEAN_TEST_VERIFIER,['--verify-runtime-release',f.manifest,signature,publicKey,'--channel','stable','--target','linux-x86_64','--min-sequence','1','--current-runtime-version','0.2.0'],{encoding:'utf8',timeout:5000,env:{HOME:f.root,XDG_STATE_HOME:path.join(f.root,'state'),PATH:'/nonexistent'}});};
+  const result=verify(signRelease([...f.args,'--product','runtime']));assert.equal(result.status,0,result.stderr);
+  assert.notEqual(verify(signRelease(f.args)).status,0,'shell-domain signing must fail independent Runtime verifier');assert.ok(!fs.existsSync(path.join(f.root,'state')),'offline verification must not remember a floor');
+});
 test('supports an owner-read-only PEM without altering it', t => {
   const f = fixture(t); fs.chmodSync(f.key, 0o400); assert.equal(signRelease(f.args).signature.keyId, 'test-only'); assert.equal(fs.statSync(f.key).mode & 0o777, 0o400);
 });
