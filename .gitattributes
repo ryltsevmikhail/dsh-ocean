@@ -9,3 +9,5 @@ docs/third-party/evidence/** -text -whitespace
 docs/third-party/sources/*.crate -text
 docs/third-party/inventory.json linguist-generated
 packaging/license-inputs.txt -text
+# Supplemental compiler-source evidence must retain exact upstream bytes.
+docs/toolchain/source-evidence/** -text -whitespace
