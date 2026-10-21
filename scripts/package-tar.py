@@ -16,7 +16,7 @@ if sys.version_info < (3, 11):
     sys.exit("[package] Python 3.11+ is required for the build helper (not the installed client)")
 import tomllib
 
-DOCS = ("README", "USAGE", "BRANDING", "OPEN_SOURCE_CHECKLIST", "ARCHITECTURE", "DOWNLOADS", "INSTALLATION", "NOTIFICATIONS", "PACKAGING", "PROFILE_BACKUPS", "RELEASE_VERIFICATION", "RELEASING", "ROADMAP", "SHELL_UPDATES", "UPDATE_TESTING")
+DOCS = ("README", "USAGE", "BRANDING", "OPEN_SOURCE_CHECKLIST", "ARCHITECTURE", "DOWNLOADS", "INSTALLATION", "NOTIFICATIONS", "PACKAGING", "PROFILE_BACKUPS", "RELEASE_VERIFICATION", "RELEASING", "ROADMAP", "SHELL_UPDATES", "UPDATE_TESTING", "TOOLCHAIN_NATIVE_AUDIT")
 INPUTS = {"README.md": "README.md", "CHANGELOG.md": "CHANGELOG.md", "LICENSE": "LICENSE", "NOTICE": "NOTICE", "install.sh": "packaging/install-from-package.sh", "install.py": "packaging/install-from-package.py", "packaging/dsh-ocean.desktop": "packaging/dsh-ocean.desktop"}
 INPUTS.update({name: name for name in ("CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md")})
 INPUTS.update({f"docs/{name}.md": f"docs/{name}.md" for name in DOCS})
