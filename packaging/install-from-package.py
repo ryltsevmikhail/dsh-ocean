@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import secrets
 import stat
 import sys
@@ -178,6 +179,8 @@ def write_ledger(records, ledger, created_dirs=(), roots=()):
             "directories": sorted(str(directory) for directory in created_dirs
                                   if any(root in directory.parents for root in roots)),
         }, sort_keys=True, indent=1) + "\n").encode()
+        if len(body) > 64 * 1024:
+            raise ValueError("install ledger would exceed its readable bound")
         stage = os.open(record["temporary"], os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=fd)
         record["fd"], record["owned"] = stage, os.fstat(stage)
         with os.fdopen(os.dup(stage), "wb") as output:
@@ -336,6 +339,36 @@ def uninstall(binary_dir, data_home, state_home):
     return removed
 
 
+def license_payload(root_fd):
+    source, before = source_file(root_fd, "packaging/license-inputs.txt")
+    try:
+        if before.st_size > 65536:
+            raise ValueError("license payload manifest exceeds bound")
+        raw = source.read(65537)
+        if len(raw) > 65536 or stamp(os.fstat(source.fileno())) != stamp(before):
+            raise ValueError("license payload manifest changed")
+        base = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "docs/third-party/inventory.json", "docs/BINARY_LICENSE_AUDIT.md",
+                "docs/third-party/sources/cssparser-0.37.0.crate", "docs/third-party/sources/cssparser-macros-0.7.1.crate",
+                "docs/third-party/sources/dtoa-short-0.3.5.crate", "docs/third-party/sources/option-ext-0.2.0.crate",
+                "docs/third-party/sources/selectors-0.38.0.crate"}
+        names = []
+        for name in raw.decode("utf-8").splitlines():
+            if not name or name.startswith("#"):
+                continue
+            if name != name.strip() or (name not in base and not re.fullmatch(r"docs/third-party/sources/[a-z0-9][a-z0-9_-]*-[0-9][0-9A-Za-z._+-]*\.crate", name)):
+                raise ValueError("unsupported license payload path")
+            if name in names:
+                raise ValueError("duplicate license payload path")
+            names.append(name)
+        if len(names) > 64 or set(names) != base:
+            raise ValueError("required license payload missing")
+        source.seek(0)
+        return names, source, before
+    except BaseException:
+        source.close()
+        raise
+
+
 def install(root, binary_dir, data_home, state_home, check=False):
     if platform.system() != "Linux" or os.geteuid() == 0:
         raise ValueError("portable installation requires a non-root Linux user")
@@ -350,11 +383,18 @@ def install(root, binary_dir, data_home, state_home, check=False):
     committed = False
     try:
         root_fd = source_root_fd(root)
+        notices, selection, selection_stamp = license_payload(root_fd)
+        docroot = data_home / "doc/dsh-ocean"
+        opened.append((selection, selection_stamp, root / "packaging/license-inputs.txt", docroot / "packaging/license-inputs.txt", 0o644))
+        inputs += [(name, docroot / name, 0o644) for name in notices]
         for relative, target, mode in inputs:
             source, before = source_file(root_fd, relative, relative == "dsh-ocean")
             opened.append((source, before, root / relative, target, mode))
-        desktop = opened[-1][0]
-        lines = desktop.read(opened[-1][1].st_size + 1).decode("utf-8").splitlines()
+        # Keep legacy binary/icon ordering, but never infer desktop by position.
+        opened.append(opened.pop(0))
+        desktop_path = root / "packaging/dsh-ocean.desktop"
+        desktop, desktop_stamp, *_ = next(row for row in opened if row[2] == desktop_path)
+        lines = desktop.read(desktop_stamp.st_size + 1).decode("utf-8").splitlines()
         if sum(line.startswith("Exec=") for line in lines) != 1:
             raise ValueError("expected one desktop Exec field")
         content = ("\n".join("Exec=" + desktop_exec(binary) if line.startswith("Exec=") else line for line in lines) + "\n").encode()
@@ -373,15 +413,15 @@ def install(root, binary_dir, data_home, state_home, check=False):
                 if stamp(os.fstat(source.fileno())) != stamp(before) or stamp(path.lstat()) != stamp(before):
                     raise ValueError("install input changed during preflight")
             return
-        for index, (source, before, path, target, mode) in enumerate(opened):
+        for source, before, path, target, mode in opened:
             fd = parent_fd(target, True, created_dirs)
             record = {"parent": fd, "target": target, "temporary": ".dsh-ocean-install-" + secrets.token_hex(16), "fd": None, "owned": None, "published": False}
             records.append(record)
             stage = os.open(record["temporary"], os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=fd)
             record["fd"], record["owned"] = stage, os.fstat(stage)
             source.seek(0)
-            reader = io.BytesIO(content) if index == len(opened) - 1 else source
-            remaining = len(content) if index == len(opened) - 1 else before.st_size
+            reader = io.BytesIO(content) if path == desktop_path else source
+            remaining = len(content) if path == desktop_path else before.st_size
             with os.fdopen(os.dup(stage), "wb") as output:
                 while remaining:
                     block = reader.read(min(remaining, 65536))

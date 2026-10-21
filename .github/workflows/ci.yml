@@ -100,6 +100,11 @@ jobs:
           python3 -B scripts/check-glib-backport.py --archive "$RUNNER_TEMP/glib-0.18.5.crate"
           python3 -B -m unittest discover -s tests -p 'test_glib_backport.py' -v
 
+      - name: Verify Linux license evidence and covered sources
+        run: |
+          python3 -B scripts/license-inventory.py --check
+          python3 -B -m unittest discover -s tests -p 'test_license_*.py' -v
+
       - name: Format
         run: cargo fmt --check
 
@@ -243,6 +248,12 @@ jobs:
 
       - name: Release build
         run: cargo build --locked --release
+
+      - name: Native toolchain and direct linkage evidence (not full closure)
+        run: |
+          rustc -vV
+          pkg-config --modversion gtk+-3.0 webkit2gtk-4.1 javascriptcoregtk-4.1 libsoup-3.0
+          readelf --dynamic --program-headers target/release/dsh-ocean
 
       - name: Optimized GLib iterator security regression (headless)
         run: cargo run --locked --release --example glib_variant_iter_regression

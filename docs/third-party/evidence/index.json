@@ -1,0 +1,72 @@
+[
+  {
+    "file": "alloc-stdlib-LICENSE",
+    "lines": null,
+    "packages": [
+      "alloc-stdlib@0.3.0"
+    ],
+    "sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae",
+    "supplier_file_sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae",
+    "url": "https://raw.githubusercontent.com/dropbox/rust-alloc-no-stdlib/0a81fd6928ea3b33c8cd484aa4575d50ffb98012/LICENSE"
+  },
+  {
+    "file": "dlopen2-LICENSE",
+    "lines": null,
+    "packages": [
+      "dlopen2@0.8.2",
+      "dlopen2_derive@0.4.3"
+    ],
+    "sha256": "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2",
+    "supplier_file_sha256": "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2",
+    "url": "https://raw.githubusercontent.com/OpenByteDev/dlopen2/cc80e4a0a90d499b677fdf7743699b4b3a43a989/LICENSE"
+  },
+  {
+    "file": "libappindicator-LICENSE-MIT",
+    "lines": null,
+    "packages": [
+      "libappindicator-sys@0.9.0"
+    ],
+    "sha256": "eb227437252b2a7a9c1fc342c93ade1f3d7ce38cc6dd754f613db07d53ceff0b",
+    "supplier_file_sha256": "eb227437252b2a7a9c1fc342c93ade1f3d7ce38cc6dd754f613db07d53ceff0b",
+    "url": "https://raw.githubusercontent.com/tauri-apps/libappindicator-rs/eafd1e3682a1247f595410266091e9684021cb6f/LICENSE-MIT"
+  },
+  {
+    "file": "libappindicator-LICENSE-APACHE",
+    "lines": null,
+    "packages": [
+      "libappindicator-sys@0.9.0"
+    ],
+    "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+    "supplier_file_sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+    "url": "https://raw.githubusercontent.com/tauri-apps/libappindicator-rs/eafd1e3682a1247f595410266091e9684021cb6f/LICENSE-APACHE"
+  },
+  {
+    "file": "qrcodegen-header",
+    "lines": "1-22",
+    "packages": [
+      "qrcodegen@1.8.0"
+    ],
+    "sha256": "29dd69709492b2f774fc322f0c18835d26a481fb02cd225beff64e32675d5e76",
+    "supplier_file_sha256": "a4546464799faaea27393dd60a24be08349618fb98333decbaf686d4c98ca410",
+    "url": "https://raw.githubusercontent.com/nayuki/QR-Code-generator/720f62bddb7226106071d4728c292cb1df519ceb/rust/src/lib.rs"
+  },
+  {
+    "file": "selectors-header",
+    "lines": "1-3",
+    "packages": [
+      "selectors@0.38.0"
+    ],
+    "sha256": "766674381e88a468d55e07de3596987391cf0e8beebe51baf4fddf11078785b3",
+    "supplier_file_sha256": "d54c6e13e9e952dac17d209171df8657e3cae93beaddace4906150cdec8d02e9",
+    "url": "https://raw.githubusercontent.com/servo/stylo/572ecba2d1600e7c3d490586692a209faf703baa/selectors/lib.rs"
+  },
+  {
+    "file": "selectors-MPL-2.0-supplement",
+    "note": "Explicit full MPL 2.0 terms supplement from checksum-verified cssparser 0.37.0 LICENSE, not a claimed standalone selectors license file.",
+    "packages": [
+      "selectors@0.38.0"
+    ],
+    "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+    "url": "https://crates.io/api/v1/crates/cssparser/0.37.0/download"
+  }
+]

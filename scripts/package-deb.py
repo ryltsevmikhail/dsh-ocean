@@ -39,7 +39,7 @@ def destinations(opened):
             path = "usr/bin/dsh-ocean"
         elif key == "packaging/dsh-ocean.desktop":
             path = "usr/share/applications/dev.dsh.ocean.desktop"
-        elif key == "assets/ocean-ice.svg" or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"):
+        elif key in ("assets/ocean-ice.svg", "packaging/license-inputs.txt") or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"):
             path = "usr/share/doc/dsh-ocean/" + key
         elif key.startswith("icons/"):
             size = key.split("/")[1].removesuffix(".png")
@@ -79,7 +79,7 @@ def write_data(raw, opened, epoch):
                 key = mapping[path]
                 if key is None:
                     notices = []
-                    for license_name in ("LICENSE", "NOTICE"):
+                    for license_name in ("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt"):
                         source, info, _, _ = opened[license_name]
                         source.seek(0)
                         content = source.read(info.st_size + 1)

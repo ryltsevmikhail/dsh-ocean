@@ -84,6 +84,41 @@ def open_source(path, binary=False, machine=None, repository=None):
         raise
 
 
+# Exact current covered-source set; dependency/source revisions require review.
+LICENSE_BASE = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "docs/third-party/inventory.json", "docs/BINARY_LICENSE_AUDIT.md",
+                "docs/third-party/sources/cssparser-0.37.0.crate", "docs/third-party/sources/cssparser-macros-0.7.1.crate",
+                "docs/third-party/sources/dtoa-short-0.3.5.crate", "docs/third-party/sources/option-ext-0.2.0.crate",
+                "docs/third-party/sources/selectors-0.38.0.crate"}
+
+
+def license_payload(root):
+    source, before = open_source(root / "packaging/license-inputs.txt", repository=root)
+    with source:
+        if before.st_size > 65536:
+            raise ValueError("license payload manifest exceeds bound")
+        raw = source.read(65537)
+        if len(raw) > 65536 or stamp(os.fstat(source.fileno())) != stamp(before):
+            raise ValueError("license payload manifest changed")
+    names = []
+    for name in raw.decode("utf-8").splitlines():
+        if not name or name.startswith("#"):
+            continue
+        if name != name.strip() or (name not in LICENSE_BASE and not re.fullmatch(r"docs/third-party/sources/[a-z0-9][a-z0-9_-]*-[0-9][0-9A-Za-z._+-]*\.crate", name)):
+            raise ValueError("unsupported license payload path")
+        if name in names:
+            raise ValueError("duplicate license payload path")
+        names.append(name)
+    if len(names) > 64 or set(names) != LICENSE_BASE:
+        raise ValueError("required license payload missing")
+    return tuple(names), raw
+
+
+# One explicit reviewed list, never a recursive sweep of user/build directories.
+LICENSE_INPUTS, LICENSE_MANIFEST = license_payload(Path(__file__).resolve().parents[1])
+INPUTS.update({name: name for name in LICENSE_INPUTS})
+INPUTS["packaging/license-inputs.txt"] = "packaging/license-inputs.txt"
+
+
 def same_directory(path, fd):
     current = path.lstat()
     held = os.fstat(fd)
@@ -135,6 +170,10 @@ def package(root, directory, epoch, *, archive_writer=None, archive_name=None):
     try:
         for key, (path, mode) in inputs.items():
             opened[key] = (*open_source(path, key == "dsh-ocean", machines[arch], root if key != "dsh-ocean" else None), path, mode)
+        manifest_source = opened["packaging/license-inputs.txt"][0]
+        if manifest_source.read(65537) != LICENSE_MANIFEST:
+            raise ValueError("license payload manifest changed after selection")
+        manifest_source.seek(0)
         directory.mkdir(mode=0o700, exist_ok=True)
         fd = os.open(directory, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
         info = os.fstat(fd)

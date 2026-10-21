@@ -9,6 +9,12 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+- Collect reproducible Linux Rust dependency license evidence, full notices and
+  five exact MPL covered-source archives. Package helpers and initial installers
+  retain the explicit notice/source payload instead of discarding licenses after
+  tar extraction. Ownership-aware portable uninstall still refuses modified files.
+  This is not complete native/toolchain/AppImage clearance or release approval.
+
 - Update the direct SHA-256 dependency to `sha2 0.11` without changing backup
   manifest hashes: use the existing byte-wise lowercase hex encoder instead of
   depending on the digest output container's formatting traits. Fixed vectors

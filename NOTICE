@@ -29,3 +29,10 @@ binary must include the notices, license texts or source offers required by the
 actual components included in that artifact, including any AppImage runtime.
 This NOTICE is not a complete transitive binary-dependency license inventory;
 maintainers must complete that inventory before publishing binary artifacts.
+
+THIRD_PARTY_NOTICES.txt and docs/third-party/inventory.json now collect a
+checksum-verified conservative Linux Cargo source-graph inventory. Fixed package
+and initial-install payloads retain the supplied notice texts and five MPL covered
+source archives. This evidence does not complete native/toolchain/AppImage or
+other distribution review. See docs/BINARY_LICENSE_AUDIT.md for the precise scope
+and remaining release gates; it is not a whole-executable MIT grant or clearance.

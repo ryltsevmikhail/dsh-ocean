@@ -43,7 +43,7 @@ def read_ar(raw):
 
 def expected_payload():
     files = {"usr/bin/dsh-ocean", "usr/share/applications/dev.dsh.ocean.desktop", "usr/share/doc/dsh-ocean/copyright"}
-    files.update("usr/share/doc/dsh-ocean/" + key for key in INPUTS if key == "assets/ocean-ice.svg" or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"))
+    files.update("usr/share/doc/dsh-ocean/" + key for key in INPUTS if key in ("assets/ocean-ice.svg", "packaging/license-inputs.txt") or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"))
     files.update(f"usr/share/icons/hicolor/{size}x{size}/apps/dsh-ocean.png" for size in (32, 64, 128, 256, 512))
     return files
 
@@ -102,6 +102,10 @@ class DebianPackaging(PackagingFixture):
         self.assertNotIn(b"stale-should-not-ship", files["usr/bin/dsh-ocean"])
         self.assertIn(b"fixture LICENSE", files["usr/share/doc/dsh-ocean/copyright"])
         self.assertIn(b"fixture NOTICE", files["usr/share/doc/dsh-ocean/copyright"])
+        self.assertIn(b"fixture THIRD_PARTY_NOTICES.txt", files["usr/share/doc/dsh-ocean/copyright"])
+        self.assertEqual(files["usr/share/doc/dsh-ocean/THIRD_PARTY_NOTICES.txt"],
+                         (self.root / "THIRD_PARTY_NOTICES.txt").read_bytes())
+        self.assertEqual(sum(name.startswith("usr/share/doc/dsh-ocean/docs/third-party/sources/") for name in files), 5)
         self.assertTrue(all(row[1:] == (17, 0, 0, 0o100644) for row in headers))
         self.assertTrue(all(entry.uid == entry.gid == 0 and entry.mtime == 17 for entry in entries))
         self.assertEqual(next(entry.mode for entry in entries if entry.name == "usr/bin/dsh-ocean"), 0o755)

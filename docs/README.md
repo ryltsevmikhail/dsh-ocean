@@ -18,6 +18,7 @@ Start with the [project README](../README.md) for status, requirements and sourc
 - [Architecture](ARCHITECTURE.md): lifecycle, authentication and failure modes.
 - [Update testing](UPDATE_TESTING.md): isolated fixture, native and real-runtime acceptance.
 - [Packaging](PACKAGING.md): tar/deb/AppImage builders and redistribution limitations.
+- [Binary license evidence](BINARY_LICENSE_AUDIT.md): collected Rust notices/source and unresolved release gates.
 - [Release checklist](RELEASING.md) and [release verification](RELEASE_VERIFICATION.md).
 - [Roadmap](ROADMAP.md) and [changelog](../CHANGELOG.md).
 - [Open-source publication checklist](OPEN_SOURCE_CHECKLIST.md): audit scope and approval gates.

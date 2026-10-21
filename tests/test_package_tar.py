@@ -12,6 +12,7 @@ import tomllib
 import tarfile
 import tempfile
 import unittest
+from license_payload_fixture import populate as license_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUTS = runpy.run_path(str(ROOT / "scripts/package-tar.py"))["INPUTS"]
@@ -54,6 +55,7 @@ class PackagingFixture(unittest.TestCase):
             path = self.root / source
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(("fixture " + source + "\n").encode())
+        license_fixture(self.root)
         stale = self.root / "target/release/dsh-ocean"
         stale.parent.mkdir(parents=True)
         stale.write_bytes(b"stale-should-not-ship")
@@ -107,6 +109,38 @@ class Packaging(PackagingFixture):
             self.assertEqual(archive.getmember(self.name + "/install.sh").mode, 0o755)
             self.assertFalse(any("untracked-secret" in entry.name for entry in members))
         self.assertFalse(list(output.parent.glob(".dsh-ocean-package-*")))
+
+    def test_covered_source_entries_cannot_be_removed_from_manifest(self):
+        manifest = self.root / "packaging/license-inputs.txt"
+        rows = manifest.read_text().splitlines()
+        manifest.write_text("\n".join(row for row in rows if not row.startswith("docs/third-party/sources/")) + "\n")
+        self.assertTrue((self.root / "docs/third-party/sources/cssparser-0.37.0.crate").is_file())
+        result, output = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(output.exists())
+
+    def test_missing_linked_or_oversized_notices_fail_closed(self):
+        notice = self.root / "THIRD_PARTY_NOTICES.txt"
+        self.assertEqual(notice.parent, self.root)
+        original = notice.read_bytes()
+        notice.unlink()
+        result, output = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(output.exists())
+        outside = Path(self.temporary.name) / "outside-notice"
+        outside.write_bytes(original)
+        notice.symlink_to(outside)
+        result, output = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(output.exists())
+        self.assertEqual(outside.read_bytes(), original)
+        notice.unlink()
+        notice.write_bytes(original)
+        with notice.open("r+b") as stream:
+            stream.truncate(16 * 1024 * 1024 + 1)
+        result, output = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(output.exists())
 
     def test_archive_bytes_are_reproducible_for_identical_inputs_not_source_mtimes(self):
         first, a = self.build("one")
