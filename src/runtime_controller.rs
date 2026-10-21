@@ -40,6 +40,11 @@ pub struct OwnedController {
     new_unit: Option<Vec<u8>>,
     unit_path: PathBuf,
     unit_name: String,
+    /// Recovery mode proves ownership against the journal's captured before/after
+    /// unit images instead of re-rendering the OLD runtime's unit, so a recovery
+    /// that begins after the unit was already switched to the candidate is still
+    /// provable. `start`/`check_unit`/`switch_unit` use the captured images.
+    recovery: bool,
 }
 
 /// Resolve a path to its canonical form, failing closed on symlink ambiguity or
@@ -204,6 +209,100 @@ impl OwnedController {
         Self::construct(None, permit, old, candidate, expected_home)
     }
 
+    /// Explicit-recovery constructor (production): the OLD runtime is derived
+    /// from the pending journal's `old` generation (never `bootstrap::detect`),
+    /// and ownership is proven against the journal's captured before/after unit
+    /// images. `unit` is `None` for a managed child (which still refuses a fresh
+    /// session that no longer owns a child handle).
+    pub fn owned_recover(
+        app: AppHandle,
+        permit: RuntimePermit,
+        old_root: PathBuf,
+        candidate: PathBuf,
+        expected_home: PathBuf,
+        unit: Option<UnitImage>,
+    ) -> Result<Self> {
+        Self::construct_recover(Some(app), permit, old_root, candidate, expected_home, unit)
+    }
+
+    /// Headless/tests recovery constructor, same authority as [`Self::owned_recover`].
+    pub fn headless_recover(
+        permit: RuntimePermit,
+        old_root: PathBuf,
+        candidate: PathBuf,
+        expected_home: PathBuf,
+        unit: Option<UnitImage>,
+    ) -> Result<Self> {
+        Self::construct_recover(None, permit, old_root, candidate, expected_home, unit)
+    }
+
+    fn construct_recover(
+        app: Option<AppHandle>,
+        permit: RuntimePermit,
+        old_root: PathBuf,
+        candidate: PathBuf,
+        expected_home: PathBuf,
+        unit: Option<UnitImage>,
+    ) -> Result<Self> {
+        let old = generation_runtime(&old_root);
+        if unit.is_some() {
+            // Systemd recovery is unit-based and cross-session: a fresh session
+            // has no published server (the pending gate forbids starting one,
+            // and the health monitor skips while pending), but the journal's
+            // captured before/after unit images are sufficient authority once
+            // the exact fragment, no drop-ins and the manager scope are proven.
+            // Reconstruct the fixed loopback origin from configuration and
+            // publish the fresh launch token only after the recovered OLD root
+            // starts and proves authenticated health; a remote origin cannot
+            // own the local unit.
+            let base = config::checked_server_url()?;
+            anyhow::ensure!(
+                service::permits_local_start(&base),
+                "an owned systemd recovery requires a loopback configured origin; \
+                 a remote origin cannot own the local unit"
+            );
+            anyhow::ensure!(
+                base.host_str() == Some("127.0.0.1"),
+                "owned systemd recovery requires the fixed loopback unit origin"
+            );
+            validate_systemd_scope(&expected_home)?;
+            let mut controller = Self {
+                app,
+                handle: tauri::async_runtime::handle(),
+                permit,
+                mode: ServerMode::Systemd,
+                base,
+                old,
+                candidate,
+                expected_home,
+                old_root: None,
+                old_unit: None,
+                new_unit: None,
+                unit_path: systemd::unit_path(),
+                unit_name: config::UNIT_NAME.to_string(),
+                recovery: true,
+            };
+            controller.old_unit = unit.as_ref().map(|image| image.before.clone());
+            controller.new_unit = unit.as_ref().map(|image| image.after.clone());
+            return Ok(controller);
+        }
+        // Managed-child recovery is same-session only: it needs a live owned
+        // child handle. A fresh session (no published server) must refuse with
+        // clear guidance rather than a misleading "no running server" or a PID
+        // reconstructed from a path.
+        if permit.server()?.is_none() {
+            anyhow::bail!(
+                "a managed-child runtime can only be recovered in the same session \
+                 that started it; this fresh session no longer owns the stopped child, \
+                 so it cannot be recovered safely. Start or reinstall DSH with the \
+                 original package manager; the pending transaction is retained."
+            );
+        }
+        let mut controller = Self::construct(app, permit, old, candidate, expected_home)?;
+        controller.recovery = true;
+        Ok(controller)
+    }
+
     fn construct(
         app: Option<AppHandle>,
         permit: RuntimePermit,
@@ -261,6 +360,7 @@ impl OwnedController {
             new_unit: None,
             unit_path: systemd::unit_path(),
             unit_name: config::UNIT_NAME.to_string(),
+            recovery: false,
         })
     }
 
@@ -315,10 +415,29 @@ impl OwnedController {
 
     /// Prove the on-disk unit is the exact generated unit for the captured OLD
     /// runtime, and that the manager resolves exactly that fragment with no
-    /// drop-ins. This is the only systemd ownership authority.
+    /// drop-ins. This is the only systemd ownership authority. In recovery mode
+    /// the on-disk unit may already be the candidate image, so the captured
+    /// before/after images from the journal are the authority instead of a fresh
+    /// render of the old runtime.
     fn prove_unit_owned(&mut self) -> Result<()> {
-        let rendered = systemd::render_unit(&self.old, &self.base).into_bytes();
         let on_disk = self.read_unit()?;
+        if self.recovery {
+            let old = self
+                .old_unit
+                .clone()
+                .context("recovery unit image not captured")?;
+            let new = self
+                .new_unit
+                .clone()
+                .context("recovery unit image not captured")?;
+            anyhow::ensure!(
+                on_disk == old || on_disk == new,
+                "the managed unit does not match the pending transaction images; recovery refused"
+            );
+            self.verify_provenance()?;
+            return Ok(());
+        }
+        let rendered = systemd::render_unit(&self.old, &self.base).into_bytes();
         anyhow::ensure!(
             on_disk == rendered,
             "the managed unit differs from the exact generated unit; automatic switch refused"
@@ -655,5 +774,69 @@ mod tests {
             permit.owned_server().unwrap().is_none(),
             "a successful stop discards ownership"
         );
+    }
+
+    #[test]
+    fn recovery_refuses_a_fresh_session_without_an_owned_child() {
+        use crate::runtime_lifecycle::Lifecycle;
+        let root = std::env::temp_dir().join(format!(
+            "dsh-ocean-recover-child-{}",
+            crate::downloads::unique_id()
+        ));
+        let old_root = root.join("generations/gen.old");
+        std::fs::create_dir_all(&old_root).unwrap();
+        std::fs::write(old_root.join(".versions"), b"fixture\n").unwrap();
+        // A managed-child server without a published child handle: the fresh
+        // session no longer owns the stopped child, so recovery must refuse
+        // rather than kill an arbitrary PID reconstructed from a path.
+        let lifecycle: Lifecycle<Server, tokio::process::Child> =
+            Lifecycle::new(crate::managed_child::kill_owned_child);
+        let permit = lifecycle.try_begin(Operation::Update).unwrap();
+        permit.publish_server(child_server()).unwrap();
+        let error = OwnedController::headless_recover(
+            permit,
+            old_root.clone(),
+            std::env::temp_dir().join("candidate"),
+            std::env::temp_dir().join(".dsh"),
+            None,
+        )
+        .err()
+        .expect("fresh child recovery must be refused");
+        assert!(error.to_string().contains("child"), "{error:#}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn fresh_child_recovery_gives_clear_same_session_guidance() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-ocean-recover-fresh-child-{}",
+            crate::downloads::unique_id()
+        ));
+        let old_root = root.join("generations/gen.old");
+        std::fs::create_dir_all(&old_root).unwrap();
+        std::fs::write(old_root.join(".versions"), b"fixture\n").unwrap();
+        // No server published at all: the fresh session lost the owned child
+        // handle. Recovery must refuse with clear same-session guidance, never
+        // the misleading "no running server to own" or a reconstructed PID.
+        let lifecycle: Lifecycle<Server, tokio::process::Child> =
+            Lifecycle::new(crate::managed_child::kill_owned_child);
+        let permit = lifecycle.try_begin(Operation::Update).unwrap();
+        let error = OwnedController::headless_recover(
+            permit,
+            old_root.clone(),
+            std::env::temp_dir().join("candidate"),
+            std::env::temp_dir().join(".dsh"),
+            None,
+        )
+        .err()
+        .expect("fresh child recovery must be refused");
+        let text = error.to_string();
+        assert!(text.contains("child"), "{text}");
+        assert!(text.contains("same session"), "{text}");
+        assert!(
+            !text.contains("no running server to own"),
+            "guidance must not mislead: {text}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

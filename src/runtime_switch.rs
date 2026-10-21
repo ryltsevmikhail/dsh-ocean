@@ -28,6 +28,67 @@ impl Paths {
         self.prefix.join(".runtime-pending.json")
     }
 }
+/// Bounded read-only summary of a pending transaction journal, for a native
+/// recovery dialog. It never establishes ownership and never exposes an
+/// unvalidated path as authority: the journal is parsed with the same schema,
+/// scope and selector checks as [`recover`], and only then are the (already
+/// validated) old/new generation roots and captured unit image returned. The
+/// ownership proof itself remains in the caller's controller.
+#[derive(Clone)]
+pub struct PendingInfo {
+    /// Absolute validated OLD generation root to restore (not a detected candidate).
+    pub old: PathBuf,
+    /// Absolute validated NEW generation root that was being activated.
+    pub new: PathBuf,
+    /// A durable full-home snapshot was captured before activation.
+    pub has_snapshot: bool,
+    /// Captured before/after unit images (systemd only; `None` for a child).
+    pub unit: Option<UnitImage>,
+}
+/// Read a pending journal and return a validated, read-only summary, or `None`
+/// when no transaction is pending. A corrupt, dangling or scope-divergent
+/// journal is an error, exactly like the ordinary-start gate refuses it.
+pub fn pending_info(p: &Paths) -> Result<Option<PendingInfo>> {
+    validate(p)?;
+    let pending = p.pending();
+    let metadata = match fs::symlink_metadata(&pending) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error).context("inspect runtime recovery gate"),
+        Ok(metadata) => metadata,
+    };
+    anyhow::ensure!(
+        metadata.is_file()
+            && metadata.uid() == unsafe { libc::geteuid() }
+            && metadata.mode() & 0o077 == 0
+            && metadata.nlink() == 1
+            && metadata.len() < 1024 * 1024,
+        "unsafe pending journal"
+    );
+    let j: Journal =
+        serde_json::from_slice(&crate::release_feed::read_input(&pending, 1024 * 1024)?)?;
+    anyhow::ensure!(
+        j.schema == 1 && j.home == p.home && j.backups == p.backups,
+        "pending runtime journal scope changed; restore original home/backup configuration before recovery"
+    );
+    target(&j.old)?;
+    target(&j.new)?;
+    let has_snapshot = match &j.snapshot {
+        None => false,
+        Some(path) => {
+            anyhow::ensure!(
+                path.starts_with(&p.backups),
+                "snapshot outside transaction backups"
+            );
+            true
+        }
+    };
+    Ok(Some(PendingInfo {
+        old: p.prefix.join(&j.old),
+        new: p.prefix.join(&j.new),
+        has_snapshot,
+        unit: j.unit,
+    }))
+}
 #[derive(Clone, Serialize, Deserialize)]
 pub struct UnitImage {
     pub before: Vec<u8>,
@@ -447,4 +508,37 @@ mod tests {
     }
     include!("../tests/runtime_switch.rs");
     runtime_switch_tests!();
+
+    #[test]
+    fn pending_info_reports_a_validated_journal_and_refuses_a_changed_scope() {
+        let (p, _c) = fixture();
+        assert!(
+            pending_info(&p).unwrap().is_none(),
+            "no pending journal yet"
+        );
+        let j = Journal {
+            schema: 1,
+            home: p.home.clone(),
+            backups: p.backups.clone(),
+            old: PathBuf::from("generations/gen.old"),
+            new: PathBuf::from("generations/gen.new"),
+            snapshot: None,
+            unit: None,
+        };
+        save(&p, &j).unwrap();
+        let info = pending_info(&p)
+            .unwrap()
+            .expect("a valid journal must be reported");
+        assert_eq!(info.old, p.prefix.join("generations/gen.old"));
+        assert_eq!(info.new, p.prefix.join("generations/gen.new"));
+        assert!(!info.has_snapshot);
+        assert!(info.unit.is_none());
+        // A pending journal whose home/backups scope diverged is refused.
+        let mut wrong = p;
+        wrong.home = wrong.home.with_file_name("other-home");
+        assert!(
+            pending_info(&wrong).is_err(),
+            "a scope-divergent journal must not be summarised"
+        );
+    }
 }

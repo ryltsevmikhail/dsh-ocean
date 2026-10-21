@@ -3,8 +3,9 @@
 The tray has separate **Check for DSH core updates…** and **DSH Ocean shell
 updates…** entries. The native shell screen supports explicit signed
 check → download → apply, retained rollback and interrupted-selector recovery.
-It never silently replaces the running client. Signed core orchestration remains
-separate M2 work at this checkpoint.
+It never silently replaces the running client. Signed core orchestration uses a
+separate native flow, trust/settings/floor and data-rollback boundary; see
+[runtime updates and recovery limits](RUNTIME_RELEASES.md).
 
 ## Evidence is not ownership
 

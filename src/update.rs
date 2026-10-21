@@ -1,242 +1,167 @@
-use std::process::Command;
-
 use semver::Version;
-use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
 use crate::bootstrap::{self, Runtime};
-use crate::state::{AppState, RuntimePermit};
-use crate::{auth, config, runtime_update, service, systemd, ui};
+use crate::managed_runtime::{self, ApplyOutcome, Check, RecoverOutcome};
+use crate::runtime_feed::Candidate;
+use crate::state::AppState;
+use crate::{auth, ui};
 
-#[derive(Clone, Debug)]
-struct UpdateInfo {
-    current: String,
-    latest: String,
-    next: String,
-    channel: String,
-    target: String,
-    update_available: bool,
-}
-
-fn clean_version(value: &str) -> Result<Version, String> {
-    Version::parse(value.strip_prefix('v').unwrap_or(value))
-        .map_err(|_| format!("invalid DSH version: {value:?}"))
-}
-
-fn dist_tags(runtime: &Runtime) -> Result<Value, String> {
-    let npm = bootstrap::npm_path(runtime);
-    let output = Command::new(&npm)
-        .args([
-            "view",
-            "@deepseek-ai/dsh",
-            "dist-tags",
-            "--json",
-            "--fetch-timeout=10000",
-            "--fetch-retries=1",
-        ])
-        .env("PATH", bootstrap::path_env(Some(&runtime.node)))
-        .output()
-        .map_err(|error| format!("could not run {}: {error}", npm.display()))?;
-    if !output.status.success() {
-        return Err(auth::redact(String::from_utf8_lossy(&output.stderr).trim()));
-    }
-    serde_json::from_slice(&output.stdout).map_err(|error| format!("invalid npm response: {error}"))
-}
-
-fn from_tags(current: &str, channel: &str, tags: &Value) -> Result<UpdateInfo, String> {
-    let tag = match channel {
-        "latest" | "stable" => "latest",
-        "next" => "next",
-        other => return Err(format!("unsupported update channel: {other:?}")),
-    };
-    let target = tags
-        .get(tag)
-        .and_then(Value::as_str)
-        .ok_or_else(|| format!("npm response has no {tag:?} version"))?;
-    let target_version = clean_version(target)?;
-    let current_version = clean_version(current)?;
-    Ok(UpdateInfo {
-        current: current.to_owned(),
-        latest: tags
-            .get("latest")
-            .and_then(Value::as_str)
-            .unwrap_or("unknown")
-            .to_owned(),
-        next: tags
-            .get("next")
-            .and_then(Value::as_str)
-            .unwrap_or("unknown")
-            .to_owned(),
-        channel: channel.to_owned(),
-        target: target_version.to_string(),
-        update_available: target_version > current_version,
-    })
-}
-
-fn query(runtime: &Runtime) -> Result<UpdateInfo, String> {
-    let channel = config::load()
-        .update_channel
-        .unwrap_or_else(|| "latest".into());
-    from_tags(&runtime.version, &channel, &dist_tags(runtime)?)
-}
-
+/// Native signed installed-runtime update entry point. This is the reachable
+/// production path (tray → Updates): it checks the independent configured
+/// runtime Source (settings/key/channel) and never queries `npm view`. A pending
+/// transaction routes to explicit recovery instead.
 pub fn check_and_show(app: &AppHandle) {
     let app = app.clone();
-    // Node discovery and npm registry calls must not block GTK's event loop.
+    // Detection, feed checks and downloads must not block GTK's event loop.
     tauri::async_runtime::spawn_blocking(move || {
-        let result = bootstrap::detect()
-            .ok_or_else(|| {
-                "DeepSeek Harness was not found; install it in the setup window first.".to_owned()
-            })
-            .and_then(|runtime| query(&runtime).map(|info| (runtime, info)));
-        let app_for_main = app.clone();
-        let _ = app.run_on_main_thread(move || match result {
-            Ok((runtime, info)) => present_update(&app_for_main, runtime, info),
-            Err(error) => ui::message(
-                &app_for_main,
-                "DSH update check failed",
-                &auth::redact(&error),
-                gtk::MessageType::Error,
-            ),
-        });
-    });
-}
-
-fn managed_update_base(app: &AppHandle) -> Option<url::Url> {
-    let server = app.state::<AppState>().server()?;
-    if server.mode == service::ServerMode::Child || !systemd::is_active() {
-        return None;
-    }
-    (server.base_url.scheme() == "http" && server.base_url.host_str() == Some("127.0.0.1"))
-        .then_some(server.base_url)
-}
-
-fn present_update(app: &AppHandle, runtime: Runtime, info: UpdateInfo) {
-    let mut body = format!(
-        "Installed:  {}\nChannel:    {}\nlatest:     {}\nnext:       {}",
-        info.current, info.channel, info.latest, info.next
-    );
-    if !info.update_available {
-        body.push_str("\n\nYou are on the latest DSH for this channel.");
-        ui::message(app, "DSH updates", &body, gtk::MessageType::Info);
-        return;
-    }
-    if !runtime.is_generation_managed() {
-        body.push_str("\n\nThis is an external installation. Ocean does not overwrite external npm prefixes. Use the original package manager; safe migration to private generations is not implemented yet.");
-        ui::message(
-            app,
-            "DSH update available",
-            &body,
-            gtk::MessageType::Warning,
-        );
-        return;
-    }
-    if managed_update_base(app).is_none() {
-        body.push_str("\n\nAutomatic generation activation currently requires a running local dsh-web.service. Managed-child and remote server updates are not supported yet; no files were changed.");
-        ui::message(
-            app,
-            "DSH update available",
-            &body,
-            gtk::MessageType::Warning,
-        );
-        return;
-    }
-    body.push_str(&format!(
-        "\n\nUpdate to {} now?\nThe local server and its WebSocket clients will restart.",
-        info.target
-    ));
-    body.push_str("\nA separate user-manager worker validates the candidate and restores the previous runtime/unit on failure. Closing this window does not cancel the transaction.\nIMPORTANT: rollback does not undo profile/data migrations. Make a profile backup before proceeding.\nIntegrity currently relies on npm/Node checksums; a signed Ocean update feed is not implemented yet.");
-    let app_for_update = app.clone();
-    ui::confirm(app, "DSH update available", &body, move || {
-        tauri::async_runtime::spawn(async move {
-            perform_update(app_for_update, runtime, info.target).await;
-        });
-    });
-}
-
-async fn perform_generation_update(
-    app: AppHandle,
-    runtime: Runtime,
-    target: String,
-    permit: &RuntimePermit,
-) {
-    let Some(base) = managed_update_base(&app) else {
-        show_message(
-            &app,
-            "DSH update refused",
-            "A running local dsh-web.service is required.",
-            gtk::MessageType::Warning,
-        );
-        return;
-    };
-    let mut task = match runtime_update::prepare(&runtime, &target, &base) {
-        Ok(task) => task,
-        Err(error) => {
+        match managed_runtime::pending_status() {
+            Ok(Some(info)) => {
+                let app_for_main = app.clone();
+                let _ = app.run_on_main_thread(move || present_recovery(&app_for_main, &info));
+                return;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                show_message(
+                    &app,
+                    "Runtime recovery inspection failed",
+                    &format!("{error:#}"),
+                    gtk::MessageType::Error,
+                );
+                return;
+            }
+        }
+        let Some(runtime) = bootstrap::detect() else {
             show_message(
                 &app,
-                "Could not prepare DSH update",
-                &format!("{error:#}"),
+                "DSH update check",
+                "DeepSeek Harness was not found; install it in the setup window first.",
                 gtk::MessageType::Error,
             );
             return;
+        };
+        let current = match Version::parse(runtime.version.trim_start_matches('v')) {
+            Ok(version) => version,
+            Err(error) => {
+                show_message(
+                    &app,
+                    "DSH update check",
+                    &format!("invalid installed DSH version: {error}"),
+                    gtk::MessageType::Error,
+                );
+                return;
+            }
+        };
+        // Register the metadata check with the native update registry so quit
+        // cancels the metadata curl and a concurrent apply/check is refused.
+        let operation = match app.state::<AppState>().updates.begin() {
+            Ok(operation) => operation,
+            Err(error) => {
+                show_message(
+                    &app,
+                    "Update busy",
+                    &error.to_string(),
+                    gtk::MessageType::Warning,
+                );
+                return;
+            }
+        };
+        let control = operation.control.clone();
+        match managed_runtime::check(&current, control.clone()) {
+            Ok(check) => {
+                let cancelled = !control.complete();
+                drop(operation);
+                if cancelled {
+                    return;
+                }
+                let app_for_main = app.clone();
+                let _ =
+                    app.run_on_main_thread(move || present_update(&app_for_main, runtime, check));
+            }
+            Err(error) => {
+                let _ = control.complete();
+                drop(operation);
+                show_message(
+                    &app,
+                    "DSH update check failed",
+                    &auth::redact(&format!("{error:#}")),
+                    gtk::MessageType::Error,
+                );
+            }
         }
-    };
-    app.state::<AppState>().log(format!(
-        "Prepared background transaction {}; log: {}",
-        task.unit,
-        task.log.display()
-    ));
-    // Preparation may run while Quit closes admission on GTK's thread.
-    if let Err(error) = permit.ensure_open() {
-        app.state::<AppState>()
-            .log(format!("DSH update launch refused: {error}"));
+    });
+}
+
+fn describe_check(runtime: &Runtime, check: &Check) -> String {
+    let summary = &check.summary;
+    let release = summary
+        .get("release")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown");
+    let sequence = summary
+        .get("sequence")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0);
+    let fingerprint = summary
+        .get("keyFingerprint")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown");
+    format!(
+        "Installed:  {}\nChannel:    {}\nUpdate:     {} (sequence {})\nPublic key: {}\nSource:     {}\n\nThis downloads the signed runtime bundle, verifies it, stops the local server, takes a full private (unencrypted) backup of your DSH home — credentials, configuration, plugins and sessions — and activates the new runtime. The server and its WebSocket clients will restart. Close all other DSH CLI/TUI writers first.",
+        runtime.version,
+        check.source.channel,
+        release,
+        sequence,
+        fingerprint,
+        check.source.manifest_url,
+    )
+}
+
+fn present_update(app: &AppHandle, runtime: Runtime, check: Check) {
+    // Offer policy: only an owned (systemd or managed-child), generation-managed,
+    // loopback install may be offered an apply. External/attached/remote installs
+    // get check-only guidance before any download, never a doomed apply.
+    let server = app.state::<AppState>().server();
+    if let Some(block) = managed_runtime::apply_block(&runtime, server.as_ref()) {
+        let mut body = describe_check(&runtime, &check);
+        body.push_str("\n\n");
+        body.push_str(block.guidance());
+        ui::message(
+            app,
+            "DSH update available",
+            &body,
+            gtk::MessageType::Warning,
+        );
         return;
     }
-    let result = task.command.output().await;
-    let tail = runtime_update::log_tail(&task.log);
-    for line in tail.lines() {
-        app.state::<AppState>().log(line);
-    }
-    match result {
-        Ok(output) if output.status.success() => {
-            let refresh = service::refresh_after_update(&app, permit).await;
-            let extra = refresh
-                .err()
-                .map(|e| {
-                    format!("\nThe server passed health checks, but window refresh failed: {e:#}")
-                })
-                .unwrap_or_default();
-            show_message(&app, "DSH updated", &format!("DeepSeek Harness {target} is serving from the verified generation.{extra}\nLog: {}", task.log.display()), gtk::MessageType::Info);
-        }
-        other => {
-            // A failed activation may have restarted the restored old unit.
-            // Reauthenticate only; never trigger another restart here.
-            if systemd::is_active() {
-                let _ = service::refresh_after_update(&app, permit).await;
-            }
-            let detail = match other {
-                Ok(output) => format!(
-                    "Update worker exited with {}.\n{}",
-                    output.status,
-                    auth::redact(String::from_utf8_lossy(&output.stderr).trim())
-                ),
-                Err(error) => format!("Could not confirm background update status: {error}"),
-            };
-            show_message(
-                &app,
-                "DSH update not committed",
-                &format!(
-                    "{detail}\n{tail}\nLog: {}\nWorker: {}",
-                    task.log.display(),
-                    task.unit
-                ),
-                gtk::MessageType::Error,
+    match check.status {
+        managed_runtime::Status::Current => {
+            let body = format!(
+                "Installed:  {}\nChannel:    {}\n\nYou are on the latest DSH for this channel.",
+                runtime.version, check.source.channel
             );
+            ui::message(app, "DSH updates", &body, gtk::MessageType::Info);
+        }
+        managed_runtime::Status::Available => {
+            let release = check
+                .summary
+                .get("release")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("unknown")
+                .to_owned();
+            let mut body = describe_check(&runtime, &check);
+            body.push_str(&format!("\n\nUpdate to {release} now?"));
+            let app_for_update = app.clone();
+            let candidate = check.candidate;
+            ui::confirm(app, "DSH update available", &body, move || {
+                perform_apply(app_for_update, runtime, candidate);
+            });
         }
     }
 }
 
-async fn perform_update(app: AppHandle, runtime: Runtime, target: String) {
+fn perform_apply(app: AppHandle, runtime: Runtime, candidate: Candidate) {
     let state = app.state::<AppState>();
     let permit = match state.begin_update() {
         Ok(permit) => permit,
@@ -250,56 +175,173 @@ async fn perform_update(app: AppHandle, runtime: Runtime, target: String) {
             return;
         }
     };
-    if !runtime.is_generation_managed() {
-        show_message(&app, "External installation", "Ocean does not overwrite external npm prefixes. Update with the original package manager; safe migration to private generations is not implemented yet.", gtk::MessageType::Warning);
+    let operation = match state.updates.begin() {
+        Ok(operation) => operation,
+        Err(error) => {
+            show_message(
+                &app,
+                "Update busy",
+                &error.to_string(),
+                gtk::MessageType::Warning,
+            );
+            return;
+        }
+    };
+    let control = operation.control.clone();
+    let worker_app = app.clone();
+    std::thread::spawn(move || {
+        let result = managed_runtime::apply_native(
+            Some(worker_app.clone()),
+            permit,
+            runtime,
+            candidate,
+            control.clone(),
+        );
+        let cancelled = !control.complete();
+        drop(operation); // release the global gate before exposing completion
+        let for_main = worker_app.clone();
+        let _ = worker_app
+            .run_on_main_thread(move || present_apply_outcome(&for_main, cancelled, result));
+    });
+}
+
+fn present_apply_outcome(app: &AppHandle, cancelled: bool, result: anyhow::Result<ApplyOutcome>) {
+    if cancelled {
+        show_message(
+            app,
+            "Update cancelled",
+            "No runtime was activated.",
+            gtk::MessageType::Info,
+        );
         return;
     }
-    perform_generation_update(app.clone(), runtime, target, &permit).await;
+    match result {
+        Ok(ApplyOutcome::Applied { release }) => show_message(
+            app,
+            "DSH updated",
+            &format!("DeepSeek Harness {release} is now active."),
+            gtk::MessageType::Info,
+        ),
+        Ok(ApplyOutcome::RolledBack { error }) => show_message(
+            app,
+            "DSH update not committed",
+            &format!(
+                "The previous runtime was restored.\n\n{}",
+                auth::redact(&error)
+            ),
+            gtk::MessageType::Error,
+        ),
+        Ok(ApplyOutcome::PendingRecovery { error }) => present_pending(app, &auth::redact(&error)),
+        Err(error) => show_message(
+            app,
+            "DSH update failed",
+            &auth::redact(&format!("{error:#}")),
+            gtk::MessageType::Error,
+        ),
+    }
+}
+
+fn present_recovery(app: &AppHandle, info: &crate::runtime_switch::PendingInfo) {
+    let snapshot = if info.has_snapshot {
+        "A full private home backup snapshot is available for rollback."
+    } else {
+        "No snapshot was captured before activation."
+    };
+    let body = format!(
+        "A runtime switch is pending and ordinary start/restart stays blocked until recovery succeeds.\n\nOld generation: {}\nNew generation: {}\n{snapshot}\n\nRecover the previous runtime now?",
+        info.old.display(),
+        info.new.display()
+    );
+    let app_for_recover = app.clone();
+    ui::confirm(app, "Runtime recovery required", &body, move || {
+        perform_recover(app_for_recover);
+    });
+}
+
+fn present_pending(app: &AppHandle, error: &str) {
+    let body = format!(
+        "The runtime switch did not complete and the previous runtime could not be restored automatically. Ordinary start/restart stays blocked until recovery succeeds.\n\n{error}\n\nRecover the previous runtime now?"
+    );
+    let app_for_recover = app.clone();
+    ui::confirm(app, "Runtime recovery required", &body, move || {
+        perform_recover(app_for_recover);
+    });
+}
+
+fn perform_recover(app: AppHandle) {
+    let state = app.state::<AppState>();
+    let permit = match state.begin_update() {
+        Ok(permit) => permit,
+        Err(error) => {
+            show_message(
+                &app,
+                "Runtime busy",
+                &error.to_string(),
+                gtk::MessageType::Warning,
+            );
+            return;
+        }
+    };
+    let operation = match state.updates.begin() {
+        Ok(operation) => operation,
+        Err(error) => {
+            show_message(
+                &app,
+                "Recovery busy",
+                &error.to_string(),
+                gtk::MessageType::Warning,
+            );
+            return;
+        }
+    };
+    let control = operation.control.clone();
+    let worker_app = app.clone();
+    std::thread::spawn(move || {
+        let result =
+            managed_runtime::recover_native(Some(worker_app.clone()), permit, control.clone());
+        let cancelled = !control.complete();
+        drop(operation);
+        let for_main = worker_app.clone();
+        let _ = worker_app
+            .run_on_main_thread(move || present_recover_outcome(&for_main, cancelled, result));
+    });
+}
+
+fn present_recover_outcome(
+    app: &AppHandle,
+    cancelled: bool,
+    result: anyhow::Result<RecoverOutcome>,
+) {
+    if cancelled {
+        show_message(
+            app,
+            "Recovery cancelled",
+            "The pending transaction was retained.",
+            gtk::MessageType::Warning,
+        );
+        return;
+    }
+    match result {
+        Ok(RecoverOutcome::Recovered) => show_message(
+            app,
+            "Runtime recovered",
+            "The previous runtime was restored and is serving again.",
+            gtk::MessageType::Info,
+        ),
+        Err(error) => show_message(
+            app,
+            "Recovery incomplete",
+            &format!(
+                "The pending transaction was retained; ordinary start/restart stays blocked.\n\n{}",
+                auth::redact(&format!("{error:#}"))
+            ),
+            gtk::MessageType::Error,
+        ),
+    }
 }
 
 fn show_message(app: &AppHandle, title: &'static str, body: &str, kind: gtk::MessageType) {
     let app_for_main = app.clone();
     let body = auth::redact(body);
     let _ = app.run_on_main_thread(move || ui::message(&app_for_main, title, &body, kind));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn compares_release_candidates() {
-        assert!(clean_version("0.2.1-rc.2").unwrap() > clean_version("0.2.0-rc.2").unwrap());
-        assert_eq!(
-            clean_version("v0.2.0-rc.2").unwrap(),
-            Version::parse("0.2.0-rc.2").unwrap()
-        );
-    }
-    #[test]
-    fn validates_channel_and_version_without_silent_fallback() {
-        let tags = serde_json::json!({"latest": "0.2.0-rc.2", "next": "0.2.1-rc.2"});
-        assert!(
-            from_tags("0.2.0-rc.2", "next", &tags)
-                .unwrap()
-                .update_available
-        );
-        assert!(
-            !from_tags("0.2.0-rc.2", "stable", &tags)
-                .unwrap()
-                .update_available
-        );
-        assert!(from_tags("broken", "next", &tags).is_err());
-        assert!(from_tags("0.2.0-rc.2", "custom", &tags).is_err());
-        assert!(from_tags(
-            "0.2.0-rc.2",
-            "next",
-            &serde_json::json!({"latest": "0.2.0-rc.2"})
-        )
-        .is_err());
-        assert!(from_tags(
-            "0.2.0-rc.2",
-            "next",
-            &serde_json::json!({"next": "package@malicious"})
-        )
-        .is_err());
-    }
 }

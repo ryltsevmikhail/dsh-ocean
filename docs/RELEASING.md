@@ -45,10 +45,11 @@ release clearance. The workflow never publishes a public release automatically.
    WebKitGTK 4.1/GTK3, and a clean `dist/` (`SOURCE_DATE_EPOCH` may be set for
    reproducible tar/deb archives).
 10. Release notes list user-visible changes and explicitly state the limits that
-   still apply: system WebKit dependency, no production signed feed (the opt-in
-   local anti-rollback store is not publisher authentication), no data/schema
-   rollback, no portable-ABI guarantee, and that AppImage tool
-   trust is an operator-provided digest.
+   still apply: system WebKit dependency; production feed/root provisioning is an
+   owner action (an anti-rollback store is not publisher authentication); data
+   rollback is limited to the supported quiesced managed home and proven-owned
+   controller workflow, not arbitrary schemas/writers or post-success core
+   history; no portable-ABI guarantee; AppImage tool trust uses an operator digest.
 
 Do not describe a build as verified, signed or reproducible unless independent
 evidence exists. Public trust provisioning/rotation, compatibility acceptance and

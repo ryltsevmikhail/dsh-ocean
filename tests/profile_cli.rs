@@ -2,7 +2,7 @@
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::process::{Command, Output};
@@ -16,14 +16,28 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> Self {
-        let root = std::env::temp_dir().join(format!(
-            "dsh-ocean-profile-cli-{}-{}",
-            std::process::id(),
+        Self::new_with_stamp(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
-        ));
+                .as_nanos(),
+        )
+    }
+    fn new_with_stamp(nanos: u128) -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = loop {
+            let serial = NEXT.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "dsh-ocean-profile-cli-{}-{nanos}-{serial}",
+                std::process::id()
+            ));
+            match fs::DirBuilder::new().mode(0o700).create(&path) {
+                Ok(()) => break path,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("reserve private profile fixture: {error}"),
+            }
+        };
         let home = root.join("dsh");
         let profile = home.join("profiles/web");
         for dir in [
@@ -110,6 +124,17 @@ fn describe(output: &Output) -> String {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     )
+}
+
+#[test]
+fn equal_timestamp_fixture_cleanup_never_deletes_another_profiles_data() {
+    let first = Fixture::new_with_stamp(0);
+    let second = Fixture::new_with_stamp(0);
+    drop(first);
+    assert!(
+        second.profile.join("package.json").is_file(),
+        "a peer fixture must not share or delete this fixture's profile"
+    );
 }
 
 #[test]

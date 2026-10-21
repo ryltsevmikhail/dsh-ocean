@@ -167,6 +167,36 @@ fn download_artifact(
     )
 }
 
+/// Crate-private preparatory transfer for the owned apply workflow. It shares
+/// the terminal downloader's controlled `CurlSource` and authenticated
+/// `Artifact` guard, but the publication boundary is `control.check()` (still
+/// cancellable) instead of `control.begin_commit()`: the bytes are staged into
+/// a private cache directory that is never externally selected, and the caller
+/// still runs `control.check()`/`control.complete()` around the whole operation.
+/// A late cancellation after the cache is published leaves the private RAII
+/// cache to be removed, and a `check`/`complete` failure prevents the result
+/// from ever being reported as available. The public CLI terminal download
+/// (`download_runtime_controlled`) is unchanged.
+pub(crate) fn download_runtime_preparatory(
+    release: &crate::runtime_feed::Verified,
+    destination: &Path,
+    control: Arc<Control>,
+) -> Result<Staged> {
+    let artifact = release.artifact().artifact();
+    control.phase(
+        crate::update_control::Phase::Downloading,
+        Some(artifact.size),
+    )?;
+    let mut source = source(&artifact.url, artifact.size, control.clone())?;
+    release_feed::stage_artifact_guarded(
+        &mut source,
+        destination,
+        &artifact,
+        |bytes| control.observe(bytes),
+        || control.check(),
+    )
+}
+
 /// Bounded untrusted metadata, never authority until the independent signature
 /// verifier accepts it. No disk publication, key retrieval or persistent state.
 pub(crate) fn fetch_metadata_controlled(

@@ -218,10 +218,14 @@ filesystem tests inject an owned controller, and ordinary local starts refuse
 pending records. Real owned Systemd/Child adapters now retain the permit, prove
 manager/unit/child authority and effective service data-home scope, stop/reap,
 start explicit roots and refresh authenticated origins/tokens. Native configured
-consent/apply/recovery and legacy/post-success rollback wiring remain required;
-the old installed-update UI is not signed by these separate APIs. Offline runtime
-signing and complete publisher archive assembly exist; the guarded pinned build/
-release workflow is still pending. See
+check/consent/apply/recovery now replace the installed npm-update path, retain
+settings/floor/prefix guards and revalidate before new start after snapshotting.
+Fresh-session Systemd journal recovery works without a previously published server;
+lost child ownership refuses safely. Post-success core history/rollback is not
+provided; same-session failure data rollback is. Offline signing, complete publisher
+archive assembly and manual dry-run-default native build/signed-draft CI are wired.
+Whole-M2 final review/exact-head CI and owner trust/real-artifact/laptop acceptance
+remain separate gates. See
 [runtime boundary](RUNTIME_RELEASES.md).
 
 **Native shell updater:** distinct tray entries separate core from shell updates.

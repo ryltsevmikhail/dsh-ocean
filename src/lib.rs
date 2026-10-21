@@ -25,6 +25,7 @@ pub mod downloads;
 pub mod exposure_plan;
 pub mod http;
 pub mod managed_child;
+pub mod managed_runtime;
 pub mod managed_shell;
 pub mod native_updates;
 pub mod navigation;

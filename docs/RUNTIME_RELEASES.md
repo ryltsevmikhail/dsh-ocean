@@ -3,9 +3,13 @@
 This checkpoint implements runtime **metadata authentication/check/explicit
 acceptance, authenticated complete-generation download/import, isolated candidate
 health, exact home snapshots, a durable switch/rollback engine and proven-owned
-Systemd/Child adapters**. Native consent/update/recovery orchestration remains
-unfinished; these APIs do not yet replace the old installed-update UI. Existing bootstrap/core installer paths remain
-separate and unsigned until their M2 replacement is wired.
+Systemd/Child adapters, native signed check/download/apply and explicit recovery**.
+The installed-update UI now uses the independent signed runtime source, not npm
+version tags or a detached unsigned installer. Accepted M1 first bootstrap/manual
+maintenance trust remains separate; a version pin is not a release signature.
+Fresh-session Systemd recovery is supported; lost child ownership refuses safely
+with the pending record retained (see limits below). Whole-M2 final review and
+production trust/artifact/laptop acceptance remain separate gates.
 Do not describe an npm version pin as authentication of its dependency closure.
 
 ## Independent authority
@@ -196,13 +200,13 @@ state and absence/publication consistency. All contents are synthetic; no runnin
 user profile or service participates. No live update controller/automatic rollback
 is claimed by these primitives alone.
 
-## Durable switch engine and owned OS adapters (native wiring still pending)
+## Durable switch engine, owned OS adapters and native orchestration
 
 [The shared engine](../src/runtime_switch.rs) accepts typed Prepared/Verified and
 runs the native candidate check before entering a noncancellable local commit.
 The narrow trusted controller boundary must represent **proven owned** Systemd
-or Child, not Attached/loopback guesses. The real adapters below exist; configured
-native orchestration/consent/recovery entrypoints still need to be wired. Callers must retain the settings, Runtime floor guard,
+or Child, not Attached/loopback guesses. The real adapters and configured native
+entrypoints below share this transaction and its pending-recovery gate. Callers must retain the settings, Runtime floor guard,
 Prepared prefix lock and lifecycle permit, and supply the exact atomic floor
 record callback. A controller health result must mean authenticated live health.
 
@@ -229,8 +233,8 @@ They exercise failure ordering, restore refusal, original absence, interrupted
 recovery, ownership interference, floor callback errors, cancellation commitment,
 changed recovery scope and local-start gates. Those engine tests do not prove real
 OS adapter behavior; that separate boundary is tested below. Genuine publisher
-runtime acceptance remains an owner gate. The installed core update UI still needs
-replacement; separate tested APIs do not make its legacy path signed.
+runtime acceptance remains an owner gate. The installed core update UI now calls
+the signed native facade described below; no npm fallback is offered.
 
 ### Proven-owned Systemd and managed-child controllers
 
@@ -265,6 +269,57 @@ and real owned private children, covering failed stops, lease restoration, expli
 old roots, fresh tokens, manager provenance, scope divergence, inactive proof and
 bounded query failures. They do not operate the user's actual service/profile or
 constitute genuine publisher/system integration acceptance.
+
+## Native installed-runtime workflow
+
+The tray's installed-core update action calls [the native facade](../src/managed_runtime.rs)
+through [native GTK dialogs](../src/update.rs), with no webview updater command.
+It checks the independent configured runtime feed/key/channel and reports their
+identity. Missing configuration is an error/guidance state, never an npm fallback.
+An exact selected-generation import receipt can report **Current**; the receipt
+is cosmetic status, not apply authority. Equal DSH version alone is insufficient:
+a signed candidate can change Node/pnpm/native closure and remains **Available**.
+
+External, legacy, Attached and Remote installs get check-only/original-manager
+or migration guidance, not an Apply offer. Eligibility is re-proven before any
+artifact download/import. Metadata check and apply use the native operation
+registry (duplicate gate and quit cancellation/defer). The lifecycle permit is
+retained through the apply workflow; filesystem locks order settings → runtime
+floor transaction → prefix `.bootstrap.lock`.
+
+Explicit confirmation covers restart, closing all other CLI/TUI writers, and a
+full **unencrypted private** supported-home backup containing credentials, config,
+plugins/dependencies and sessions. Native preparation downloads authenticated
+bytes to an unselected private cache without prematurely latching commit, imports
+under the prefix lock and runs isolated native health before stopping the old
+runtime. A fresh policy/expiry check runs again **before new-root start**, even
+if snapshotting took a long time. Rollback of the explicit old root remains
+possible after candidate expiry. Only successful new authenticated health records
+the exact verified runtime floor; rollback never lowers it. The window/origin/
+token are refreshed after apply and successful rollback.
+
+Pending recovery is offered before a normal update check, without requiring a
+working feed/key. Recovery binds the private journal to the configured paths and
+captured **old** root; it does not rediscover the selected candidate as the old
+runtime. Fresh-session Systemd recovery proves the journal's before/after unit
+images, manager fragment/no-drop-ins and service data-home scope even when startup
+could not publish a server because the journal is pending. Its origin must be the
+configured fixed loopback origin; no token is published until the restored old
+root starts and passes authenticated health. A changed origin/scope/foreign unit
+fails closed and retains pending state.
+
+**Limits:** a fresh session that lost its managed-child handle cannot infer
+ownership from a PID or executable path and refuses recovery with guidance. Stop
+unknown writers and obtain offline recovery assistance; do not delete pending or
+start an old binary against unrestored data. Automatic same-session failure
+rollback is supported; post-success core `.previous`/history rollback is not this
+transaction's feature. The M1 maintenance command is selector-only, not a data
+rollback substitute. Mutating legacy maintenance/bootstrap modes refuse pending
+signed transactions under the prefix lock; read-only check remains available.
+[Facade tests](../tests/managed_runtime.rs) cover a real signed child apply→failed
+health→data restoration and fresh-session fake-manager Systemd recovery, all in
+private synthetic homes. Actual GTK/window integration and genuine publisher/
+service/laptop acceptance are separate owner evidence, not implied by those tests.
 
 ## Publisher archive assembly (not release clearance)
 
@@ -302,7 +357,11 @@ bindings, the signed manifest and the resulting archive with the Rust verifier/
 importer and disposable native health before publication. Current tests exercise
 synthetic native bytes, real private JS shim behavior and independent signed Rust
 import (including long paths/notices); they are not genuine DSH bundle acceptance.
-The full pinned producer/guarded release workflow remains M2 work.
+The [manual guarded release workflow](../.github/workflows/release.yml) now wires
+pinned native producer builds and independent checks on both architectures, with
+no production keys or binary uploads in default dry-run. Its protected operation
+creates only a draft; actual execution/provisioning/clearance and final public
+publication remain owner actions (see [release operations](RELEASING.md)).
 
 ## Offline publisher signing
 
