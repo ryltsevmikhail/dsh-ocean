@@ -36,6 +36,7 @@ pub mod profile_history_ui;
 pub mod profile_ui;
 pub mod profile_verify_ui;
 pub mod release_cli;
+pub mod release_download;
 pub mod release_draft_cli;
 pub mod release_feed;
 pub mod release_state;

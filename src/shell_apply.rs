@@ -120,6 +120,10 @@ fn copy_verified(source: &Path, destination: &Path, release: &Verified) -> Resul
 
 /// Activates `staged` and keeps the previous version for rollback.
 pub fn apply(staged: &Path, release: &Verified, prefix: &Path) -> Result<Value> {
+    anyhow::ensure!(
+        release.artifact().kind == release_feed::Kind::AppImage,
+        "local activation currently supports AppImage only; tar.gz extraction is not implemented"
+    );
     let prefix = absolute(prefix)?;
     ensure_prefix(&prefix)?;
     let manifest = release.manifest();

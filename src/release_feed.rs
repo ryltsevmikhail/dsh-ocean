@@ -457,7 +457,11 @@ pub fn stage_artifact(source: &Path, destination: &Path, release: &Verified) -> 
     );
     stage_reader(&mut input, destination, release)
 }
-fn stage_reader(input: &mut impl Read, destination: &Path, release: &Verified) -> Result<Staged> {
+pub(crate) fn stage_reader(
+    input: &mut impl Read,
+    destination: &Path,
+    release: &Verified,
+) -> Result<Staged> {
     stage_reader_with_io(
         input,
         destination,
@@ -488,9 +492,7 @@ fn stage_reader_with_io(
     let mut total = 0u64;
     let mut buffer = [0u8; 65536];
     loop {
-        let size = input
-            .read(&mut buffer)
-            .context("read local release source")?;
+        let size = input.read(&mut buffer).context("read release source")?;
         if size == 0 {
             break;
         }

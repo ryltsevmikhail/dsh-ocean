@@ -1,11 +1,11 @@
-//! Offline verifier and separately requested local staging. Neither is an updater.
+//! Signed release verification, explicit HTTPS staging, and local apply/rollback.
 use crate::release_feed::{self, Channel, Kind, Policy, Target, TrustedKey};
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 
-pub const USAGE: &str = "--verify-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target linux-x86_64|linux-aarch64 --kind appimage|tar.gz --min-sequence N [--artifact FILE]; --stage-release uses the same policy and requires --artifact SOURCE --output NEW_FILE; --accept-release verifies and remembers the accepted sequence; --release-state reports it; --reset-release-state --confirm-reset forgets it";
+pub const USAGE: &str = "--verify-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target linux-x86_64|linux-aarch64 --kind appimage|tar.gz --min-sequence N [--artifact FILE]; --stage-release uses the same policy and requires --artifact SOURCE --output NEW_FILE; --download-release uses the same authenticated policy, requires --output NEW_FILE and downloads only the signed URL via trusted curl; --accept-release verifies and remembers the accepted sequence; --release-state reports it; --reset-release-state --confirm-reset forgets it";
 /// `--apply-release MANIFEST SIGNATURE KEY <policy> --artifact STAGED --prefix DIR --confirm-apply`
 ///
 /// Verifies, checks the remembered sequence, activates the file, and only then
@@ -178,11 +178,14 @@ pub fn run(args: &[String]) -> Result<Value> {
     anyhow::ensure!(
         matches!(
             args.first().map(String::as_str),
-            Some("--verify-release" | "--stage-release" | "--accept-release")
+            Some(
+                "--verify-release" | "--stage-release" | "--accept-release" | "--download-release"
+            )
         ) && args.len() >= 4,
         "{USAGE}"
     );
     let staging = args[0] == "--stage-release";
+    let downloading = args[0] == "--download-release";
     let accepting = args[0] == "--accept-release";
     let mut flags = HashMap::new();
     let (pairs, remainder) = args[4..].as_chunks::<2>();
@@ -191,7 +194,7 @@ pub fn run(args: &[String]) -> Result<Value> {
             matches!(
                 pair[0].as_str(),
                 "--channel" | "--target" | "--kind" | "--min-sequence" | "--artifact"
-            ) || (staging && pair[0] == "--output"),
+            ) || ((staging || downloading) && pair[0] == "--output"),
             "unknown release verification option"
         );
         anyhow::ensure!(
@@ -206,6 +209,10 @@ pub fn run(args: &[String]) -> Result<Value> {
     anyhow::ensure!(
         !staging || (flags.contains_key("--artifact") && flags.contains_key("--output")),
         "--stage-release requires --artifact SOURCE and --output NEW_FILE"
+    );
+    anyhow::ensure!(
+        !downloading || (flags.contains_key("--output") && !flags.contains_key("--artifact")),
+        "--download-release requires --output NEW_FILE and uses only the signed artifact URL"
     );
     anyhow::ensure!(
         !accepting || !flags.contains_key("--output"),
@@ -248,7 +255,30 @@ pub fn run(args: &[String]) -> Result<Value> {
     let signature = release_feed::read_input(Path::new(&args[2]), release_feed::MAX_AUXILIARY)?;
     let release = release_feed::verify(&bytes, &signature, &key, &policy)?;
     let mut staged_path = None;
-    let checked = if let Some(path) = flags.get("--artifact") {
+    let checked = if downloading {
+        let channel_name = match channel {
+            Channel::Stable => "stable",
+            Channel::Next => "next",
+        };
+        crate::release_state::check(
+            &crate::release_state::read()?,
+            channel_name,
+            release.manifest().sequence,
+            &release.manifest().release,
+            release.manifest_sha256(),
+        )?;
+        let output = Path::new(flags["--output"]);
+        let absolute = if output.is_absolute() {
+            output.to_owned()
+        } else {
+            std::env::current_dir()
+                .context("resolve release download output")?
+                .join(output)
+        };
+        let staged = crate::release_download::download(&release, &absolute)?;
+        staged_path = Some(staged.path().to_owned());
+        true
+    } else if let Some(path) = flags.get("--artifact") {
         if staging {
             let output = Path::new(flags["--output"]);
             let absolute = if output.is_absolute() {
@@ -291,6 +321,6 @@ pub fn run(args: &[String]) -> Result<Value> {
         None
     };
     Ok(
-        json!({"verification":"signature-and-policy","publisherTrust":"operator-supplied-key-only","keyId":release.key_id(),"manifestSha256":release.manifest_sha256(),"release":release.manifest().release,"channel":release.manifest().channel,"sequence":release.manifest().sequence,"artifact":release.artifact(),"artifactChecked":checked,"stagedPath":staged_path,"remembered":remembered,"applied":false,"warning":if remembered.is_some(){"No production trust root is embedded. No download, install or service change occurred. The accepted sequence is remembered locally to refuse later replays/downgrades of signed manifests; this is not a signature or a trusted clock."}else{"No production trust root is embedded. No download, install, remembered sequence or service change occurred. This does not sign or secure current core/bootstrap update paths."}}),
+        json!({"verification":"signature-and-policy","publisherTrust":"operator-supplied-key-only","keyId":release.key_id(),"manifestSha256":release.manifest_sha256(),"release":release.manifest().release,"channel":release.manifest().channel,"sequence":release.manifest().sequence,"artifact":release.artifact(),"artifactChecked":checked,"downloaded":downloading,"stagedPath":staged_path,"remembered":remembered,"applied":false,"warning":if remembered.is_some(){"No production trust root is embedded. No download, install or service change occurred. The accepted sequence is remembered locally to refuse later replays/downgrades of signed manifests; this is not a signature or a trusted clock."}else if downloading{"Artifact downloaded over HTTPS and verified into private staging. No production trust root is embedded. Nothing was executed, installed or remembered, and no service changed. Core/bootstrap updates remain unsigned."}else{"No production trust root is embedded. No download, install, remembered sequence or service change occurred. This does not sign or secure current core/bootstrap update paths."}}),
     )
 }

@@ -1,10 +1,54 @@
-# Offline signed-release verification — not an updater
+# Signed shell release verification, download and local activation
+
+## Signed artifact download (explicit, no install)
+
+```bash
+dsh-ocean --download-release manifest.json signature.json trusted-key.json \
+  --channel stable --target linux-x86_64 --kind appimage --min-sequence 42 \
+  --output downloaded.AppImage
+```
+
+The public key must be authenticated/provisioned independently. The manifest and
+signature are local bounded inputs; this command does not fetch a key or discover
+a feed. It verifies Ed25519, release/channel/target/time policy and the remembered
+sequence floor **before** starting any network request. The artifact URL comes
+only from the authenticated manifest's canonical GitHub release location; no URL
+argument is accepted. Download does not remember/advance the sequence floor.
+
+System `curl` is required and trusted, as in the Linux bootstrap toolchain. Its
+configuration file is disabled, TLS verification stays enabled, initial and
+redirect protocols are HTTPS-only, redirects are capped at five, connect timeout
+is 15 seconds and total transfer time is 180 seconds. Thirty seconds below
+1 KiB/s aborts a stalled transfer. `--max-filesize` uses the signed size; the Rust
+stream independently enforces the exact byte count and SHA-256. HTTPS redirects
+are delegated to curl, not restricted to a destination-host/IP allowlist. Normal
+proxy/CA environment configuration still applies; PATH wrappers are trusted tools,
+not an adversarial sandbox.
+
+Bytes flow directly into the existing private staging engine. A matching body is
+published only after curl exits successfully, its size/hash match, and staging
+is synced. HTTP/curl failure, truncation, excess bytes, hash mismatch or an
+existing destination refuses publication. Early failure kills/reaps curl; private
+staging cleanup is best effort. Curl stderr is discarded, never echoed with URLs,
+proxy credentials or paths. The published file is mode 0600, not executable.
+
+The JSON receipt says `downloaded:true`, `artifactChecked:true`, `applied:false`
+and gives `stagedPath`. Explicit AppImage activation and rollback below are the
+next steps; download itself never executes bytes, changes the active selector,
+restarts a service or accesses a profile. Tests drive a synthetic-key download →
+apply → second release → rollback under private HOME/XDG/prefix, using a fake
+trusted curl (no live HTTP or release publication). A real published signed feed,
+production trust provisioning, GUI orchestration and signed core/bootstrap
+updates are still separate M2 work.
 
 ## Local activation and rollback (explicit, no download)
 
 `--apply-release MANIFEST SIGNATURE TRUSTED_KEY <policy> --artifact STAGED
 --prefix DIR --confirm-apply yes` activates an **already verified local** artifact
-into a private, user-owned prefix:
+into a private, user-owned prefix. Only `--kind appimage` is supported for
+activation: `tar.gz` may be verified/downloaded/staged but is refused by apply
+before creating a prefix. No archive extraction is implemented:
+
 
 ```
 DIR/versions/<release>-<sequence>-<digest8>/dsh-ocean
@@ -60,17 +104,18 @@ Limits: this is local replay/downgrade protection, not a signature, not a truste
 clock, and not a production trust root. A same-user attacker can delete or edit the
 file, and nothing here verifies that a *newer* manifest was actually published
 (no freshness/consensus). Deleting the file with `--reset-release-state` is an
-explicit operator decision, not an automatic recovery path. AppImage/tar/shell
-apply and update-feed configuration remain unimplemented.
+explicit operator decision, not an automatic recovery path. AppImage local
+activation is explicit; tar extraction and update-feed configuration remain
+unimplemented.
 
 
 ## Implemented boundary
 
 Ocean has a read-only `--verify-release` CLI and a strict Ed25519 verifier.
 It authenticates an exact shell-release manifest, checks caller-selected policy,
-and optionally hashes an already-present local artifact. No download, install,
-service operation, profile access, key discovery, automatic signing, remembered
-sequence or self-update occurs. It works headlessly without Node/runtime/GUI
+and optionally hashes an already-present local artifact. That verifier performs
+no download, install, service operation, profile access, key discovery, automatic
+signing, remembered sequence or self-update. It works headlessly without Node/runtime/GUI
 initialization. A separate explicit `--stage-release` command can create a
 verified local copy; it does not change the read-only verifier contract.
 **Existing core/bootstrap update paths are still unsigned.**
@@ -153,8 +198,9 @@ Example manifest shape (dummy digest; not a signed release):
 - Every artifact must use the exact canonical GitHub repository/tag/basename:
   `https://github.com/ryltsevmikhail/dsh-ocean/releases/download/vVERSION/dsh-ocean-VERSION-ARCH.EXT`.
   Arbitrary hosts, queries, fragments, credentials, traversal/encoded aliases
-  and filenames are not accepted. This is metadata validation; no HTTP redirect
-  handling or private-repository authentication is implemented.
+  and filenames are not accepted. Verification is metadata validation only;
+  the separate downloader delegates bounded HTTPS redirects to trusted curl.
+  No private-repository authentication is implemented.
 - Nonzero declared size is capped at 1 GiB, with a lowercase SHA-256 digest.
   Optional local artifact verification uses one no-follow/nonblocking descriptor,
   checks regular type/single link/exact size, hashes bytes, rechecks descriptor

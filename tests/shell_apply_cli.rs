@@ -103,7 +103,10 @@ impl Sandbox {
             .env("XDG_STATE_HOME", self.root.join("state"))
             .env("XDG_CONFIG_HOME", self.root.join("config"))
             .env("XDG_RUNTIME_DIR", self.root.join("run"))
-            .env("PATH", "/usr/bin:/bin")
+            .env(
+                "PATH",
+                format!("{}/tools:/usr/bin:/bin", self.root.display()),
+            )
             .output()
             .expect("run the client CLI")
     }
@@ -139,6 +142,37 @@ impl Sandbox {
             arguments.push("yes".to_owned());
         }
         arguments
+    }
+
+    fn download_args(&self, manifest: &Path, signature: &Path, output: &Path) -> Vec<String> {
+        vec![
+            "--download-release".into(),
+            manifest.to_string_lossy().into_owned(),
+            signature.to_string_lossy().into_owned(),
+            self.key_file().to_string_lossy().into_owned(),
+            "--channel".into(),
+            "stable".into(),
+            "--target".into(),
+            "linux-x86_64".into(),
+            "--kind".into(),
+            "appimage".into(),
+            "--min-sequence".into(),
+            "1".into(),
+            "--output".into(),
+            output.to_string_lossy().into_owned(),
+        ]
+    }
+
+    // Trusted downloader stand-in: no real HTTP, credentials, profile or service.
+    fn fake_curl(&self, bytes: &[u8], exit: i32) {
+        let tools = self.root.join("tools");
+        fs::create_dir_all(&tools).unwrap();
+        let script = format!(
+            "#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\np=Path(__file__).parent\n(p/'curl-arguments').write_text('\\n'.join(sys.argv[1:]))\n(p/'curl-pid').write_text(str(os.getpid()))\nsys.stderr.write('private-downloader-marker')\nsys.stdout.buffer.write(bytes.fromhex('{}'))\nsys.stdout.buffer.flush()\nsys.exit({exit})\n",
+            hex(bytes)
+        );
+        fs::write(tools.join("curl"), script).unwrap();
+        fs::set_permissions(tools.join("curl"), fs::Permissions::from_mode(0o700)).unwrap();
     }
 
     fn state(&self) -> serde_json::Value {
@@ -304,6 +338,221 @@ fn refused_operations_leave_the_prefix_and_state_untouched() {
         "{}",
         describe(&private)
     );
+}
+
+#[test]
+fn downloads_signed_bytes_without_executing_then_applies_and_rolls_back() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let mut first_target = String::new();
+    for (name, sequence, version, bytes) in [
+        ("first", 5, "0.2.0", b"synthetic-appimage-first".as_slice()),
+        (
+            "second",
+            6,
+            "0.2.1",
+            b"synthetic-appimage-second".as_slice(),
+        ),
+    ] {
+        let (manifest, signature, _) = sandbox.release(name, sequence, version, bytes);
+        sandbox.fake_curl(bytes, 0);
+        let output = sandbox.root.join(format!("{name}-download.AppImage"));
+        let downloaded = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+        assert!(downloaded.status.success(), "{}", describe(&downloaded));
+        let receipt: serde_json::Value = serde_json::from_slice(&downloaded.stdout).unwrap();
+        assert_eq!(receipt["downloaded"], true);
+        assert_eq!(receipt["artifactChecked"], true);
+        assert_eq!(receipt["applied"], false);
+        assert_eq!(fs::read(&output).unwrap(), bytes);
+        assert_eq!(
+            fs::metadata(&output).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(!String::from_utf8_lossy(&downloaded.stderr).contains("private-downloader-marker"));
+        if sequence == 5 {
+            assert!(!prefix.exists());
+            assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
+        }
+        let curl = fs::read_to_string(sandbox.root.join("tools/curl-arguments")).unwrap();
+        let args: Vec<_> = curl.lines().collect();
+        assert_eq!(args[0], "--disable", "never load .curlrc");
+        for pair in [
+            ["--proto", "=https"],
+            ["--proto-redir", "=https"],
+            ["--max-redirs", "5"],
+            ["--connect-timeout", "15"],
+            ["--max-time", "180"],
+            ["--speed-limit", "1024"],
+            ["--speed-time", "30"],
+        ] {
+            assert!(
+                args.windows(2).any(|actual| actual == pair),
+                "missing curl bound: {pair:?}"
+            );
+        }
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--max-filesize", &bytes.len().to_string()]));
+        let applied =
+            sandbox.run(&sandbox.apply_args(&manifest, &signature, &output, &prefix, true));
+        assert!(applied.status.success(), "{}", describe(&applied));
+        if sequence == 5 {
+            first_target = current_target(&prefix);
+        }
+    }
+    let rolled = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(rolled.status.success(), "{}", describe(&rolled));
+    assert_eq!(current_target(&prefix), first_target);
+    assert_eq!(
+        fs::read(prefix.join("current/dsh-ocean")).unwrap(),
+        b"synthetic-appimage-first"
+    );
+    assert_eq!(
+        sandbox.state()["channels"]["stable"]["sequence"],
+        6,
+        "rollback must not forget the replay floor"
+    );
+}
+
+#[test]
+fn rejected_downloads_never_publish_or_leak_curl_stderr() {
+    for (label, bytes, exit) in [
+        ("changed", b"Authenticated-bytes".as_slice(), 0),
+        ("short", b"short".as_slice(), 0),
+        ("long", b"authenticated-bytes-plus-extra".as_slice(), 0),
+        ("http", b"authenticated-bytes".as_slice(), 22),
+        ("timeout", b"authenticated-bytes".as_slice(), 28),
+    ] {
+        let sandbox = Sandbox::new();
+        let (manifest, signature, _) = sandbox.release("input", 5, "0.2.0", b"authenticated-bytes");
+        sandbox.fake_curl(bytes, exit);
+        let output = sandbox.root.join(format!("{label}.AppImage"));
+        let refused = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+        assert!(!refused.status.success(), "{label}: {}", describe(&refused));
+        assert!(
+            sandbox.root.join("tools/curl-arguments").exists(),
+            "must reach the downloader: {label}"
+        );
+        assert!(
+            !output.exists(),
+            "failed transfers must not publish: {label}"
+        );
+        assert!(!describe(&refused).contains("private-downloader-marker"));
+        assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
+        assert!(!fs::read_dir(&sandbox.root).unwrap().any(|e| e
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".dsh-ocean-download-")));
+    }
+}
+
+#[test]
+fn signature_policy_and_remembered_floor_are_checked_before_download() {
+    let sandbox = Sandbox::new();
+    let (manifest, signature, _) = sandbox.release("input", 5, "0.2.0", b"authenticated-bytes");
+    sandbox.fake_curl(b"authenticated-bytes", 0);
+    let output = sandbox.root.join("download.AppImage");
+    let mut damaged = fs::read(&signature).unwrap();
+    damaged[0] = b'!';
+    let bad_signature = sandbox.root.join("bad-signature.json");
+    fs::write(&bad_signature, damaged).unwrap();
+    let refused = sandbox.run(&sandbox.download_args(&manifest, &bad_signature, &output));
+    assert!(!refused.status.success());
+    assert!(!sandbox.root.join("tools/curl-arguments").exists());
+    assert!(!output.exists());
+    let (newer, newer_sig, _) = sandbox.release("newer", 6, "0.2.1", b"newer-bytes");
+    let mut accept = sandbox.download_args(&newer, &newer_sig, &output);
+    accept[0] = "--accept-release".into();
+    accept.truncate(accept.len() - 2);
+    assert!(sandbox.run(&accept).status.success());
+    let replay = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+    assert!(!replay.status.success());
+    assert!(
+        describe(&replay).contains("rollback"),
+        "{}",
+        describe(&replay)
+    );
+    assert!(!sandbox.root.join("tools/curl-arguments").exists());
+    assert!(!output.exists());
+}
+
+#[test]
+fn download_refuses_overwrite_and_reaps_an_oversized_transfer() {
+    let sandbox = Sandbox::new();
+    let (manifest, signature, _) = sandbox.release("input", 5, "0.2.0", b"signed");
+    let output = sandbox.root.join("existing.AppImage");
+    fs::write(&output, b"keep-existing").unwrap();
+    sandbox.fake_curl(b"signed", 0);
+    let refused = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+    assert!(!refused.status.success());
+    assert_eq!(fs::read(&output).unwrap(), b"keep-existing");
+    let oversized = sandbox.root.join("oversized.AppImage");
+    sandbox.fake_curl(b"too-many-bytes", 0);
+    let curl = sandbox.root.join("tools/curl");
+    let code = fs::read_to_string(&curl)
+        .unwrap()
+        .replace("sys.exit(0)", "import time\ntime.sleep(20)\nsys.exit(0)");
+    fs::write(&curl, code).unwrap();
+    let start = std::time::Instant::now();
+    let refused = sandbox.run(&sandbox.download_args(&manifest, &signature, &oversized));
+    assert!(!refused.status.success());
+    assert!(start.elapsed() < std::time::Duration::from_secs(5));
+    assert!(!oversized.exists());
+    let pid: i32 = fs::read_to_string(sandbox.root.join("tools/curl-pid"))
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(
+        unsafe { libc::kill(pid, 0) },
+        -1,
+        "oversized downloader must be reaped"
+    );
+    assert_eq!(
+        std::io::Error::last_os_error().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+}
+
+#[test]
+fn tar_archive_is_not_activated_as_an_executable() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (manifest, signature, artifact) =
+        sandbox.release("archive", 5, "0.2.0", b"synthetic-tar-bytes");
+    let raw = fs::read_to_string(&manifest)
+        .unwrap()
+        .replace("\"kind\":\"appimage\"", "\"kind\":\"tar.gz\"")
+        .replace(".AppImage", ".tar.gz");
+    fs::write(&manifest, raw.as_bytes()).unwrap();
+    let mut message = DOMAIN.to_vec();
+    message.extend_from_slice(raw.as_bytes());
+    fs::write(
+        &signature,
+        format!(
+            "{{\"version\":1,\"keyId\":\"{KEY_ID}\",\"signatureHex\":\"{}\"}}",
+            hex(&sandbox.key.sign(&message).to_bytes())
+        ),
+    )
+    .unwrap();
+    let mut args = sandbox.apply_args(&manifest, &signature, &artifact, &prefix, true);
+    let kind = args.iter().position(|arg| arg == "--kind").unwrap();
+    args[kind + 1] = "tar.gz".into();
+    let refused = sandbox.run(&args);
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert!(
+        describe(&refused).contains("AppImage"),
+        "{}",
+        describe(&refused)
+    );
+    assert!(!prefix.exists());
+    assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
 }
 
 #[test]
