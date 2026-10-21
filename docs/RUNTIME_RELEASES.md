@@ -91,10 +91,47 @@ must be separate from Harness state, not paths inferred from an install hint.
 Import **does not execute Node/DSH/pnpm**, install packages, change `current`,
 write `.previous`, restart a service, mutate a profile or advance the remembered
 floor. It reports `healthChecked:false`; artifact authentication and a complete
-retained tree are not proof of native version/ABI/authenticated health. Those
-checks and owned controller/data transactions remain the next M2 step. A CLI
+retained tree are not proof of native version/ABI/authenticated health. A separate
+explicit candidate check below supplies that evidence; owned controller/data
+transactions remain the next M2 step. A CLI
 import ends its lock when it returns; an inactive prepared generation may later
 be reclaimed by an explicit/cooperating installer/GC.
+
+## Isolated native/version/authenticated health
+
+`--check-runtime-bundle` takes the same metadata/policy/artifact/prefix inputs,
+with **`--confirm-check yes`**, imports/rechecks the complete retained tree and
+executes only the authenticated **native Linux ELF64 Node**. It checks metadata
+freshness again at execution/result boundaries, holds the installer lock, and
+passes the exact signed component versions to the embedded helper. A changed
+retained file or incompatible architecture refuses execution.
+
+The helper probes exact Node/DSH/pnpm versions and loads `node-pty`/`koffi` from
+the DSH package before server health. Every probe uses disposable HOME/DSH_HOME,
+all XDG directories, TMPDIR/cwd and a pinned clean PATH; the Rust launcher clears
+inherited environment/NODE_OPTIONS. The server binds 127.0.0.1 port 0, disables
+browser launch and must return anonymous 401 then launch-token 303. No real
+profile/server or global install is used. Token-bearing output is not returned.
+
+The owned Rust process group bounds combined output (64 KiB) and total time
+(95 seconds), polls cancellation without blocking GTK, and kills/reaps its owned
+checker on every result/error/timeout. In this mode helper children inherit that
+group; legacy standalone calls retain their existing group cleanup. This is
+cooperating process ownership, not containment of malicious same-UID code or
+processes that deliberately escape groups. Temporary state is removed only after
+owned cleanup. A health result is bound to the staged manifest/components/tree;
+**it is not an activation permit or data-migration compatibility guarantee**.
+
+[Helper tests](../tests/runtime_health.mjs) exercise isolated probes, version/native
+mismatch, authentication and cleanup. An opt-in [signed-bundle fixture](../tests/runtime_feed_cli.rs)
+uses an explicitly selected real Node binary with synthetic DSH/pnpm/native module
+stubs, fixed test-only trust and private state. This proves the complete client
+orchestration, not real DSH/native-addon/production acceptance:
+
+```bash
+DSH_OCEAN_TEST_RUNTIME_NODE=/usr/bin/node cargo test --locked \
+  --test runtime_feed_cli signed_runtime_bundle_health -- --ignored
+```
 
 ## Headless commands
 

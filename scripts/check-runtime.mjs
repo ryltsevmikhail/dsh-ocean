@@ -12,6 +12,7 @@ if (!root || !path.isAbsolute(root)) throw new Error('absolute runtime root requ
 const home = await mkdtemp(path.join(tmpdir(), 'dsh-ocean-health.'));
 const node = path.join(root, 'runtime/node/bin/node');
 const dsh = path.join(root, 'harness/node_modules/.bin/dsh');
+const externallyOwnedGroup=process.argv.includes('--owned-group');
 let child;
 let timer;
 let stopping = false;
@@ -31,7 +32,7 @@ function request(url) {
 
 function signalGroup(signal) {
   if (!child?.pid) return;
-  try { process.kill(-child.pid, signal); }
+  try { if(externallyOwnedGroup)child.kill(signal);else process.kill(-child.pid, signal); }
   catch (error) { if (error.code !== 'ESRCH') throw error; }
 }
 
@@ -53,31 +54,50 @@ async function stop() {
   await rm(home, { recursive: true, force: true });
 }
 
+const isolatedEnv = {
+  HOME:home, DSH_HOME:path.join(home,'.dsh'), DSH_TELEMETRY_DISABLED:'1',
+  XDG_CONFIG_HOME:path.join(home,'.config'), XDG_DATA_HOME:path.join(home,'.local/share'),
+  XDG_STATE_HOME:path.join(home,'.local/state'), XDG_CACHE_HOME:path.join(home,'.cache'),
+  TMPDIR:path.join(home,'tmp'), LANG:'C.UTF-8',
+  PATH:`${path.dirname(node)}:${path.join(root,'tools/node_modules/.bin')}:/usr/bin:/bin`,
+};
 let failHealth;
-const interrupted = () => failHealth?.(new Error('health check interrupted'));
+let interruptionRequested=false;
+const interrupted = () => {interruptionRequested=true;failHealth?.(new Error('health check interrupted'));};
+async function probe(args) {
+  if(interruptionRequested)throw new Error('health check interrupted');
+  return new Promise((resolve,reject)=>{
+    failHealth=reject;timer=setTimeout(()=>reject(new Error('runtime component probe timed out')),10000);
+    child=spawn(node,args,{cwd:home,detached:!externallyOwnedGroup,stdio:['ignore','pipe','ignore'],env:isolatedEnv});
+    let output='';
+    child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{output+=chunk;if(output.length>65536)reject(new Error('runtime component output exceeds limit'));});
+    child.once('error',()=>reject(new Error('runtime component probe failed')));
+    child.once('exit',code=>{clearTimeout(timer);signalGroup('SIGKILL');child=undefined;if(code===0)resolve(output.trim());else reject(new Error('runtime component probe failed'));});
+  });
+}
 process.once('SIGINT', interrupted);
 process.once('SIGTERM', interrupted);
 try {
   await mkdir(path.join(home, 'tmp'));
+  const expectedIndex=process.argv.indexOf('--expected-components');
+  if(expectedIndex!==-1) {
+    if(expectedIndex+2!==process.argv.length-1)throw new Error('invalid expected component arguments');
+    let expected;try{expected=JSON.parse(process.argv[expectedIndex+1]);}catch{throw new Error('invalid expected components');}
+    if(!expected||Object.keys(expected).sort().join(',')!=='dsh,node,pnpm'||!Object.values(expected).every(value=>typeof value==='string'&&value.length<128&&/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(value)))throw new Error('invalid expected components');
+    if(process.versions.node!==expected.node)throw new Error('candidate Node version mismatch');
+    if((await probe([dsh,'--version'])).split('\n').at(-1)!==expected.dsh)throw new Error('candidate DSH version mismatch');
+    if(await probe([path.join(root,'tools/node_modules/.bin/pnpm'),'--version'])!==expected.pnpm)throw new Error('candidate pnpm version mismatch');
+    await probe(['--input-type=commonjs','-e','const {createRequire}=require("node:module");const load=createRequire(process.argv[1]+"/harness/node_modules/@deepseek-ai/dsh/package.json");load("node-pty");load("koffi");',root]);
+  }
+  if(interruptionRequested)throw new Error('health check interrupted');
   const ready = new Promise((resolve, reject) => {
     failHealth = reject;
     timer = setTimeout(() => reject(new Error('DSH health check timed out')), 60000);
     child = spawn(node, [dsh, '--profile', 'web', '--host', '127.0.0.1', '--port', '0', '--no-open'], {
       cwd: home,
-      detached: true,
+      detached: !externallyOwnedGroup,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        HOME: home,
-        DSH_HOME: path.join(home, '.dsh'),
-        DSH_TELEMETRY_DISABLED: '1',
-        XDG_CONFIG_HOME: path.join(home, '.config'),
-        XDG_DATA_HOME: path.join(home, '.local/share'),
-        XDG_STATE_HOME: path.join(home, '.local/state'),
-        XDG_CACHE_HOME: path.join(home, '.cache'),
-        TMPDIR: path.join(home, 'tmp'),
-        LANG: 'C.UTF-8',
-        PATH: `${path.dirname(node)}:${path.join(root, 'tools/node_modules/.bin')}:/usr/bin:/bin`,
-      },
+      env: isolatedEnv,
     });
     child.once('error', () => reject(new Error('could not start candidate DSH')));
     child.once('exit', () => reject(new Error('candidate DSH exited during health check')));

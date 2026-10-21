@@ -25,11 +25,12 @@ pub fn run(args: &[String]) -> Result<Value> {
     }
     anyhow::ensure!(args.len()>=4,"usage: --verify-runtime-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target linux-x86_64|linux-aarch64 --min-sequence N --current-runtime-version VERSION");
     let accept = match args[0].as_str() {
-        "--verify-runtime-release" | "--import-runtime-release" => false,
+        "--verify-runtime-release" | "--import-runtime-release" | "--check-runtime-bundle" => false,
         "--accept-runtime-release" => true,
         _ => anyhow::bail!("unsupported runtime metadata operation"),
     };
-    let import = args[0] == "--import-runtime-release";
+    let health = args[0] == "--check-runtime-bundle";
+    let import = args[0] == "--import-runtime-release" || health;
     let mut flags = HashMap::new();
     let (pairs, rest) = args[4..].as_chunks::<2>();
     anyhow::ensure!(
@@ -48,7 +49,7 @@ pub fn run(args: &[String]) -> Result<Value> {
             ) || (import
                 && matches!(
                     pair[0].as_str(),
-                    "--artifact" | "--prefix" | "--confirm-import"
+                    "--artifact" | "--prefix" | "--confirm-import" | "--confirm-check"
                 )),
             "unsupported runtime verification option"
         );
@@ -65,8 +66,12 @@ pub fn run(args: &[String]) -> Result<Value> {
     };
     if import {
         anyhow::ensure!(
-            value("--confirm-import")? == "yes",
-            "runtime import requires --confirm-import yes"
+            value(if health {
+                "--confirm-check"
+            } else {
+                "--confirm-import"
+            })? == "yes",
+            "runtime import/check requires explicit confirmation"
         );
         value("--artifact")?;
         value("--prefix")?;
@@ -127,12 +132,19 @@ pub fn run(args: &[String]) -> Result<Value> {
         verified.manifest_sha256(),
     )?;
     if import {
-        return Ok(crate::runtime_bundle::import(
+        let prepared = crate::runtime_bundle::import(
             std::path::Path::new(value("--artifact")?),
             &verified,
             std::path::Path::new(value("--prefix")?),
-        )?
-        .summary());
+        )?;
+        if health {
+            return Ok(serde_json::to_value(crate::runtime_health::check(
+                &prepared,
+                &verified,
+                std::sync::Arc::new(crate::update_control::Control::default()),
+            )?)?);
+        }
+        return Ok(prepared.summary());
     }
     let mut summary = verified.summary();
     if accept {

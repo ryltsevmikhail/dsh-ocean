@@ -163,13 +163,15 @@ fn handle_cli() -> bool {
         | "--verify-runtime-release"
         | "--accept-runtime-release"
         | "--check-runtime-update"
-        | "--import-runtime-release" => {
+        | "--import-runtime-release"
+        | "--check-runtime-bundle" => {
             let result = if matches!(
                 args[0].as_str(),
                 "--verify-runtime-release"
                     | "--accept-runtime-release"
                     | "--check-runtime-update"
                     | "--import-runtime-release"
+                    | "--check-runtime-bundle"
             ) {
                 dsh_ocean::runtime_cli::run(&args)
             } else {
@@ -325,6 +327,7 @@ fn handle_cli() -> bool {
                    --verify-runtime-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target TARGET --min-sequence N --current-runtime-version VERSION  verify complete runtime metadata (no execution)\n  \
                    --accept-runtime-release ... --confirm-accept yes  remember a verified runtime floor separately from shell\n  \
                    --import-runtime-release ... --artifact ARCHIVE --prefix DIR --confirm-import yes  import complete signed bytes without executing/selecting runtime\n  \
+                   --check-runtime-bundle ... --artifact ARCHIVE --prefix DIR --confirm-check yes  execute authenticated native candidate checks in disposable state (no activation)\n  \
                    --check-runtime-update --current-runtime-version VERSION  check configured signed runtime source without installation\n  \
                    --managed-shell-status  inspect explicitly enrolled destination (no network)\n  \
                    --enroll-shell --confirm-managed yes  opt into a separate managed user destination\n  \

@@ -206,9 +206,11 @@ acceptance never install/execute or access a profile. Cross-product signatures,
 replay, malformed/unsafe policy and storage tests pass. Complete signed generation
 import now captures/hash-checks/extracts all payload bytes, protects a retained
 inventory and holds the shared installer lock without executing/selecting runtime
-or advancing the floor. Authenticated native health, owned controller integration
-and exact data rollback are still pending; the old bootstrap/core installer is not
-made signed by metadata/import alone. See
+or advancing the floor. Separate explicit isolated candidate checking validates
+native Node, exact signed versions/native bindings and authenticated server health,
+with clean disposable state and bounded cancellable process-group ownership.
+Owned controller integration and exact data rollback are still pending; the old
+bootstrap/core installer is not made signed by metadata/import/health alone. See
 [runtime boundary](RUNTIME_RELEASES.md).
 
 **Native shell updater:** distinct tray entries separate core from shell updates.

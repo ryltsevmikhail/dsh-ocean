@@ -77,26 +77,46 @@ impl Fixture {
     }
     fn bundle(&mut self, invalid: Option<&str>) {
         use sha2::{Digest, Sha256};
+        let health = invalid == Some("health");
+        let node_bytes = if health {
+            let node = std::env::var_os("DSH_OCEAN_TEST_RUNTIME_NODE")
+                .expect("explicit isolated real-Node fixture opt-in");
+            let output = Command::new(&node)
+                .arg("--version")
+                .env_clear()
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            self.manifest["components"]["node"] = json!(String::from_utf8(output.stdout)
+                .unwrap()
+                .trim()
+                .trim_start_matches('v'));
+            fs::read(node).unwrap()
+        } else {
+            b"#!/bin/sh\nexit 97\n".to_vec()
+        };
+        let dsh = if health {
+            b"if(process.argv.includes('--version')){console.log('0.2.1');process.exit(0);} const http=require('node:http'); const s=http.createServer((q,r)=>{r.statusCode=q.url.includes('token=')?303:401;r.end();});s.listen(0,'127.0.0.1',()=>console.log('dsh web: http://127.0.0.1:'+s.address().port+'/?token=synthetic-never-print'))".as_slice()
+        } else {
+            b"// signed fixture entry, never executed".as_slice()
+        };
+        let pnpm = if health {
+            b"console.log('10.30.3');".as_slice()
+        } else {
+            b"// resolved fixture tool".as_slice()
+        };
         let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
         {
             let mut tar = tar::Builder::new(&mut gzip);
-            let versions = format!("24.14.1\n0.2.1\n10.30.3\n{}\n", "22".repeat(32));
+            let versions = format!(
+                "{}\n0.2.1\n10.30.3\n{}\n",
+                self.manifest["components"]["node"].as_str().unwrap(),
+                "22".repeat(32)
+            );
             for (name, body, mode) in [
-                (
-                    "runtime/node/bin/node",
-                    b"#!/bin/sh\nexit 97\n".as_slice(),
-                    0o755,
-                ),
-                (
-                    "harness/node_modules/.bin/dsh",
-                    b"// signed fixture entry, never executed".as_slice(),
-                    0o755,
-                ),
-                (
-                    "tools/node_modules/.bin/pnpm",
-                    b"// resolved fixture tool".as_slice(),
-                    0o755,
-                ),
+                ("runtime/node/bin/node", node_bytes.as_slice(), 0o755),
+                ("harness/node_modules/.bin/dsh", dsh, 0o755),
+                ("tools/node_modules/.bin/pnpm", pnpm, 0o755),
                 (
                     "harness/node_modules/native-addon/native.node",
                     b"resolved native bytes".as_slice(),
@@ -127,6 +147,15 @@ impl Fixture {
                     body,
                 )
                 .unwrap();
+            }
+            if health {
+                for name in ["node-pty", "koffi"] {
+                    let mut header = tar::Header::new_gnu();
+                    header.set_mode(0o644);
+                    header.set_size(18);
+                    header.set_cksum();
+                    tar.append_data(&mut header,format!("dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/harness/node_modules/@deepseek-ai/dsh/node_modules/{name}/index.js"),b"module.exports={};".as_slice()).unwrap();
+                }
             }
             if invalid == Some("link") {
                 let mut header = tar::Header::new_gnu();
@@ -556,6 +585,35 @@ fn prepared_generation_holds_existing_bootstrap_lock_until_dropped() {
         0,
         "normal completion releases installer lock"
     );
+}
+
+#[test]
+#[ignore = "requires explicitly provided real Node binary; fixed-key synthetic DSH, no user runtime"]
+fn signed_runtime_bundle_health_uses_real_node_but_only_disposable_synthetic_state() {
+    let mut f = Fixture::new();
+    f.bundle(Some("health"));
+    let mut args = f.args(false);
+    args[0] = "--check-runtime-bundle".into();
+    args.extend([
+        "--artifact".into(),
+        f.root.join("bundle.tar.gz").to_string_lossy().into_owned(),
+        "--prefix".into(),
+        f.root.join("runtime-prefix").to_string_lossy().into_owned(),
+        "--confirm-check".into(),
+        "yes".into(),
+    ]);
+    let output = f.run(&args);
+    assert!(output.status.success(), "{}", describe(&output));
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["healthChecked"], true);
+    assert_eq!(result["activated"], false);
+    assert!(!describe(&output).contains("synthetic-never-print"));
+    assert!(!f.root.join("home/.dsh").exists());
+    assert!(!f.root.join("runtime-prefix/current").exists());
+    assert!(!f
+        .root
+        .join("state/dsh-ocean/runtime-release-state.json")
+        .exists());
 }
 
 #[test]
