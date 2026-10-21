@@ -71,7 +71,9 @@ client keeps the executable it already started. Rollback only switches the
 selector back to one retained version; it is not a filesystem transaction, does
 not remove newer versions, and does not verify that the retained version is still
 healthy. Nothing here signs, attests or publishes; a system-wide install, package
-manager integration and update-feed configuration remain unimplemented.
+manager integration and update-feed configuration remain unimplemented. Run
+apply/rollback one at a time: the existing path does not hold a whole-prefix
+transaction lock across activation and remembered-state recording.
 
 ## Persisted anti-rollback state (opt-in acceptance)
 
@@ -416,10 +418,14 @@ cargo test --test release_feed
 cargo test --lib staging_tests
 ```
 
-Production key custody/provisioning/rotation/revocation, signed publishing CI,
-feed fetch/redirect policy, persisted rollback/freeze state, authenticated
-network downloader, safe shell apply/rollback, package-manager behavior and GUI acceptance
-are **not implemented by this slice**. M2 remains incomplete.
+Implemented CLI foundations now include persisted sequence/downgrade protection,
+authenticated artifact download and explicit local AppImage activation/selector
+rollback. These are not a complete automatic updater. Production key custody/
+provisioning/rotation/revocation, manifest/signature feed retrieval, signed
+publishing CI, tar extraction, package-manager behavior, GUI orchestration and
+real published-feed acceptance remain open. Core/bootstrap updates are still
+unsigned; local apply/rollback retain the transaction/concurrency/health limits
+described above. M2 remains incomplete.
 
 The declared Rust floor is now 1.90: the already-locked Tauri 2.12 stack itself
 requires 1.90, whereas the previous 1.77 declaration was inaccurate. The selected
