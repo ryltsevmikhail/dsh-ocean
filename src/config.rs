@@ -33,7 +33,10 @@ fn absolute_env_path(var: &str) -> Option<PathBuf> {
 }
 
 /// Reentrant account lookup: never changes HOME or trusts the working directory.
-fn account_home() -> Option<PathBuf> {
+///
+/// Shared with the owned-switch controller so the systemd service's `%h` login
+/// home has a single source of truth (the passwd entry), never a copied local.
+pub(crate) fn account_home() -> Option<PathBuf> {
     let mut size = 16 * 1024;
     while size <= 1024 * 1024 {
         let mut buffer = vec![0u8; size];

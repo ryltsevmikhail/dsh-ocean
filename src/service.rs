@@ -82,7 +82,7 @@ pub async fn prepare_and_open(app: &AppHandle) -> Result<()> {
 /// Keep admission through dispatch acknowledgement, without holding a metadata
 /// lock or blocking GTK. A cancelled/timed-out older callback uses its stamp to
 /// skip navigation after a newer operation or shutdown.
-async fn reload_window(
+pub(crate) async fn reload_window(
     app: &AppHandle,
     permit: &RuntimePermit,
     server: Server,
@@ -232,6 +232,20 @@ async fn spawn_managed(
     let log: crate::managed_child::Log = std::sync::Arc::new(move |line: String| {
         log_app.state::<AppState>().log(line);
     });
+    let server = spawn_managed_logged(runtime, permit, log).await?;
+    state.log(format!("Managed DSH is ready at {}", server.base_url));
+    Ok(server)
+}
+
+/// Spawn and publish a managed child from an explicit runtime without touching
+/// the app or the log sink. The owned switch engine uses this to start a freshly
+/// selected generation without `bootstrap::detect()`.
+pub(crate) async fn spawn_managed_logged(
+    runtime: &Runtime,
+    permit: &RuntimePermit,
+    log: crate::managed_child::Log,
+) -> Result<Server> {
+    permit.ensure_open()?;
     let started = crate::managed_child::start(
         &runtime.node,
         &runtime.dsh,
@@ -262,7 +276,6 @@ async fn spawn_managed(
         return Err(error.into());
     }
     auth::cache_token(&server.token);
-    state.log(format!("Managed DSH is ready at {}", server.base_url));
     Ok(server)
 }
 
@@ -409,7 +422,11 @@ pub async fn refresh_after_update(app: &AppHandle, permit: &RuntimePermit) -> Re
     reload_systemd_server(app, &base, permit).await
 }
 
-async fn reload_systemd_server(app: &AppHandle, base: &Url, permit: &RuntimePermit) -> Result<()> {
+pub(crate) async fn reload_systemd_server(
+    app: &AppHandle,
+    base: &Url,
+    permit: &RuntimePermit,
+) -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         permit.ensure_open()?;

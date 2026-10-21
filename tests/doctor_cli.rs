@@ -1,7 +1,7 @@
 //! `--doctor` output in a private sandbox: read-only counters, no secrets.
 #![cfg(target_os = "linux")]
 use std::fs;
-use std::os::unix::fs::{symlink, FileTypeExt, PermissionsExt};
+use std::os::unix::fs::{symlink, DirBuilderExt, FileTypeExt, PermissionsExt};
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -21,10 +21,23 @@ impl Sandbox {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "dsh-ocean-doctor-cli-{}-{nanos}",
-            std::process::id()
-        ));
+        Self::new_with_stamp(nanos)
+    }
+    fn new_with_stamp(nanos: u128) -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = loop {
+            let id = NEXT.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "dsh-ocean-doctor-cli-{}-{nanos}-{id}",
+                std::process::id()
+            ));
+            match fs::DirBuilder::new().mode(0o700).create(&path) {
+                Ok(()) => break path,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("allocate private doctor fixture: {error}"),
+            }
+        };
         let home = root.join("home");
         let dsh = root.join("dsh");
         let runtime = root.join("runtime");
@@ -168,6 +181,13 @@ fn doctor_reports_read_only_runtime_and_backup_counters() {
     assert!(sandbox.runtime.join("generations/gen.bbb").is_dir());
     assert!(sandbox.runtime.join(".download.stale").is_dir());
     assert!(sandbox.dsh.join("profiles/web/cordis.patch.yml").is_file());
+}
+
+#[test]
+fn simultaneous_doctor_fixtures_never_reuse_a_root_when_timestamps_match() {
+    let first = Sandbox::new_with_stamp(0);
+    let second = Sandbox::new_with_stamp(0);
+    assert_ne!(first.root, second.root);
 }
 
 #[test]

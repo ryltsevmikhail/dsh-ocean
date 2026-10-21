@@ -1,9 +1,12 @@
 use std::fs;
 use std::io::{Read, Write};
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::io::AsRawFd;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use url::Url;
@@ -204,7 +207,7 @@ pub fn daemon_reload() -> Result<()> {
 
 const MAX_UNIT_BYTES: u64 = 64 * 1024;
 
-fn read_owned_unit(path: &Path) -> Result<Option<Vec<u8>>> {
+pub(crate) fn read_owned_unit(path: &Path) -> Result<Option<Vec<u8>>> {
     let file = match fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
@@ -335,6 +338,287 @@ pub fn restart() -> Result<()> {
             String::from_utf8_lossy(&output.stderr).trim()
         );
     }
+    Ok(())
+}
+
+/// Checked stop for the owned switch engine: a stop that fails must refuse the
+/// whole transaction, never be silently treated as inactive.
+pub fn stop() -> Result<()> {
+    let output = systemctl(&["--user", "stop", config::UNIT_NAME])?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "could not stop {}: {}",
+            config::UNIT_NAME,
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(())
+}
+
+/// Checked inactive proof. `systemctl --user show <unit> --property=ActiveState
+/// --value` returns the exact state; only an explicit `inactive` proves the
+/// service is stopped. `active`, `failed`, transitional (`activating` /
+/// `deactivating` / `reloading`), unknown or unreadable states all fail closed,
+/// so a caller can never mistake a failed or transitional service for "stopped".
+/// (The legacy `is-active --quiet` exit 3 covered every non-active state, so a
+/// "failed" unit would have masqueraded as "inactive"; the exact-state read does
+/// not.)
+pub fn is_inactive() -> Result<bool> {
+    let output = systemctl(&[
+        "--user",
+        "show",
+        config::UNIT_NAME,
+        "--property=ActiveState",
+        "--value",
+    ])?;
+    if !output.status.success() {
+        anyhow::bail!("could not query the managed service state; the service state is unknown");
+    }
+    let state = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    match state.as_str() {
+        "inactive" => Ok(true),
+        "active" => Ok(false),
+        "failed" | "activating" | "deactivating" | "reloading" | "maintenance" => {
+            anyhow::bail!("the managed service is not inactive (state {state}); the inactive proof requires an explicit inactive state")
+        }
+        "" => anyhow::bail!(
+            "the managed service state could not be determined; the inactive proof requires an explicit inactive state"
+        ),
+        _ => anyhow::bail!(
+            "the managed service reported an unexpected state; the inactive proof requires an explicit inactive state"
+        ),
+    }
+}
+
+/// The two manager-environment variables the owned-switch engine must prove,
+/// captured as raw bytes exactly as the manager emitted them (never
+/// shell-evaluated). Other variables are never retained.
+pub(crate) struct ManagerEnvironment {
+    /// Each `HOME=` value, in order of appearance.
+    pub home: Vec<Vec<u8>>,
+    /// Each `DSH_HOME=` value, in order of appearance.
+    pub dsh_home: Vec<Vec<u8>>,
+}
+
+/// A normal user-manager environment is far smaller; a larger block produces no
+/// proof rather than an unbounded read.
+const MAX_MANAGER_ENV_BYTES: usize = 64 * 1024;
+const MANAGER_ENV_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Read the user manager environment, retaining only the `HOME=` and `DSH_HOME=`
+/// lines. Every other variable is discarded as it streams in and is never logged
+/// or retained; the query is bounded in size and time so an oversized or hung
+/// manager environment produces no proof (fail closed), and `stderr` is never
+/// captured. This is the source of truth for the effective systemd service data
+/// home, independent of the client's own `HOME`/`DSH_HOME`.
+pub(crate) fn show_environment() -> Result<ManagerEnvironment> {
+    // Reaps the child (and its process group) on every early-return path so a
+    // hung/oversized query cannot leak a live process.
+    struct Guard(std::process::Child);
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            unsafe {
+                libc::kill(-(self.0.id() as i32), libc::SIGKILL);
+            }
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    let mut child = Guard(
+        Command::new("systemctl")
+            .args(["--user", "show-environment"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            // Never capture stderr: it can carry paths/errors we must not retain.
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .context("run systemctl --user show-environment")?,
+    );
+    let mut stdout = child
+        .0
+        .stdout
+        .take()
+        .context("capture show-environment stdout")?;
+    set_nonblocking(&stdout)?;
+
+    let start = Instant::now();
+    let mut filter = EnvironmentFilter::default();
+    let mut buf = [0u8; 4096];
+    let status = loop {
+        if start.elapsed() >= MANAGER_ENV_TIMEOUT {
+            anyhow::bail!(
+                "the user manager environment query timed out; refusing an owned systemd switch"
+            );
+        }
+        let mut progressed = false;
+        loop {
+            match stdout.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    filter.push(&buf[..n])?;
+                    progressed = true;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => anyhow::bail!(
+                    "the user manager environment could not be read; refusing an owned systemd switch"
+                ),
+            }
+        }
+        if let Some(status) = child.0.try_wait().context("reap show-environment")? {
+            break status;
+        }
+        if !progressed {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    };
+    // Child exited: drain any final buffered bytes before verifying the result.
+    loop {
+        match stdout.read(&mut buf) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => filter.push(&buf[..n])?,
+        }
+    }
+    anyhow::ensure!(
+        status.success(),
+        "the user manager environment could not be read; refusing an owned systemd switch"
+    );
+    Ok(filter.finish())
+}
+
+fn set_nonblocking(pipe: &impl AsRawFd) -> Result<()> {
+    let fd = pipe.as_raw_fd();
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    anyhow::ensure!(
+        flags >= 0 && unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } >= 0,
+        "could not configure the manager environment query"
+    );
+    Ok(())
+}
+
+/// Streams `show-environment` output, retaining only the `HOME=`/`DSH_HOME=`
+/// lines and discarding every other variable immediately.
+#[derive(Default)]
+struct EnvironmentFilter {
+    pending: Vec<u8>,
+    home: Vec<Vec<u8>>,
+    dsh_home: Vec<Vec<u8>>,
+    total: usize,
+}
+
+impl EnvironmentFilter {
+    fn push(&mut self, chunk: &[u8]) -> Result<()> {
+        self.total += chunk.len();
+        anyhow::ensure!(
+            self.total <= MAX_MANAGER_ENV_BYTES,
+            "the user manager environment is too large to prove; refusing an owned systemd switch"
+        );
+        self.pending.extend_from_slice(chunk);
+        while let Some(newline) = self.pending.iter().position(|&b| b == b'\n') {
+            let mut line: Vec<u8> = self.pending.drain(..=newline).collect();
+            line.pop(); // the '\n'
+            if line.last() == Some(&b'\r') {
+                line.pop();
+            }
+            self.classify(&line);
+        }
+        Ok(())
+    }
+
+    fn classify(&mut self, line: &[u8]) {
+        if let Some(value) = line.strip_prefix(b"HOME=") {
+            self.home.push(value.to_vec());
+        } else if let Some(value) = line.strip_prefix(b"DSH_HOME=") {
+            self.dsh_home.push(value.to_vec());
+        }
+        // Every other variable is dropped here and never retained or logged.
+    }
+
+    fn finish(mut self) -> ManagerEnvironment {
+        if !self.pending.is_empty() {
+            let trailing = std::mem::take(&mut self.pending);
+            self.classify(&trailing);
+        }
+        ManagerEnvironment {
+            home: self.home,
+            dsh_home: self.dsh_home,
+        }
+    }
+}
+
+/// Manager provenance for the owned unit: the exact fragment path it resolves to
+/// and any drop-ins. The switch engine refuses a fragment that is not the fixed
+/// generated unit file, and refuses any drop-in.
+pub(crate) fn unit_provenance(unit: &str) -> Result<(PathBuf, Vec<PathBuf>)> {
+    let fragment = systemctl(&["--user", "show", unit, "--property=FragmentPath", "--value"])?;
+    if !fragment.status.success() {
+        anyhow::bail!(
+            "could not inspect {unit} fragment: {}",
+            String::from_utf8_lossy(&fragment.stderr).trim()
+        );
+    }
+    let fragment_path = PathBuf::from(String::from_utf8_lossy(&fragment.stdout).trim().to_owned());
+    let drop_ins = systemctl(&["--user", "show", unit, "--property=DropInPaths", "--value"])?;
+    if !drop_ins.status.success() {
+        anyhow::bail!(
+            "could not inspect {unit} drop-ins: {}",
+            String::from_utf8_lossy(&drop_ins.stderr).trim()
+        );
+    }
+    let drop_in_paths: Vec<PathBuf> = String::from_utf8_lossy(&drop_ins.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(PathBuf::from)
+        .collect();
+    Ok((fragment_path, drop_in_paths))
+}
+
+/// Replace the owned unit file only when its current content is one of the known
+/// transaction images (before/after); the original file mode is preserved. This
+/// is a check-then-rename guard: it refuses an external edit that is already on
+/// disk, but the window between the content check and the rename is not a
+/// hostile-race proof — a same-UID process deliberately racing the rename can
+/// still be overwritten. The guard is cooperative, not a security boundary.
+pub(crate) fn replace_owned_unit(path: &Path, allowed: &[&[u8]], content: &[u8]) -> Result<()> {
+    let current = read_owned_unit(path)?.context("owned unit disappeared before replacement")?;
+    anyhow::ensure!(
+        allowed.iter().any(|known| *known == current),
+        "unit changed outside the transaction; refusing to overwrite"
+    );
+    let mode = fs::symlink_metadata(path)?.mode() & 0o777;
+    let parent = path.parent().context("unit has no parent")?;
+    static SERIAL: AtomicU64 = AtomicU64::new(0);
+    let stage = parent.join(format!(
+        ".dsh-ocean-unit-{}-{}",
+        std::process::id(),
+        SERIAL.fetch_add(1, Ordering::Relaxed)
+    ));
+    let result = (|| -> Result<()> {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(&stage)?;
+        file.write_all(content)?;
+        file.sync_all()?;
+        fs::set_permissions(&stage, fs::Permissions::from_mode(mode))?;
+        fs::rename(&stage, path)?;
+        fs::File::open(parent)?.sync_all()?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&stage);
+        return result;
+    }
+    let after = read_owned_unit(path)?.context("replaced unit disappeared")?;
+    anyhow::ensure!(
+        after == content,
+        "unit replacement did not persist; refusing service action"
+    );
     Ok(())
 }
 

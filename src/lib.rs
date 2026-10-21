@@ -46,6 +46,7 @@ pub mod release_state;
 pub mod remote;
 pub mod runtime_bundle;
 pub mod runtime_cli;
+pub mod runtime_controller;
 pub mod runtime_feed;
 pub mod runtime_health;
 pub mod runtime_lifecycle;
