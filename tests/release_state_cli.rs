@@ -141,7 +141,7 @@ impl Sandbox {
 
     fn state(&self) -> Value {
         let output = self.run(&["--release-state".to_owned()]);
-        assert!(output.status.success());
+        assert!(output.status.success(), "{}", describe(&output));
         serde_json::from_slice(&output.stdout).expect("release state JSON")
     }
 }
@@ -159,7 +159,8 @@ impl Drop for Sandbox {
 
 fn describe(output: &Output) -> String {
     format!(
-        "{}\n{}",
+        "status: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     )
@@ -201,10 +202,19 @@ fn plain_verification_stays_read_only_and_accept_records_once() {
 fn older_sequences_conflicting_manifests_and_downgrades_are_refused() {
     let sandbox = Sandbox::new();
     let [newer, newer_sig] = sandbox.signed("newer", 5, "0.2.0", 1);
-    assert!(sandbox
-        .invoke("--accept-release", &newer, &newer_sig, "1")
-        .status
-        .success());
+    let accepted = sandbox.invoke("--accept-release", &newer, &newer_sig, "1");
+    assert!(
+        accepted.status.success(),
+        "sandbox: {}\n{}",
+        sandbox.root.display(),
+        describe(&accepted)
+    );
+    assert!(
+        sandbox.state_file().exists(),
+        "accepted release state missing in sandbox: {}\n{}",
+        sandbox.root.display(),
+        describe(&accepted)
+    );
     let before = fs::read(sandbox.state_file()).unwrap();
 
     let [older, older_sig] = sandbox.signed("older", 4, "0.3.0", 2);
@@ -245,14 +255,28 @@ fn older_sequences_conflicting_manifests_and_downgrades_are_refused() {
 fn reset_requires_confirmation_and_forgets_the_remembered_sequence() {
     let sandbox = Sandbox::new();
     let [newer, newer_sig] = sandbox.signed("newer", 5, "0.2.0", 1);
-    assert!(sandbox
-        .invoke("--accept-release", &newer, &newer_sig, "1")
-        .status
-        .success());
+    let accepted = sandbox.invoke("--accept-release", &newer, &newer_sig, "1");
+    assert!(
+        accepted.status.success(),
+        "sandbox: {}\n{}",
+        sandbox.root.display(),
+        describe(&accepted)
+    );
+    assert!(
+        sandbox.state_file().exists(),
+        "accepted release state missing in sandbox: {}\n{}",
+        sandbox.root.display(),
+        describe(&accepted)
+    );
 
     let unconfirmed = sandbox.run(&["--reset-release-state".to_owned()]);
-    assert!(!unconfirmed.status.success());
-    assert!(sandbox.state_file().exists());
+    assert!(!unconfirmed.status.success(), "{}", describe(&unconfirmed));
+    assert!(
+        sandbox.state_file().exists(),
+        "release state missing after unconfirmed reset in sandbox: {}\n{}",
+        sandbox.root.display(),
+        describe(&unconfirmed)
+    );
 
     let reset = sandbox.run(&[
         "--reset-release-state".to_owned(),
@@ -293,14 +317,33 @@ fn fifo_state_is_rejected_without_waiting_for_a_writer() {
 fn corrupted_state_is_reported_instead_of_silently_ignored() {
     let sandbox = Sandbox::new();
     let [newer, newer_sig] = sandbox.signed("newer", 5, "0.2.0", 1);
-    assert!(sandbox
-        .invoke("--accept-release", &newer, &newer_sig, "1")
-        .status
-        .success());
+    let accepted = sandbox.invoke("--accept-release", &newer, &newer_sig, "1");
+    assert!(
+        accepted.status.success(),
+        "sandbox: {}\n{}",
+        sandbox.root.display(),
+        describe(&accepted)
+    );
+    assert!(
+        sandbox.state_file().exists(),
+        "accepted release state missing in sandbox: {}\n{}",
+        sandbox.root.display(),
+        describe(&accepted)
+    );
     fs::write(sandbox.state_file(), b"{ not json").unwrap();
     let reported = sandbox.run(&["--release-state".to_owned()]);
     assert!(!reported.status.success());
-    assert!(describe(&reported).contains("invalid release state file"));
+    let diagnostic = describe(&reported);
+    assert!(
+        diagnostic.contains("status: exit status: 1"),
+        "{diagnostic}"
+    );
+    assert!(diagnostic.contains("stdout:"), "{diagnostic}");
+    assert!(diagnostic.contains("stderr:"), "{diagnostic}");
+    assert!(
+        diagnostic.contains("invalid release state file"),
+        "{diagnostic}"
+    );
     // A corrupted store must block acceptance rather than reset the floor.
     let accepted = sandbox.invoke("--accept-release", &newer, &newer_sig, "1");
     assert!(!accepted.status.success());
