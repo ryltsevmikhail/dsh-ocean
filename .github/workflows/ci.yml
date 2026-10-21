@@ -265,12 +265,16 @@ jobs:
         run: |
           stage="$RUNNER_TEMP/public-toolchain-notices"
           mkdir -m 700 "$stage"
-          args=(--binary target/release/dsh-ocean --output-dir "$RUNNER_TEMP/native-license-evidence")
+          args=(--binary target/release/dsh-ocean --output-dir "$RUNNER_TEMP/native-license-evidence"
+                --notice ci-scope=docs/toolchain/NOTICE-ci-scope.txt)
           # The installed compiler is trusted build tooling here. These exact
           # distribution copyright names are candidates, never coverage proof.
           sysroot="$(rustc --print sysroot)"
           n=0
-          for relative in share/doc/rust/COPYRIGHT-library.html share/doc/rust/COPYRIGHT.html share/licenses/rust/COPYRIGHT-library.html.rustc share/licenses/rust/COPYRIGHT.html.rustc; do
+          # Deliberately exclude compiler-wide COPYRIGHT.html (14,423,589 bytes
+          # in diagnostic run 39603165011); do not enlarge/truncate collector limits.
+          # The retained ci-scope notice makes this selection gap explicit.
+          for relative in share/doc/rust/COPYRIGHT-library.html share/licenses/rust/COPYRIGHT-library.html.rustc; do
             candidate="$sysroot/$relative"
             if [ -f "$candidate" ] && [ ! -L "$candidate" ]; then
               n=$((n+1))
@@ -294,6 +298,8 @@ jobs:
             args+=(--notice "source-58cf8f9c-index=$stage/NOTICE-source-index.json")
           fi
           python3 -B scripts/artifact-license-evidence.py "${args[@]}"
+          # Independent log cross-check for reviewers; never upload the ELF itself.
+          sha256sum target/release/dsh-ocean
 
       - name: Retain reports and public notice text only (no ELF publication)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

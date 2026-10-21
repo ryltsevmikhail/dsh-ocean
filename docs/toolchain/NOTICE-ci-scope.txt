@@ -1,0 +1,20 @@
+CI candidate-selection scope -- not license clearance
+
+This companion retains only selected public library copyright candidates and,
+when the observed compiler commit matches, reviewed source-profile texts.
+The compiler-wide COPYRIGHT.html / COPYRIGHT.html.rustc is deliberately NOT
+selected or retained. In diagnostic CI run 39603165011, Rust 1.99.1 commit
+58cf8f9c35b355199727627d07ae34a4e2846d67 supplied COPYRIGHT.html at 14,423,589
+bytes and COPYRIGHT-library.html at 1,499,465 bytes. The former exceeded the
+collector's unchanged 4 MiB per-notice limit. These are historical observations,
+not byte sizes, hashes or provenance claims about this run's toolchain.
+
+No oversized text is truncated, split, silently treated as covered, or accepted
+under a higher limit. A selected library candidate exceeding the limit still
+fails capture. Omitted compiler-wide material must be reviewed and retained
+separately if applicable before any authorized redistribution.
+
+A library candidate, even if nonempty, is not proof of complete std, compiler
+runtime, compiler-builtins, unwind, native/dlopen or distribution-patch coverage.
+This scope notice is collector context, not an upstream license text. All
+release gates remain open; this report is not a linked SBOM or build attestation.

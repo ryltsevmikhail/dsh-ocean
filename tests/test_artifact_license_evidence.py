@@ -212,6 +212,56 @@ class EvidenceTests(unittest.TestCase):
                 evidence.create_evidence(self.binary, self.root / 'bytes-out', str(self.compiler), [('one', source), ('two', source)], self.root)
         self.assertFalse((self.root / 'bytes-out').exists())
 
+    def test_ci_selects_library_notice_not_oversized_compiler_omnibus(self):
+        # Run the actual capture step against a fake trusted toolchain, not source-text assertions.
+        workflow = (SCRIPT.parent.parent / '.github/workflows/ci.yml').read_text()
+        body = workflow.split('      - name: Capture artifact-bound observations and public notice candidates\n        run: |\n', 1)[1].split('\n      - name:', 1)[0]
+        body = '\n'.join(line[10:] for line in body.splitlines())
+        repo = self.root / 'repo'
+        (repo / 'scripts').mkdir(parents=True)
+        (repo / 'scripts/artifact-license-evidence.py').write_bytes(SCRIPT.read_bytes())
+        (repo / 'target/release').mkdir(parents=True)
+        (repo / 'target/release/dsh-ocean').write_bytes(fixture())
+        scope = SCRIPT.parent.parent / 'docs/toolchain/NOTICE-ci-scope.txt'
+        if scope.exists():
+            (repo / 'docs/toolchain').mkdir(parents=True)
+            (repo / 'docs/toolchain/NOTICE-ci-scope.txt').write_bytes(scope.read_bytes())
+        sysroot = self.root / 'toolchain-private-marker'
+        docs = sysroot / 'share/doc/rust'
+        docs.mkdir(parents=True)
+        library = docs / 'COPYRIGHT-library.html'
+        library.write_bytes(b'public library candidate')
+        with (docs / 'COPYRIGHT.html').open('wb') as stream:
+            stream.truncate(14423589)  # Actual oversized candidate in CI 39603165011.
+        tools = self.root / 'tools'
+        tools.mkdir()
+        rustc = tools / 'rustc'
+        rustc.write_text('#!' + sys.executable + '\nimport sys\nif sys.argv[1:] == ["--print", "sysroot"]: print(' + repr(str(sysroot)) + ')\nelse: print("rustc 1.80.0\\nrelease: 1.80.0\\nhost: x86_64-unknown-linux-gnu\\ncommit-hash: ' + 'a' * 40 + '")\n')
+        rustc.chmod(0o700)
+        runner = self.root / 'runner'
+        runner.mkdir()
+        env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'], RUNNER_TEMP=str(runner))
+        result = subprocess.run(['bash', '-e', '-c', body], cwd=repo, env=env, capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = runner / 'native-license-evidence'
+        report = json.loads((output / 'report.json').read_text())
+        self.assertEqual(report['binary']['sha256'], hashlib.sha256(fixture()).hexdigest())
+        notices = {item['label']: item for item in report['notices']}
+        self.assertEqual(set(notices), {'distribution-1', 'ci-scope'})
+        self.assertEqual((output / notices['distribution-1']['file']).read_bytes(), library.read_bytes())
+        self.assertIn('COPYRIGHT.html', (output / notices['ci-scope']['file']).read_text())
+        self.assertNotIn('private-marker', (output / 'report.json').read_text())
+        self.assertFalse((runner / 'public-toolchain-notices/COPYRIGHT-distribution-2.html').exists())
+        with library.open('wb') as stream:
+            stream.truncate(4 * 1024**2 + 1)
+        second_runner = self.root / 'runner-oversized-library'
+        second_runner.mkdir()
+        env['RUNNER_TEMP'] = str(second_runner)
+        result = subprocess.run(['bash', '-e', '-c', body], cwd=repo, env=env, capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stderr, 'artifact evidence refused: input size exceeds limit\n')
+        self.assertFalse((second_runner / 'native-license-evidence').exists())
+
     def test_notice_validation(self):
         notice = self.root / 'NOTICE'
         notice.write_bytes(b'notice')

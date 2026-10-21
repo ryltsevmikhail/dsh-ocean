@@ -102,6 +102,24 @@ and required source/notice payloads durably with any future authorized release.
 Package helpers' existing Cargo notice/covered-source retention is not
 silently treated as complete runtime/toolchain coverage.
 
+### Confirmed CI capture refusal and bounded selection
+
+Diagnostic [run 39603165011](https://github.com/ryltsevmikhail/dsh-ocean/actions/runs/39603165011)
+on head `80838ee96dc3332895240074c8bf1b1f1685a032` measured the installed Rust
+1.99.1 library copyright candidate at 1,499,465 bytes and compiler-wide
+`COPYRIGHT.html` at 14,423,589 bytes. Capture refused the latter with
+`input size exceeds limit`; this was not an ELF architecture or ownership failure.
+
+CI now deliberately selects only the two known library copyright locations,
+plus matching source-profile supplements. It does not select compiler-wide
+`COPYRIGHT.html` or `COPYRIGHT.html.rustc`. The retained
+`docs/toolchain/NOTICE-ci-scope.txt` explicitly records this gap and the historical
+measurement; it is scope context, not an upstream license or a claim about the
+current toolchain's bytes. No truncation, splitting or larger limits are used.
+Selected library notices still fail closed above 4 MiB. Omitted applicable
+compiler-wide material needs separate review/retention before redistribution;
+a green capture does not clear compiler/runtime/std coverage.
+
 ## Native origin and redistribution decisions still required
 
 For the actual target/release, record which bytes are copied, which libraries are
