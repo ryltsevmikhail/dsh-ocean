@@ -25,10 +25,11 @@ pub fn run(args: &[String]) -> Result<Value> {
     }
     anyhow::ensure!(args.len()>=4,"usage: --verify-runtime-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target linux-x86_64|linux-aarch64 --min-sequence N --current-runtime-version VERSION");
     let accept = match args[0].as_str() {
-        "--verify-runtime-release" => false,
+        "--verify-runtime-release" | "--import-runtime-release" => false,
         "--accept-runtime-release" => true,
         _ => anyhow::bail!("unsupported runtime metadata operation"),
     };
+    let import = args[0] == "--import-runtime-release";
     let mut flags = HashMap::new();
     let (pairs, rest) = args[4..].as_chunks::<2>();
     anyhow::ensure!(
@@ -44,7 +45,11 @@ pub fn run(args: &[String]) -> Result<Value> {
                     | "--min-sequence"
                     | "--current-runtime-version"
                     | "--confirm-accept"
-            ),
+            ) || (import
+                && matches!(
+                    pair[0].as_str(),
+                    "--artifact" | "--prefix" | "--confirm-import"
+                )),
             "unsupported runtime verification option"
         );
         anyhow::ensure!(
@@ -58,6 +63,14 @@ pub fn run(args: &[String]) -> Result<Value> {
             .copied()
             .with_context(|| format!("missing runtime policy option {name}"))
     };
+    if import {
+        anyhow::ensure!(
+            value("--confirm-import")? == "yes",
+            "runtime import requires --confirm-import yes"
+        );
+        value("--artifact")?;
+        value("--prefix")?;
+    }
     if accept {
         anyhow::ensure!(
             value("--confirm-accept")? == "yes",
@@ -113,6 +126,14 @@ pub fn run(args: &[String]) -> Result<Value> {
         &metadata.release,
         verified.manifest_sha256(),
     )?;
+    if import {
+        return Ok(crate::runtime_bundle::import(
+            std::path::Path::new(value("--artifact")?),
+            &verified,
+            std::path::Path::new(value("--prefix")?),
+        )?
+        .summary());
+    }
     let mut summary = verified.summary();
     if accept {
         let entry = crate::release_state::Transaction::begin_for(Product::Runtime)?.record(

@@ -1,8 +1,9 @@
 # Signed complete runtime metadata — M2 boundary
 
 This checkpoint implements runtime **metadata authentication/check/explicit
-acceptance**, not runtime installation or data rollback. Existing bootstrap/core
-installer paths remain separate and unsigned until their M2 replacement is wired.
+acceptance and authenticated complete-generation import**, not live runtime
+switch/restart or data rollback. Existing bootstrap/core installer paths remain
+separate and unsigned until their M2 replacement is wired.
 Do not describe an npm version pin as authentication of its dependency closure.
 
 ## Independent authority
@@ -68,6 +69,32 @@ or proof of consistent backups. The identifier is bounded/recognized at this
 checkpoint; exact stopped-writer snapshot/absence inventory/restore enforcement
 and supported migration acceptance are still M2 implementation/owner gates. No
 whole-home/global-credential rollback or excluded-plugin rollback is implied.
+
+## Complete-generation import (no activation)
+
+`--import-runtime-release` uses the same authenticated inputs/policy as Verify,
+plus `--artifact ARCHIVE --prefix DIR --confirm-import yes`. It captures exact
+signed compressed bytes privately, rejects bad size/hash before extraction,
+then extracts the full expected root with the existing bounded no-link archive
+validator. It preserves all package/native files and notices, requires regular
+executable Node/DSH/pnpm entries, and checks the four-line component/source digest
+record. The publisher cannot supply transaction predecessor/receipt/index files.
+
+A complete owned index is hash-bound to the private receipt, verified before
+atomic no-overwrite publication under `generations/gen.<alphanumeric>`, and fully
+rechecked before any retained generation reuse. Tampered retained content fails
+without overwriting it. The prepared handle holds the existing `.bootstrap.lock`
+through future health/activation so cooperating installers cannot race it. Local
+failed staging cleans only its own private temporary directory. Install prefixes
+must be separate from Harness state, not paths inferred from an install hint.
+
+Import **does not execute Node/DSH/pnpm**, install packages, change `current`,
+write `.previous`, restart a service, mutate a profile or advance the remembered
+floor. It reports `healthChecked:false`; artifact authentication and a complete
+retained tree are not proof of native version/ABI/authenticated health. Those
+checks and owned controller/data transactions remain the next M2 step. A CLI
+import ends its lock when it returns; an inactive prepared generation may later
+be reclaimed by an explicit/cooperating installer/GC.
 
 ## Headless commands
 

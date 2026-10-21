@@ -75,6 +75,112 @@ impl Fixture {
         }
         args
     }
+    fn bundle(&mut self, invalid: Option<&str>) {
+        use sha2::{Digest, Sha256};
+        let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        {
+            let mut tar = tar::Builder::new(&mut gzip);
+            let versions = format!("24.14.1\n0.2.1\n10.30.3\n{}\n", "22".repeat(32));
+            for (name, body, mode) in [
+                (
+                    "runtime/node/bin/node",
+                    b"#!/bin/sh\nexit 97\n".as_slice(),
+                    0o755,
+                ),
+                (
+                    "harness/node_modules/.bin/dsh",
+                    b"// signed fixture entry, never executed".as_slice(),
+                    0o755,
+                ),
+                (
+                    "tools/node_modules/.bin/pnpm",
+                    b"// resolved fixture tool".as_slice(),
+                    0o755,
+                ),
+                (
+                    "harness/node_modules/native-addon/native.node",
+                    b"resolved native bytes".as_slice(),
+                    0o644,
+                ),
+                (
+                    "NOTICE",
+                    b"complete-runtime-license-evidence".as_slice(),
+                    0o644,
+                ),
+                (".versions", versions.as_bytes(), 0o644),
+            ] {
+                if invalid == Some("missing") && name == "tools/node_modules/.bin/pnpm" {
+                    continue;
+                }
+                let body = if invalid == Some("versions") && name == ".versions" {
+                    b"wrong-component-versions".as_slice()
+                } else {
+                    body
+                };
+                let mut header = tar::Header::new_gnu();
+                header.set_mode(mode);
+                header.set_size(body.len() as u64);
+                header.set_cksum();
+                tar.append_data(
+                    &mut header,
+                    format!("dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/{name}"),
+                    body,
+                )
+                .unwrap();
+            }
+            if invalid == Some("link") {
+                let mut header = tar::Header::new_gnu();
+                header.set_entry_type(tar::EntryType::Symlink);
+                header.set_mode(0o777);
+                header.set_size(0);
+                header.set_link_name("/outside").unwrap();
+                header.set_cksum();
+                tar.append_data(
+                    &mut header,
+                    "dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/escape",
+                    std::io::empty(),
+                )
+                .unwrap();
+            }
+            if invalid == Some("predecessor") {
+                let mut header = tar::Header::new_gnu();
+                header.set_mode(0o644);
+                header.set_size(4);
+                header.set_cksum();
+                tar.append_data(
+                    &mut header,
+                    "dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/.previous",
+                    b"none".as_slice(),
+                )
+                .unwrap();
+            }
+            tar.finish().unwrap();
+        }
+        let bytes = gzip.finish().unwrap();
+        self.manifest["artifacts"][0]["size"] = json!(bytes.len());
+        self.manifest["artifacts"][0]["sha256"] = json!(hex(&Sha256::digest(&bytes)));
+        fs::write(self.root.join("bundle.tar.gz"), bytes).unwrap();
+        self.write(DOMAIN, &self.key);
+    }
+    fn import(&self) -> Output {
+        let mut args = self.args(false);
+        args[0] = "--import-runtime-release".into();
+        args.extend([
+            "--artifact".into(),
+            self.root
+                .join("bundle.tar.gz")
+                .to_string_lossy()
+                .into_owned(),
+            "--prefix".into(),
+            self.root
+                .join("runtime-prefix")
+                .to_string_lossy()
+                .into_owned(),
+            "--confirm-import".into(),
+            "yes".into(),
+        ]);
+        self.run(&args)
+    }
     fn run(&self, args: &[String]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_dsh-ocean"))
             .args(args)
@@ -297,6 +403,159 @@ fn runtime_floor_refuses_writable_linked_or_redirected_storage() {
             describe(&output)
         );
     }
+}
+
+#[test]
+fn complete_runtime_import_retains_all_bytes_without_execution_selection_or_floor_acceptance() {
+    let mut f = Fixture::new();
+    f.bundle(None);
+    let prefix = f.root.join("runtime-prefix");
+    fs::create_dir_all(prefix.join("generations/gen.old")).unwrap();
+    fs::write(prefix.join("generations/gen.old/original"), b"original").unwrap();
+    std::os::unix::fs::symlink("generations/gen.old", prefix.join("current")).unwrap();
+    let output = f.import();
+    assert!(output.status.success(), "{}", describe(&output));
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let generation = PathBuf::from(result["generation"].as_str().unwrap());
+    assert_eq!(
+        fs::read(generation.join("harness/node_modules/native-addon/native.node")).unwrap(),
+        b"resolved native bytes"
+    );
+    assert_eq!(
+        fs::read(generation.join("NOTICE")).unwrap(),
+        b"complete-runtime-license-evidence"
+    );
+    assert!(!generation.join(".previous").exists());
+    assert_eq!(
+        fs::read_link(prefix.join("current")).unwrap(),
+        PathBuf::from("generations/gen.old")
+    );
+    assert_eq!(
+        fs::read(prefix.join("current/original")).unwrap(),
+        b"original"
+    );
+    assert_eq!(result["activated"], false);
+    assert_eq!(result["healthChecked"], false);
+    assert!(!f.root.join("state").exists());
+    assert!(!f.root.join("home/.dsh").exists());
+    assert!(
+        f.import().status.success(),
+        "same exact verified tree may be reused"
+    );
+    let file = generation.join("harness/node_modules/native-addon/native.node");
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&file, b"tampered retained closure").unwrap();
+    assert!(
+        !f.import().status.success(),
+        "retained complete tree must be rechecked, never overwritten"
+    );
+    assert_eq!(fs::read(file).unwrap(), b"tampered retained closure");
+}
+#[test]
+fn signed_invalid_runtime_trees_never_publish_a_generation() {
+    for invalid in ["missing", "versions", "link", "predecessor"] {
+        let mut f = Fixture::new();
+        f.bundle(Some(invalid));
+        let output = f.import();
+        assert!(
+            !output.status.success(),
+            "invalid {invalid}: {}",
+            describe(&output)
+        );
+        let prefix = f.root.join("runtime-prefix");
+        assert!(!prefix.join("current").exists());
+        if prefix.join("generations").exists() {
+            assert_eq!(
+                fs::read_dir(prefix.join("generations")).unwrap().count(),
+                0,
+                "failed private staging must be removed"
+            );
+        }
+        assert!(!f.root.join("state").exists());
+        assert!(!f.root.join("home/.dsh").exists());
+    }
+}
+#[test]
+fn runtime_import_authenticates_before_touching_destination_or_payload() {
+    let mut f = Fixture::new();
+    f.bundle(None);
+    f.write(dsh_ocean::release_feed::DOMAIN, &f.key);
+    assert!(!f.import().status.success());
+    assert!(!f.root.join("runtime-prefix").exists());
+    f.write(DOMAIN, &f.key);
+    fs::write(f.root.join("bundle.tar.gz"), b"wrong signed bytes").unwrap();
+    assert!(!f.import().status.success());
+    assert!(!f.root.join("runtime-prefix/current").exists());
+    assert!(!f.root.join("state").exists());
+}
+
+#[test]
+fn runtime_import_never_uses_harness_state_as_an_install_destination() {
+    let mut f = Fixture::new();
+    f.bundle(None);
+    let mut args = f.args(false);
+    args[0] = "--import-runtime-release".into();
+    args.extend([
+        "--artifact".into(),
+        f.root.join("bundle.tar.gz").to_string_lossy().into_owned(),
+        "--prefix".into(),
+        f.root
+            .join("home/.dsh/runtime")
+            .to_string_lossy()
+            .into_owned(),
+        "--confirm-import".into(),
+        "yes".into(),
+    ]);
+    let output = f.run(&args);
+    assert!(
+        !output.status.success(),
+        "runtime bytes and mutable Harness state must be separate: {}",
+        describe(&output)
+    );
+    assert!(!f.root.join("home/.dsh").exists());
+}
+
+#[test]
+fn prepared_generation_holds_existing_bootstrap_lock_until_dropped() {
+    use dsh_ocean::release_feed::{Channel, Kind, Policy, Target, TrustedKey};
+    use std::os::fd::AsRawFd;
+    let mut f = Fixture::new();
+    f.bundle(None);
+    let verified = dsh_ocean::runtime_feed::verify(
+        &fs::read(f.root.join("manifest.json")).unwrap(),
+        &fs::read(f.root.join("signature.json")).unwrap(),
+        &TrustedKey::from_json(&fs::read(f.root.join("key.json")).unwrap()).unwrap(),
+        &Policy {
+            channel: Channel::Stable,
+            target: Target::LinuxX86_64,
+            kind: Kind::TarGz,
+            minimum_sequence: 1,
+            current_release: semver::Version::parse("0.2.0").unwrap(),
+            now: Utc::now(),
+        },
+    )
+    .unwrap();
+    let prefix = f.root.join("runtime-prefix");
+    let prepared =
+        dsh_ocean::runtime_bundle::import(&f.root.join("bundle.tar.gz"), &verified, &prefix)
+            .unwrap();
+    let competing = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(prefix.join(".bootstrap.lock"))
+        .unwrap();
+    assert_ne!(
+        unsafe { libc::flock(competing.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+        0,
+        "ready generation must retain installer lock during health/switch"
+    );
+    prepared.verify(&verified).unwrap();
+    drop(prepared);
+    assert_eq!(
+        unsafe { libc::flock(competing.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+        0,
+        "normal completion releases installer lock"
+    );
 }
 
 #[test]

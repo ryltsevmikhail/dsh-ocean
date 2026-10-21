@@ -531,6 +531,47 @@ fn stage_reader_hooks(
     input: &mut impl Read,
     destination: &Path,
     release: &Verified,
+    write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
+    sync: impl FnOnce(&File) -> std::io::Result<()>,
+    progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
+) -> Result<Staged> {
+    stage_artifact_hooks(
+        input,
+        destination,
+        release.artifact(),
+        write,
+        sync,
+        progress,
+        before_publish,
+    )
+}
+/// Internal byte-copy primitive. Public callers must supply an authenticated
+/// product proof; metadata alone is never promoted to a Verified token here.
+pub(crate) fn stage_authenticated_artifact(
+    source: &Path,
+    destination: &Path,
+    artifact: &Artifact,
+) -> Result<Staged> {
+    let mut input = open_regular(source, MAX_ASSET)?;
+    anyhow::ensure!(
+        input.metadata()?.len() == artifact.size,
+        "release artifact size mismatch"
+    );
+    stage_artifact_hooks(
+        &mut input,
+        destination,
+        artifact,
+        |file, bytes| file.write_all(bytes),
+        File::sync_all,
+        |_| Ok(()),
+        || Ok(()),
+    )
+}
+fn stage_artifact_hooks(
+    input: &mut impl Read,
+    destination: &Path,
+    artifact: &Artifact,
     mut write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
     sync: impl FnOnce(&File) -> std::io::Result<()>,
     mut progress: impl FnMut(u64) -> Result<()>,
@@ -555,16 +596,13 @@ fn stage_reader_hooks(
             break;
         }
         total += size as u64;
-        anyhow::ensure!(
-            total <= release.artifact.size,
-            "release source exceeds signed size"
-        );
+        anyhow::ensure!(total <= artifact.size, "release source exceeds signed size");
         write(&mut output, &buffer[..size]).context("write private release staging file")?;
         progress(total)?;
         hash.update(&buffer[..size]);
     }
     anyhow::ensure!(
-        total == release.artifact.size && hex(&hash.finalize()) == release.artifact.sha256,
+        total == artifact.size && hex(&hash.finalize()) == artifact.sha256,
         "staged release size or SHA-256 mismatch"
     );
     sync(&output).context("sync verified release staging file")?;

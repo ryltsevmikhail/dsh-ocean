@@ -551,8 +551,9 @@ These are not a complete M2 or an unattended updater. Production key custody/
 provisioning/rotation/revocation, signed publishing CI, signed runtime orchestration,
 real package/AppImage and published-feed acceptance remain open. Core/bootstrap
 updates are still unsigned; local apply/rollback retain the recovery/durability/health limits
-described above. A [separate runtime metadata verifier and floor](RUNTIME_RELEASES.md)
-now exist, but do not yet convert those installers into signed transactions.
+described above. [Separate runtime authentication/floor and complete-generation
+import](RUNTIME_RELEASES.md) now exist, but do not yet convert those installers into
+signed live-update transactions.
 M2 remains incomplete.
 
 The declared Rust floor is now 1.90: the already-locked Tauri 2.12 stack itself
