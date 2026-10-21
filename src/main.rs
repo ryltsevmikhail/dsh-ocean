@@ -136,7 +136,8 @@ fn handle_cli() -> bool {
         | "--release-state"
         | "--reset-release-state"
         | "--apply-release"
-        | "--rollback-shell" => {
+        | "--rollback-shell"
+        | "--recover-shell" => {
             match dsh_ocean::release_cli::run(&args) {
                 Ok(value) => println!(
                     "{}",
@@ -266,6 +267,7 @@ fn handle_cli() -> bool {
                    --reset-release-state --confirm-reset  forget them (allows older signed manifests again)\n  \
                    --apply-release ...  verify and activate a local artifact into a private prefix (no download)\n  \
                    --rollback-shell --prefix DIR --confirm-rollback yes  reactivate the retained previous version\n  \
+                   --recover-shell --prefix DIR --confirm-recovery yes  restore verified selectors after an interrupted shell activation\n  \
                    --stage-release MANIFEST SIGNATURE TRUSTED_KEY [policy options] --artifact SOURCE --output NEW_FILE  verified local copy only, no install\n  \
                    --download-release MANIFEST SIGNATURE TRUSTED_KEY [policy options] --output NEW_FILE  signed HTTPS artifact to verified staging; no install\n  \
                    --draft-release --release VERSION --channel CHANNEL --sequence N --valid-hours N --asset TARGET KIND FILE [--asset ...]  unsigned JSON only; single-artifact flags also supported\n  \

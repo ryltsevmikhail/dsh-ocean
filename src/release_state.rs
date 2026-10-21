@@ -195,25 +195,62 @@ fn write_at(path: &Path, channels: &BTreeMap<String, Entry>) -> Result<()> {
     result
 }
 
-/// Records an accepted manifest under an exclusive lock, applying `check` first.
-///
-/// Returns the stored entry. A rejected or failed write leaves the previous
-/// state untouched.
+/// Hold the global sequence lock across checking, activation and recording.
+/// Prefix operations acquire their own lock only AFTER this guard (one order).
+pub struct Transaction {
+    _lock: std::fs::File,
+    path: PathBuf,
+    existing: BTreeMap<String, Entry>,
+}
+
+impl Transaction {
+    pub fn begin() -> Result<Self> {
+        let path = path();
+        let directory = path.parent().context("release state has no directory")?;
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(directory)
+            .context("create private state directory")?;
+        let lock = crate::profile_backup::operation_lock(&directory.join(LOCK))
+            .context("another release state update is in progress")?;
+        let existing = read_at(&path)?;
+        Ok(Self {
+            _lock: lock,
+            path,
+            existing,
+        })
+    }
+
+    pub fn check(
+        &self,
+        channel: &str,
+        sequence: u64,
+        release: &str,
+        digest: &str,
+    ) -> Result<Entry> {
+        check(&self.existing, channel, sequence, release, digest)
+    }
+
+    pub fn record(
+        &mut self,
+        channel: &str,
+        sequence: u64,
+        release: &str,
+        digest: &str,
+    ) -> Result<Entry> {
+        let entry = self.check(channel, sequence, release, digest)?;
+        let mut updated = self.existing.clone();
+        updated.insert(channel.to_owned(), entry.clone());
+        write_at(&self.path, &updated)?;
+        self.existing = updated;
+        Ok(entry)
+    }
+}
+
+/// Record under the same guard used by activation, acceptance and reset.
 pub fn record(channel: &str, sequence: u64, release: &str, manifest_sha256: &str) -> Result<Entry> {
-    let path = path();
-    let directory = path.parent().context("release state has no directory")?;
-    fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(directory)
-        .context("create private state directory")?;
-    let _lock = crate::profile_backup::operation_lock(&directory.join(LOCK))
-        .context("another release state update is in progress")?;
-    let mut existing = read_at(&path)?;
-    let entry = check(&existing, channel, sequence, release, manifest_sha256)?;
-    existing.insert(channel.to_owned(), entry.clone());
-    write_at(&path, &existing)?;
-    Ok(entry)
+    Transaction::begin()?.record(channel, sequence, release, manifest_sha256)
 }
 
 /// Removes the remembered state. Deliberately operator-only and explicit.

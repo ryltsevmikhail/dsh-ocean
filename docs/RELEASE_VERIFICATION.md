@@ -56,24 +56,43 @@ DIR/current  -> versions/<…>      (atomic symlink swap)
 DIR/.previous -> versions/<…>     (retained for rollback)
 ```
 
-Checks before anything is written: the manifest signature/policy, the staged
-file's size and SHA-256 against the authenticated manifest, the remembered
-sequence floor, and that the prefix is absolute, owned by the current user and not
-writable by others. The bytes are copied through a no-follow descriptor into a
-fresh private file, `fsync`ed, marked 0755 and then **re-verified after landing**;
-a mismatch or an existing non-matching version refuses the operation. The previous
-activation is written to `.previous` before `current` is swapped, so an explicit
-`--rollback-shell --prefix DIR --confirm-rollback yes` can switch back. The
-remembered release sequence is recorded only **after** a successful activation.
+Before executable/selector publication the signature/policy, exact staged bytes,
+remembered floor and owned non-writable-by-others directory chain are checked.
+A global release-state lock spans the final floor check, prefix activation and
+state recording; a per-prefix lock serializes apply, rollback and recovery.
+Bytes use the existing bounded/hash-checked no-overwrite staging engine, then
+0755 permissions and a retained receipt binding the manifest digest, version,
+sequence, byte size and SHA-256. Current/previous retained receipts and bytes
+must validate before changing selectors; symlink directory aliases are refused.
 
-Limits: no download, no service restart and no process replacement — a running
-client keeps the executable it already started. Rollback only switches the
-selector back to one retained version; it is not a filesystem transaction, does
-not remove newer versions, and does not verify that the retained version is still
-healthy. Nothing here signs, attests or publishes; a system-wide install, package
-manager integration and update-feed configuration remain unimplemented. Run
-apply/rollback one at a time: the existing path does not hold a whole-prefix
-transaction lock across activation and remembered-state recording.
+A synced `.activation-pending.json` records original and intended selectors before
+the switch. If normal activation/state recording fails, the original verified
+selectors are restored. If the process is killed or power is lost, later mutation
+fails closed until the operator confirms:
+
+```bash
+dsh-ocean --recover-shell --prefix DIR --confirm-recovery yes
+```
+
+Recovery restores only journaled original selectors after checking retained bytes;
+it does not reset the accepted sequence floor or guess whether to finish an
+interrupted update. Malformed journals, changed selectors or damaged recovery
+versions remain untouched and require investigation. A floor already committed
+before a later durability failure is never reduced; reapplying the identical
+verified release is allowed. A verified but inactive version can remain on disk.
+
+`--rollback-shell --prefix DIR --confirm-rollback yes` verifies both retained
+versions and swaps the selectors under the same journal/lock. It never lowers the
+floor. The local receipt is protected app-owned state created from an authenticated
+release, not a new signature or protection against a hostile same-UID process.
+Legacy prefixes without receipts are not silently treated as verified installs.
+
+Limits: no service restart or process replacement — the running client keeps its
+original executable. Integrity verification is not an executable health check;
+rollback does not restore profile data or remove newer versions. Journaling is
+recoverable coordination, not a kernel transaction across directories, immutable
+storage or a guarantee against hardware/filesystem corruption. Nothing signs or
+publishes a release here; package-manager integration remains separate.
 
 ## Persisted anti-rollback state (opt-in acceptance)
 
@@ -96,8 +115,9 @@ Rules enforced against the remembered entry for the same channel:
 * re-accepting the identical manifest is idempotent.
 
 The store is written atomically (private scratch + `rename` + directory `fsync`)
-under an exclusive `flock`, so a rejected or failed update leaves the previous
-state untouched. A corrupted or oversized store is reported and **blocks**
+under an exclusive `flock`. Rejection and pre-rename failures leave previous state
+untouched; a durability error after rename can leave the new floor recorded, so
+activation recovery never silently reduces it. A corrupted or oversized store is reported and **blocks**
 acceptance instead of silently resetting the floor. `--release-state` prints the
 remembered entries; `--reset-release-state --confirm-reset` forgets them and
 therefore re-allows older signed manifests.
@@ -424,7 +444,7 @@ rollback. These are not a complete automatic updater. Production key custody/
 provisioning/rotation/revocation, manifest/signature feed retrieval, signed
 publishing CI, tar extraction, package-manager behavior, GUI orchestration and
 real published-feed acceptance remain open. Core/bootstrap updates are still
-unsigned; local apply/rollback retain the transaction/concurrency/health limits
+unsigned; local apply/rollback retain the recovery/durability/health limits
 described above. M2 remains incomplete.
 
 The declared Rust floor is now 1.90: the already-locked Tauri 2.12 stack itself

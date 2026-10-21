@@ -231,7 +231,11 @@ refused until extraction is implemented), re-verifying bytes after
 they land, retaining the previous version and recording the remembered sequence
 only on success; `--rollback-shell` switches the selector back. No service restart
 or process replacement occurs, and this is not a filesystem transaction or
-system-wide install.
+system-wide install. A global floor guard and per-prefix operation lock now span
+activation/state commit. Synced selector journals restore originals on normal
+errors and require explicit `--recover-shell` after interruption; rollback verifies
+retained receipts/bytes and never lowers the accepted floor. This is recoverable
+coordination, not an executable health check or a kernel transaction.
 
 **Remaining:** consistent profile/session backup and data-migration rollback
 (runtime/unit rollback alone is not data rollback), signed feeds/keys and shell

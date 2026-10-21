@@ -308,7 +308,7 @@ pub fn verify_artifact(path: &Path, release: &Verified) -> Result<()> {
     );
     Ok(())
 }
-fn artifact_digest(path: &Path, expected_size: Option<u64>) -> Result<(u64, String)> {
+pub(crate) fn artifact_digest(path: &Path, expected_size: Option<u64>) -> Result<(u64, String)> {
     let mut file = open_regular(path, MAX_ASSET)?;
     let before = file.metadata()?;
     let size = expected_size.unwrap_or(before.len());

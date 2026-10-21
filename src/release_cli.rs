@@ -85,23 +85,8 @@ fn apply(args: &[String]) -> Result<Value> {
         Channel::Stable => "stable",
         Channel::Next => "next",
     };
-    // Check the remembered floor *before* touching the prefix; the entry is only
-    // recorded after a successful activation.
-    let remembered = crate::release_state::read()?;
-    crate::release_state::check(
-        &remembered,
-        channel_name,
-        release.manifest().sequence,
-        &release.manifest().release,
-        release.manifest_sha256(),
-    )?;
-    let receipt = crate::shell_apply::apply(staged, &release, prefix)?;
-    let entry = crate::release_state::record(
-        channel_name,
-        release.manifest().sequence,
-        &release.manifest().release,
-        release.manifest_sha256(),
-    )?;
+    // One global floor guard plus the prefix guard spans activation and record.
+    let (receipt, entry) = crate::shell_apply::apply(staged, &release, prefix)?;
     Ok(json!({
         "verification": "signature-and-policy",
         "artifactChecked": true,
@@ -117,28 +102,38 @@ fn apply(args: &[String]) -> Result<Value> {
     }))
 }
 
-/// `--rollback-shell --prefix DIR --confirm-rollback yes`
-fn rollback_shell(args: &[String]) -> Result<Value> {
+/// Explicit selector rollback/recovery; neither resets the accepted floor.
+fn select_retained(args: &[String], recovery: bool) -> Result<Value> {
+    let confirmation = if recovery {
+        "--confirm-recovery"
+    } else {
+        "--confirm-rollback"
+    };
     let mut prefix = None;
     let mut confirmed = false;
     let mut iter = args.iter().skip(1);
     while let Some(argument) = iter.next() {
         match argument.as_str() {
-            "--confirm-rollback" => {
-                let value = iter.next().context("--confirm-rollback needs a value")?;
-                anyhow::ensure!(value == "yes", "rollback requires --confirm-rollback yes");
+            flag if flag == confirmation => {
+                anyhow::ensure!(!confirmed, "confirmation given twice");
+                let value = iter.next().context("confirmation needs a value")?;
+                anyhow::ensure!(value == "yes", "operation requires {confirmation} yes");
                 confirmed = true;
             }
             "--prefix" => {
                 anyhow::ensure!(prefix.is_none(), "--prefix given twice");
                 prefix = Some(iter.next().context("--prefix needs a directory")?.clone());
             }
-            other => anyhow::bail!("unexpected rollback argument: {other}"),
+            _ => anyhow::bail!("unexpected activation argument"),
         }
     }
-    anyhow::ensure!(confirmed, "rollback requires --confirm-rollback yes");
+    anyhow::ensure!(confirmed, "operation requires {confirmation} yes");
     let prefix = prefix.context("--prefix DIR is required")?;
-    crate::shell_apply::rollback(Path::new(&prefix))
+    if recovery {
+        crate::shell_apply::recover(Path::new(&prefix))
+    } else {
+        crate::shell_apply::rollback(Path::new(&prefix))
+    }
 }
 
 /// Read or clear the persisted anti-rollback store.
@@ -168,8 +163,8 @@ pub fn run(args: &[String]) -> Result<Value> {
         if first == "--release-state" || first == "--reset-release-state" {
             return state(args, first);
         }
-        if first == "--rollback-shell" {
-            return rollback_shell(args);
+        if first == "--rollback-shell" || first == "--recover-shell" {
+            return select_retained(args, first == "--recover-shell");
         }
         if first == "--apply-release" {
             return apply(args);

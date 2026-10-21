@@ -521,6 +521,158 @@ fn download_refuses_overwrite_and_reaps_an_oversized_transfer() {
 }
 
 #[test]
+fn failed_state_commit_restores_activation_selectors() {
+    if unsafe { libc::geteuid() } == 0 {
+        return;
+    } // Permission injection needs an unprivileged test user.
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (m1, s1, a1) = sandbox.release("first", 5, "0.2.0", b"first-bytes");
+    let applied = sandbox.run(&sandbox.apply_args(&m1, &s1, &a1, &prefix, true));
+    assert!(applied.status.success(), "{}", describe(&applied));
+    let original = current_target(&prefix);
+    let state_dir = sandbox.root.join("state/dsh-ocean");
+    fs::set_permissions(&state_dir, fs::Permissions::from_mode(0o500)).unwrap();
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"second-bytes");
+    let failed = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    fs::set_permissions(&state_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(!failed.status.success(), "{}", describe(&failed));
+    assert_eq!(
+        current_target(&prefix),
+        original,
+        "failed acceptance must restore current"
+    );
+    assert!(!prefix.join(".previous").exists());
+    assert!(!prefix.join(".activation-pending.json").exists());
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 5);
+}
+
+#[test]
+fn apply_and_rollback_share_the_prefix_operation_lock() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (m1, s1, a1) = sandbox.release("first", 5, "0.2.0", b"first-bytes");
+    assert!(sandbox
+        .run(&sandbox.apply_args(&m1, &s1, &a1, &prefix, true))
+        .status
+        .success());
+    let original = current_target(&prefix);
+    let _lock =
+        dsh_ocean::profile_backup::operation_lock(&prefix.join(".shell-update.lock")).unwrap();
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"second-bytes");
+    let refused = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert!(describe(&refused).contains("operation"));
+    let rollback = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(!rollback.status.success());
+    assert_eq!(current_target(&prefix), original);
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 5);
+}
+
+#[test]
+fn tampered_retained_version_is_never_selected_by_rollback() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    for (name, seq, version, bytes) in [
+        ("first", 5, "0.2.0", b"first-bytes".as_slice()),
+        ("second", 6, "0.2.1", b"second-bytes".as_slice()),
+    ] {
+        let (m, s, a) = sandbox.release(name, seq, version, bytes);
+        let applied = sandbox.run(&sandbox.apply_args(&m, &s, &a, &prefix, true));
+        assert!(applied.status.success(), "{}", describe(&applied));
+    }
+    let original = current_target(&prefix);
+    let previous = fs::read_link(prefix.join(".previous")).unwrap();
+    fs::write(
+        prefix.join(&previous).join("dsh-ocean"),
+        b"corrupt-retained-file",
+    )
+    .unwrap();
+    let refused = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert_eq!(current_target(&prefix), original);
+    assert_eq!(fs::read_link(prefix.join(".previous")).unwrap(), previous);
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 6);
+    // Valid executable bytes still do not authorize a writable receipt.
+    fs::write(prefix.join(&previous).join("dsh-ocean"), b"first-bytes").unwrap();
+    let receipt = prefix.join(&previous).join("receipt.json");
+    fs::set_permissions(&receipt, fs::Permissions::from_mode(0o666)).unwrap();
+    let refused = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(
+        !refused.status.success(),
+        "writable receipts are not trusted activation metadata"
+    );
+    assert_eq!(current_target(&prefix), original);
+}
+
+#[test]
+fn interrupted_activation_requires_explicit_verified_recovery() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (m1, s1, a1) = sandbox.release("first", 5, "0.2.0", b"first-bytes");
+    assert!(sandbox
+        .run(&sandbox.apply_args(&m1, &s1, &a1, &prefix, true))
+        .status
+        .success());
+    let first = current_target(&prefix);
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"second-bytes");
+    assert!(sandbox
+        .run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true))
+        .status
+        .success());
+    let second = current_target(&prefix);
+    let journal = prefix.join(".activation-pending.json");
+    fs::write(&journal, serde_json::to_vec(&serde_json::json!({"schema":1,"before":{"current":first,"previous":null},"after":{"current":second,"previous":first}})).unwrap()).unwrap();
+    let refused = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    assert!(
+        !refused.status.success(),
+        "pending transaction must not be silently ignored"
+    );
+    let recover = vec![
+        "--recover-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-recovery".into(),
+        "yes".into(),
+    ];
+    let recovered = sandbox.run(&recover);
+    assert!(recovered.status.success(), "{}", describe(&recovered));
+    assert_eq!(current_target(&prefix), first);
+    assert!(!prefix.join(".previous").exists());
+    assert!(!journal.exists());
+    assert_eq!(
+        sandbox.state()["channels"]["stable"]["sequence"],
+        6,
+        "recovery never lowers the floor"
+    );
+    fs::write(&journal, serde_json::to_vec(&serde_json::json!({"schema":1,"before":{"current":"../../outside","previous":null},"after":{"current":first,"previous":null}})).unwrap()).unwrap();
+    assert!(!sandbox.run(&recover).status.success());
+    assert_eq!(current_target(&prefix), first);
+    assert!(
+        journal.exists(),
+        "invalid recovery input is preserved for diagnosis"
+    );
+}
+
+#[test]
 fn tar_archive_is_not_activated_as_an_executable() {
     let sandbox = Sandbox::new();
     let prefix = sandbox.root.join("prefix");
