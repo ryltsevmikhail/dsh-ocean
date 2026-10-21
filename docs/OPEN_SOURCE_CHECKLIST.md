@@ -47,6 +47,10 @@ absence of all secrets.
 
 ## Before distributing binaries
 
+- [x] Collect reproducible default-feature Linux Cargo evidence and retain full
+  notices/covered-source payloads in explicit package and initial-install paths.
+  See [binary license audit](BINARY_LICENSE_AUDIT.md). This is not an exact linker
+  inventory, license election or clearance of the remaining gates below.
 - [ ] Inventory licenses/notices for all linked Rust and native dependencies and any
   bundled AppImage runtime, using the actual lockfile/target/build artifacts.
 - [ ] Include the required texts/source offers/notices in each artifact, not just
