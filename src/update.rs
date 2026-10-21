@@ -312,26 +312,50 @@ fn present_recover_outcome(
     cancelled: bool,
     result: anyhow::Result<RecoverOutcome>,
 ) {
+    let (title, body, kind) = recover_outcome_message(cancelled, &result);
+    show_message(app, title, &body, kind);
+}
+
+/// Message metadata for a recovery outcome, separated from the GTK dialog so the
+/// outcome-truth mapping is unit-testable without a window. The rule: only an
+/// `Err` (journal still pending) may say "pending retained / start blocked"; a
+/// completed recovery with a failed window refresh is a warning that still
+/// reports recovery, never a claim that the transaction is still pending.
+fn recover_outcome_message(
+    cancelled: bool,
+    result: &anyhow::Result<RecoverOutcome>,
+) -> (&'static str, String, gtk::MessageType) {
     if cancelled {
-        show_message(
-            app,
+        return (
             "Recovery cancelled",
-            "The pending transaction was retained.",
+            "The pending transaction was retained.".to_owned(),
             gtk::MessageType::Warning,
         );
-        return;
     }
     match result {
-        Ok(RecoverOutcome::Recovered) => show_message(
-            app,
+        Ok(RecoverOutcome::Recovered {
+            refresh_error: None,
+        }) => (
             "Runtime recovered",
-            "The previous runtime was restored and is serving again.",
+            "The previous runtime was restored and is serving again.".to_owned(),
             gtk::MessageType::Info,
         ),
-        Err(error) => show_message(
-            app,
+        Ok(RecoverOutcome::Recovered {
+            refresh_error: Some(error),
+        }) => (
+            "Runtime recovered",
+            format!(
+                "The previous runtime was restored and is serving again.\n\n\
+                 The window refresh to the restored runtime failed: {}\n\
+                 Recovery is complete and the pending transaction was cleared; \
+                 start or restart DSH normally.",
+                auth::redact(error)
+            ),
+            gtk::MessageType::Warning,
+        ),
+        Err(error) => (
             "Recovery incomplete",
-            &format!(
+            format!(
                 "The pending transaction was retained; ordinary start/restart stays blocked.\n\n{}",
                 auth::redact(&format!("{error:#}"))
             ),
@@ -344,4 +368,58 @@ fn show_message(app: &AppHandle, title: &'static str, body: &str, kind: gtk::Mes
     let app_for_main = app.clone();
     let body = auth::redact(body);
     let _ = app.run_on_main_thread(move || ui::message(&app_for_main, title, &body, kind));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recover_outcome_message_never_claims_pending_after_recovery() {
+        // A completed recovery with a failed window refresh is a warning that
+        // still reports recovery — never "pending retained / start blocked".
+        let (title, body, kind) = recover_outcome_message(
+            false,
+            &Ok(RecoverOutcome::Recovered {
+                refresh_error: Some("window refresh failed".to_owned()),
+            }),
+        );
+        assert_eq!(title, "Runtime recovered");
+        assert!(body.contains("restored"), "{body}");
+        assert!(!body.contains("retained"), "{body}");
+        assert!(!body.contains("blocked"), "{body}");
+        assert!(matches!(kind, gtk::MessageType::Warning));
+
+        // A clean recovery stays informational.
+        let (title, body, kind) = recover_outcome_message(
+            false,
+            &Ok(RecoverOutcome::Recovered {
+                refresh_error: None,
+            }),
+        );
+        assert_eq!(title, "Runtime recovered");
+        assert!(body.contains("restored"), "{body}");
+        assert!(matches!(kind, gtk::MessageType::Info));
+
+        // An incomplete recovery (journal still pending) keeps the blocked
+        // guidance and is an error, not a warning.
+        let (title, body, kind) =
+            recover_outcome_message(false, &Err(anyhow::anyhow!("old root failed to restart")));
+        assert_eq!(title, "Recovery incomplete");
+        assert!(body.contains("blocked"), "{body}");
+        assert!(body.contains("pending"), "{body}");
+        assert!(matches!(kind, gtk::MessageType::Error));
+    }
+
+    #[test]
+    fn recover_outcome_message_redacts_tokens() {
+        let (_, body, _) = recover_outcome_message(
+            false,
+            &Err(anyhow::anyhow!(
+                "dsh web: http://127.0.0.1:3080/?token=secret"
+            )),
+        );
+        assert!(!body.contains("token=secret"), "{body}");
+        assert!(body.contains("token=***"), "{body}");
+    }
 }

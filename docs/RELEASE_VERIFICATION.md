@@ -547,16 +547,24 @@ operator-provisioned trust and channel settings, bounded authenticated shell-fee
 checks, artifact download and journaled AppImage/tar package activation/rollback.
 The native GUI adds explicit managed enrollment, check/download/confirmed local
 transactions, channel settings, cancellation and original-installer guidance.
-These are not a complete M2 or an unattended updater. Production key custody/
-provisioning/rotation/revocation, signed publishing CI, signed runtime orchestration,
-real package/AppImage and published-feed acceptance remain open. Core/bootstrap
-updates are still unsigned; local apply/rollback retain the recovery/durability/health limits
-described above. [Separate runtime authentication/floor and complete-generation
-import](RUNTIME_RELEASES.md) now exist, but do not yet convert those installers into
-signed live-update transactions.
-M2 remains incomplete.
+The [signed runtime workflow](RUNTIME_RELEASES.md) now also wires complete-generation
+download/import, isolated native health, proven-owned Systemd/Child activation,
+quiesced full supported-home snapshots and restore-before-old-start failure rollback.
+Native consent/apply/recovery replaces the installed npm-update path; fresh-session
+Systemd recovery uses the journal's old root/unit proof. Lost child ownership refuses
+safely; post-success core history rollback is not provided. M1 first bootstrap/manual
+maintenance remains a separate trust boundary, not an unsigned updater fallback.
+[Manual release CI](../.github/workflows/release.yml) implements pinned native builds,
+independent verification and protected signing of **drafts only**, with dry-run default.
+These implement the software M2 boundaries, not an unattended or production-accepted
+updater. Final readiness requires whole-branch review and exact-head CI evidence.
+Production key custody/provisioning/rotation/revocation, authenticated feed activation,
+genuine native packages/AppImages, compatibility/migration and laptop acceptance
+remain explicit owner gates; no keys, releases or live user data are provisioned here.
+The recovery/durability/health limits above still apply.
 
 The declared Rust floor is now 1.90: the already-locked Tauri 2.12 stack itself
 requires 1.90, whereas the previous 1.77 declaration was inaccurate. The selected
-Ed25519 library requires only 1.85. CI currently builds with current stable Rust;
-a separate full minimum-toolchain matrix has not been run.
+Ed25519 library requires only 1.85. CI builds/tests with current stable Rust and
+separately runs `cargo check --locked --all-targets` on exactly Rust 1.90. That
+minimum-toolchain check is not full native/runtime/ABI or release-license acceptance.

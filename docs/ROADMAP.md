@@ -283,17 +283,27 @@ is bounded/path/type checked before no-overwrite version publication; the entire
 package (including notices) and installed-file inventory are retained. Rollback
 refuses damaged payload files or an unexpected file/directory set.
 
-**Remaining:** consistent profile/session backup and data-migration rollback
-(runtime/unit rollback alone is not data rollback), production signed feeds/keys,
-release CI, signed managed-child updates and real installed-client acceptance.
-Native shell channel/settings/update click-through is implemented with synthetic
-trust in a private GTK fixture; this is not production acceptance. No live user server has been
-updated during these tests. See [real-service validation](UPDATE_TESTING.md).
+**Software M2 implementation:** signed complete-runtime delivery, owned Systemd/
+managed-child activation, consistent supported-home config/plugin/session snapshots
+and restore-before-old-start failure rollback are wired into native consent/apply/
+recovery. Manual native publisher/build/sign/strict-verify CI defaults to dry-run;
+its protected operation creates drafts only. Whole-branch review and exact-head CI
+are the final software-readiness gates, not production acceptance.
 
-**Core transaction exit met locally:** update from `0.2.0-rc.2` to `0.2.1-rc.2`
-in the isolated test profile, with live runtime/unit rollback proven. M2 is
-still incomplete: production signed feed/release delivery and the remaining
-safety/UI work above are not implied by this result or the offline verifier.
+**Remaining owner gates:** authenticated production feeds/key custody and rotation,
+protected CI environments/independently confirmed public fingerprints, genuine
+native artifact/ABI/license/assets/migration and installed-client/laptop acceptance.
+Lost fresh-session child ownership refuses safely; post-success core history
+rollback is not provided. Native shell click-through and runtime transaction tests
+use private synthetic trust/state and never update the live user server/profile.
+See [runtime boundaries](RUNTIME_RELEASES.md) and
+[real-service validation](UPDATE_TESTING.md).
+
+**Earlier local core proof:** the isolated `0.2.0-rc.2` → `0.2.1-rc.2` runtime/unit
+rollback remains historical evidence, not proof of signed delivery or data recovery.
+The M2 private signed-runtime tests additionally prove config/session/plugin data
+restoration before the explicit old runtime restarts; neither result substitutes
+for owner production-feed and compatibility acceptance.
 
 ### M3 — Desktop layer (10–15 days) — in progress
 

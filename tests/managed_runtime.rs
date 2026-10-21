@@ -801,7 +801,9 @@ fn recover_systemd_full(root: &Path, prefix: &Path) {
         .expect("systemd recovery must succeed without a live server");
     assert!(matches!(
         outcome,
-        managed_runtime::RecoverOutcome::Recovered
+        managed_runtime::RecoverOutcome::Recovered {
+            refresh_error: None
+        }
     ));
 
     assert_eq!(fs::read(home.join("config")).unwrap(), b"original-config");

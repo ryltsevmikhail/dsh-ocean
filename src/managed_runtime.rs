@@ -209,8 +209,17 @@ pub enum ApplyOutcome {
     PendingRecovery { error: String },
 }
 
+/// Result of an explicit runtime recovery. Recovery either fails while the
+/// pending journal is still in place (an `Err`, reported as "pending retained"),
+/// or completes the durable rollback (journal cleared, OLD runtime serving) and
+/// optionally records a window/token refresh failure as a non-blocking warning.
+#[derive(Debug)]
 pub enum RecoverOutcome {
-    Recovered,
+    /// The durable rollback succeeded: the pending journal is cleared and the
+    /// OLD runtime is serving again. `refresh_error` is `Some` when the final
+    /// window/token refresh failed — that does NOT undo the recovery, so it is
+    /// reported as a warning, never as a pending/blocked error.
+    Recovered { refresh_error: Option<String> },
 }
 
 /// Full owned apply: settings guard -> runtime floor transaction -> candidate
@@ -370,11 +379,22 @@ pub fn recover_native(
     // 5. durable rollback.
     runtime_switch::recover(&paths, &mut controller)?;
 
-    // 6. refresh the window/token to the restored OLD runtime.
-    controller
-        .finish()
-        .context("runtime recovered; window refresh failed")?;
-    Ok(RecoverOutcome::Recovered)
+    // 6. refresh the window/token to the restored OLD runtime. A failure here
+    //    does not undo the recovery: the journal is already cleared and the OLD
+    //    runtime is serving, so it is reported as a refresh warning, never as a
+    //    pending/blocked error.
+    Ok(recovered_outcome(|| controller.finish()))
+}
+
+/// Classify the completion phase after a successful durable rollback. The
+/// pending journal is already cleared and the OLD runtime is serving, so a
+/// `finish` (window/token refresh) failure must be reported as
+/// recovered-with-warning, never as a pending/blocked error that would direct
+/// the operator to re-run recovery or avoid the working app.
+fn recovered_outcome(finish: impl FnOnce() -> Result<()>) -> RecoverOutcome {
+    RecoverOutcome::Recovered {
+        refresh_error: finish().err().map(|e| format!("{e:#}")),
+    }
 }
 
 fn build_controller(
@@ -573,5 +593,32 @@ mod tests {
             None
         );
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn recovered_outcome_reports_refresh_failure_as_recovered_warning() {
+        // A clean finish stays a plain Recovered with no refresh warning.
+        assert!(matches!(
+            recovered_outcome(|| Ok(())),
+            RecoverOutcome::Recovered {
+                refresh_error: None
+            }
+        ));
+
+        // A window-refresh failure AFTER the rollback succeeded must stay
+        // Recovered (the journal is cleared and the OLD runtime is serving),
+        // carrying the failure as a non-blocking warning — never an Err that the
+        // UI would map to "pending retained / start blocked".
+        match recovered_outcome(|| anyhow::bail!("window refresh failed")) {
+            RecoverOutcome::Recovered {
+                refresh_error: Some(error),
+            } => assert!(
+                error.contains("window refresh failed"),
+                "unexpected refresh error: {error}"
+            ),
+            RecoverOutcome::Recovered {
+                refresh_error: None,
+            } => panic!("a refresh failure must be recorded, not silently dropped"),
+        }
     }
 }
