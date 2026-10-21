@@ -291,7 +291,7 @@ jobs:
           commit="$(rustc -vV | sed -n 's/^commit-hash: //p')"
           if [ "$commit" = 58cf8f9c35b355199727627d07ae34a4e2846d67 ]; then
             profile=docs/toolchain/source-evidence/rust-58cf8f9c35b3
-            for name in LICENSE-RUST-MIT LICENSE-RUST-APACHE LICENSE-COMPILER-BUILTINS LICENSE-COMPILER-BUILTINS-LIBM; do
+            for name in LICENSE-RUST-MIT LICENSE-RUST-APACHE LICENSE-RUST-UNICODE LICENSE-COMPILER-BUILTINS LICENSE-COMPILER-BUILTINS-LIBM; do
               args+=(--notice "source-58cf8f9c-$name=$profile/$name")
             done
             cp -- "$profile/index.json" "$stage/NOTICE-source-index.json"

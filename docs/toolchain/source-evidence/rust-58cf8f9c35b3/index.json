@@ -17,6 +17,13 @@
       "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/LICENSE-APACHE"
     },
     {
+      "file": "LICENSE-RUST-UNICODE",
+      "git_blob_sha1": "ee8e69b233293872fcb4d6d4930ec196b63626e7",
+      "sha256": "f5062c9a188d81dfe66b56db4182dcf9e4b17c0d9b0d311a8e20b3a1b075c443",
+      "upstream_path": "LICENSES/Unicode-3.0.txt",
+      "url": "https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/LICENSES/Unicode-3.0.txt"
+    },
+    {
       "file": "COPYRIGHT-RUST-GUIDE",
       "git_blob_sha1": "4dad74f234eaaaa3c311ca031216e16fc9c4e940",
       "sha256": "172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af",

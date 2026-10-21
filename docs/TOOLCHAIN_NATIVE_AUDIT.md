@@ -39,9 +39,9 @@ are evidence for those source statements, not proof of linked membership.
 
 ## Pinned source profile
 
-The development checkout retains an eight-file source profile under
-`docs/toolchain/source-evidence/rust-58cf8f9c35b3/`, with the Rust MIT/Apache texts,
-compiler-builtins/libm notices, relevant manifests/unwind source and upstream
+The development checkout retains a nine-file source profile under
+`docs/toolchain/source-evidence/rust-58cf8f9c35b3/`, with the Rust MIT/Apache/Unicode
+texts, compiler-builtins/libm notices, relevant manifests/unwind source and upstream
 copyright guide. Its index records immutable URLs, Git blob IDs and SHA-256.
 The checker pins that reviewed index and rejects changed/extra/linked evidence:
 
@@ -54,6 +54,39 @@ binary notice set. They do not cover unreviewed distro patches, actual features,
 all external std dependencies, all per-file notices or arbitrary compiler releases.
 A different compiler commit requires a separate reviewed profile; never label this
 profile as its source merely because the release string looks similar.
+
+### What the retained library notice actually covers
+
+The report-only artifact from [CI run 39604466291](https://github.com/ryltsevmikhail/dsh-ocean/actions/runs/39604466291),
+artifact ID `12348027794`, retained a 1,499,465-byte library copyright HTML:
+SHA-256 `5647be074c8edf7339fd863055923a8fc80bc5610a8d4661ec3b767b9d392c27`.
+These observations describe that exact snapshot, not every Rust distribution.
+Unlike the earlier Arch sample, its out-of-tree section is **not empty**:
+it has 141 distinct package/version headings. This count is a document inventory,
+not 141 components proven linked into Ocean. The 14-day artifact retention is not
+a durable archive of that full notice payload.
+
+Its in-tree section identifies `library/core/src/unicode` as `Unicode-3.0`,
+copyright 1991-2024 Unicode, Inc., with `mod.rs` excepted as `Apache-2.0 OR MIT`.
+The profile now retains the complete exact-commit upstream
+[Unicode-3.0 text](https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/LICENSES/Unicode-3.0.txt)
+as `LICENSE-RUST-UNICODE`; the index pins its Git blob and SHA-256, and CI includes
+it only when the observed compiler commit matches. This adds a missing source
+license candidate; it does not establish compiled membership or install it as a
+complete release license payload.
+
+The upstream [generator](https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/src/tools/generate-copyright/src/main.rs)
+selects library manifests and in-tree metadata; its
+[Cargo metadata reader](https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/src/tools/generate-copyright/src/cargo_metadata.rs)
+iterates metadata packages and scrapes candidate notice files from vendored sources.
+It is not an ELF/link-map inventory for Ocean's x86_64 target. In-tree dependencies
+are handled separately from the out-of-tree crate list, so the absence of a
+compiler-builtins package heading cannot clear or exclude that runtime.
+
+Remaining work is still to match actual std/compiler-runtime components and
+applicable per-file notices to the target build, review excluded compiler-wide
+material, and durably retain the required payload for an authorized release.
+The existing native/dlopen, distro/ABI and AppImage gates are unchanged.
 
 ## Inspect one exact ELF without running it
 
