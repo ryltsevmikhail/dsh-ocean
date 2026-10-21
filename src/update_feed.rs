@@ -80,6 +80,18 @@ impl ShellCandidate {
 }
 
 pub fn check_shell(settings: &Settings, kind: Kind) -> Result<ShellCandidate> {
+    check_shell_controlled(
+        settings,
+        kind,
+        std::sync::Arc::new(crate::update_control::Control::default()),
+    )
+}
+pub fn check_shell_controlled(
+    settings: &Settings,
+    kind: Kind,
+    control: std::sync::Arc<crate::update_control::Control>,
+) -> Result<ShellCandidate> {
+    control.check()?;
     settings.validate()?;
     let source = settings.source(Product::Shell)?;
     let trust = source.trust()?;
@@ -87,11 +99,19 @@ pub fn check_shell(settings: &Settings, kind: Kind) -> Result<ShellCandidate> {
     // silently using an empty floor. Final verification reads it again.
     crate::release_state::read()?;
     let feed = source.feed(settings.channel(Product::Shell));
-    let manifest =
-        crate::release_download::fetch_metadata(&feed.manifest_url, release_feed::MAX_MANIFEST)?;
-    let signature =
-        crate::release_download::fetch_metadata(&feed.signature_url, release_feed::MAX_AUXILIARY)?;
+    let manifest = crate::release_download::fetch_metadata_controlled(
+        &feed.manifest_url,
+        release_feed::MAX_MANIFEST,
+        control.clone(),
+    )?;
+    let signature = crate::release_download::fetch_metadata_controlled(
+        &feed.signature_url,
+        release_feed::MAX_AUXILIARY,
+        control.clone(),
+    )?;
+    control.check()?;
     let verified = verify(settings, &manifest, &signature, kind)?;
+    control.check()?;
     Ok(ShellCandidate {
         verified,
         manifest,
@@ -157,6 +177,19 @@ mod tests {
             fingerprint: trust.fingerprint(),
         };
         (settings, candidate)
+    }
+    #[test]
+    fn pre_cancelled_feed_checks_stop_before_even_validating_or_reading_state() {
+        let (mut settings, _) = expired_candidate();
+        // Invalid URL is a no-network safety trap while the new entry point is
+        // red: the cancellation error must win before source/state/transport.
+        settings.shell.as_mut().unwrap().stable.manifest_url = "http://not-an-update/".into();
+        let control = std::sync::Arc::new(crate::update_control::Control::default());
+        assert!(control.cancel());
+        let error = check_shell_controlled(&settings, Kind::AppImage, control)
+            .err()
+            .expect("cancelled operation");
+        assert!(error.to_string().contains("cancelled"));
     }
     #[test]
     fn stale_candidates_recheck_time_and_channel_before_any_state_read() {

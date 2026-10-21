@@ -477,15 +477,54 @@ pub(crate) fn stage_reader(
         File::sync_all,
     )
 }
+fn stage_reader_with_io(
+    input: &mut impl Read,
+    destination: &Path,
+    release: &Verified,
+    write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
+    sync: impl FnOnce(&File) -> std::io::Result<()>,
+) -> Result<Staged> {
+    stage_reader_hooks(
+        input,
+        destination,
+        release,
+        write,
+        sync,
+        |_| Ok(()),
+        || Ok(()),
+    )
+}
+
+pub(crate) fn stage_reader_guarded(
+    input: &mut impl Read,
+    destination: &Path,
+    release: &Verified,
+    progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
+) -> Result<Staged> {
+    stage_reader_hooks(
+        input,
+        destination,
+        release,
+        |file, bytes| file.write_all(bytes),
+        File::sync_all,
+        progress,
+        before_publish,
+    )
+}
+
 // Private operation seam for deterministic I/O-failure tests. Production always
 // uses File::write_all and File::sync_all, never an environment/remote override.
-fn stage_reader_with_io(
+fn stage_reader_hooks(
     input: &mut impl Read,
     destination: &Path,
     release: &Verified,
     mut write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
     sync: impl FnOnce(&File) -> std::io::Result<()>,
+    mut progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
 ) -> Result<Staged> {
+    progress(0)?;
     let mut transfer = crate::downloads::Transfer::prepare(destination)
         .context("prepare new release staging destination")?;
     let mut output = OpenOptions::new()
@@ -509,6 +548,7 @@ fn stage_reader_with_io(
             "release source exceeds signed size"
         );
         write(&mut output, &buffer[..size]).context("write private release staging file")?;
+        progress(total)?;
         hash.update(&buffer[..size]);
     }
     anyhow::ensure!(
@@ -523,6 +563,8 @@ fn stage_reader_with_io(
         a.dev() == b.dev() && a.ino() == b.ino() && b.len() == total,
         "private release staging file changed"
     );
+    progress(total)?;
+    before_publish()?;
     let path = transfer
         .publish()
         .context("publish verified release without overwriting")?;
@@ -590,6 +632,62 @@ mod staging_tests {
             digest: String::new(),
             key_id: "unit-test-only".into(),
         }
+    }
+    #[test]
+    fn cancellation_at_copy_or_final_sync_never_publishes_staged_bytes() {
+        for at_sync in [false, true] {
+            let f = Fixture::new();
+            let target = f.0.join("cancelled.AppImage");
+            let bytes = vec![b'x'; 131072];
+            let release = proof(&bytes);
+            let control = crate::update_control::Control::default();
+            let result = stage_reader_hooks(
+                &mut Cursor::new(&bytes),
+                &target,
+                &release,
+                |f, b| f.write_all(b),
+                |file| {
+                    if at_sync {
+                        assert!(control.cancel());
+                    }
+                    file.sync_all()
+                },
+                |total| {
+                    if !at_sync && total > 0 {
+                        assert!(control.cancel());
+                    }
+                    control.observe(total)
+                },
+                || control.begin_commit(),
+            );
+            assert!(result.is_err(), "cancelled operation must not publish");
+            assert!(!target.exists());
+            assert_eq!(std::fs::read_dir(&f.0).unwrap().count(), 0);
+        }
+    }
+    #[test]
+    fn final_publication_commit_cannot_be_cancelled_or_misreported() {
+        let f = Fixture::new();
+        let target = f.0.join("committed.AppImage");
+        let release = proof(b"expected");
+        let control = crate::update_control::Control::default();
+        let result = stage_reader_hooks(
+            &mut Cursor::new(b"expected"),
+            &target,
+            &release,
+            |f, b| f.write_all(b),
+            File::sync_all,
+            |total| control.observe(total),
+            || {
+                control.begin_commit()?;
+                assert!(!control.cancel());
+                Ok(())
+            },
+        );
+        assert!(result.is_ok());
+        assert!(!control.cancel());
+        assert!(control.complete());
+        assert_eq!(std::fs::read(target).unwrap(), b"expected");
     }
     struct Interrupt {
         first: bool,

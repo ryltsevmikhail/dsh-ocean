@@ -59,6 +59,7 @@ pub mod tray;
 pub mod ui;
 pub mod update;
 pub mod update_cli;
+pub mod update_control;
 pub mod update_feed;
 pub mod update_settings;
 pub mod util;

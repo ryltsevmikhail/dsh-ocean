@@ -104,8 +104,19 @@ existing destination refuses publication. Early failure kills/reaps curl; privat
 staging cleanup is best effort. Curl stderr is discarded, never echoed with URLs,
 proxy credentials or paths. The published file is mode 0600, not executable.
 
+Native-operation backend APIs share cancellation/progress state for feed checks
+and artifact downloads. Cancellation is linearized against final result/publication:
+if it wins, named staging output is not published; once publication commits, a late
+Cancel is refused rather than reporting verified published bytes as cancelled.
+Cancellation signals only the exact owned curl process; its worker reaps it.
+Transport-exit polling never holds the child mutex across a blocking wait, and a
+native cancel request never waits behind worker cleanup. Hash/copy checkpoints
+clean private partial staging on cooperative cancellation. Abrupt process death
+can still skip cleanup; trusted wrappers/descendants are not a hostile sandbox.
+GUI orchestration of these backend APIs remains pending.
+
 The JSON receipt says `downloaded:true`, `artifactChecked:true`, `applied:false`
-and gives `stagedPath`. Explicit AppImage activation and rollback below are the
+and gives `stagedPath`. Explicit AppImage/tar activation and rollback below are the
 next steps; download itself never executes bytes, changes the active selector,
 restarts a service or accesses a profile. Tests drive a synthetic-key download →
 apply → second release → rollback under private HOME/XDG/prefix, using a fake
