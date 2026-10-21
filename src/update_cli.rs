@@ -6,6 +6,65 @@ use serde_json::Value;
 
 pub fn run(args: &[String]) -> Result<Value> {
     match args.first().map(String::as_str) {
+        Some("--managed-shell-status") => {
+            anyhow::ensure!(args.len() == 1, "usage: --managed-shell-status");
+            Ok(serde_json::to_value(crate::managed_shell::status()?)?)
+        }
+        Some("--enroll-shell") => {
+            anyhow::ensure!(
+                args.len() == 3 && args[1] == "--confirm-managed" && args[2] == "yes",
+                "enrollment requires --enroll-shell --confirm-managed yes"
+            );
+            Ok(serde_json::to_value(crate::managed_shell::enroll()?)?)
+        }
+        Some("--install-managed-shell") => {
+            let (pairs, rest) = args[1..].as_chunks::<2>();
+            anyhow::ensure!(rest.is_empty(), "install option requires a value");
+            let mut kind = Kind::AppImage;
+            let mut seen_kind = false;
+            let mut confirmed = false;
+            for pair in pairs {
+                match pair[0].as_str() {
+                    "--kind" => {
+                        anyhow::ensure!(!seen_kind, "duplicate artifact kind");
+                        seen_kind = true;
+                        kind = match pair[1].as_str() {
+                            "appimage" => Kind::AppImage,
+                            "tar.gz" => Kind::TarGz,
+                            _ => anyhow::bail!("unsupported shell artifact kind"),
+                        };
+                    }
+                    "--confirm-install" => {
+                        anyhow::ensure!(
+                            !confirmed && pair[1] == "yes",
+                            "install requires one --confirm-install yes"
+                        );
+                        confirmed = true;
+                    }
+                    _ => anyhow::bail!("unexpected managed install option"),
+                }
+            }
+            anyhow::ensure!(confirmed, "install requires --confirm-install yes");
+            crate::managed_shell::install_latest(kind)
+        }
+        Some("--rollback-managed-shell") | Some("--recover-managed-shell") => {
+            let recovery = args[0] == "--recover-managed-shell";
+            let flag = if recovery {
+                "--confirm-recovery"
+            } else {
+                "--confirm-rollback"
+            };
+            anyhow::ensure!(
+                args.len() == 3 && args[1] == flag && args[2] == "yes",
+                "operation requires explicit confirmation"
+            );
+            let control = crate::update_control::Control::default();
+            if recovery {
+                crate::managed_shell::recover(&control)
+            } else {
+                crate::managed_shell::rollback(&control)
+            }
+        }
         Some("--update-settings") => {
             anyhow::ensure!(args.len() == 1, "usage: --update-settings");
             update_settings::load()?.summary()

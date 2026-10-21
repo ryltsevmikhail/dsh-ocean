@@ -156,11 +156,26 @@ fn tick() {
 }
 #[test]
 #[ignore = "requires explicitly enabled isolated GTK dialog display"]
-fn native_shell_status_has_only_readonly_guidance_and_close() {
+fn native_shell_updater_has_channels_explicit_enrollment_and_no_unconfigured_apply() {
     assert_eq!(std::env::var("DSH_OCEAN_TEST_DIALOGS").as_deref(), Ok("1"));
     assert!(std::env::var("XDG_RUNTIME_DIR")
         .unwrap()
         .starts_with("/tmp/dsh-ocean-native-test."));
+    let private = PathBuf::from(std::env::var_os("XDG_DATA_HOME").unwrap());
+    assert!(private.starts_with("/tmp"));
+    // This is the only ignored case in this test binary, before GTK/workers:
+    // never let inherited user overrides point inspection at real Harness data.
+    std::env::set_var("DSH_HOME", private.join("isolated-harness"));
+    std::env::set_var("DSH_OCEAN_DATA_DIR", private.join("isolated-ocean"));
+    std::env::set_var("DSH_OCEAN_URL", "http://127.0.0.1:9");
+    let tools = private.join("native-update-tools");
+    fs::create_dir(&tools).unwrap();
+    fs::write(tools.join("curl"),"#!/usr/bin/python3\nimport sys\nfrom pathlib import Path\np=Path(__file__).parent\nu=sys.argv[sys.argv.index('--url')+1]\nwith (p/'calls').open('a') as f:f.write(u+'\\n')\nsys.stdout.buffer.write((p/('signature.json' if u.endswith('.sig.json') else 'artifact' if u.endswith('.AppImage') else 'manifest.json')).read_bytes())\n").unwrap();
+    fs::set_permissions(tools.join("curl"), fs::Permissions::from_mode(0o700)).unwrap();
+    std::env::set_var(
+        "PATH",
+        format!("{}:{}", tools.display(), std::env::var("PATH").unwrap()),
+    );
     gtk::init().unwrap();
     let parent = gtk::Window::new(gtk::WindowType::Toplevel);
     parent.show_all();
@@ -173,18 +188,200 @@ fn native_shell_status_has_only_readonly_guidance_and_close() {
     assert!(window.label.is_selectable() && !window.label.uses_markup());
     assert!(window.label.text().contains("AppImage"));
     assert!(window.label.text().contains("not a network update check"));
-    assert!(window
-        .label
-        .text()
-        .contains("Automatic shell update: unavailable"));
-    assert!(window
-        .dialog
-        .widget_for_response(gtk::ResponseType::Accept)
-        .is_none());
-    assert!(window
-        .dialog
-        .widget_for_response(gtk::ResponseType::Apply)
-        .is_none());
+    fn named(root: &gtk::Widget, name: &str) -> Option<gtk::Widget> {
+        if root.widget_name() == name {
+            return Some(root.clone());
+        }
+        if let Ok(container) = root.clone().downcast::<gtk::Container>() {
+            for child in container.children() {
+                if let Some(found) = named(&child, name) {
+                    return Some(found);
+                }
+            }
+        }
+        None
+    }
+    let root: gtk::Widget = window.dialog.clone().upcast();
+    let check = named(&root, "shell-update-check")
+        .expect("signed updater check button")
+        .downcast::<gtk::Button>()
+        .unwrap();
+    let apply = named(&root, "shell-update-apply")
+        .expect("managed apply button")
+        .downcast::<gtk::Button>()
+        .unwrap();
+    let enroll = named(&root, "shell-update-enroll")
+        .expect("explicit enrollment button")
+        .downcast::<gtk::Button>()
+        .unwrap();
+    let status = named(&root, "shell-update-status")
+        .unwrap()
+        .downcast::<gtk::Label>()
+        .unwrap();
+    let channel = named(&root, "shell-update-channel")
+        .unwrap()
+        .downcast::<gtk::ComboBoxText>()
+        .unwrap();
+    let end = Instant::now() + Duration::from_secs(5);
+    while !status.text().contains("Destination: not enrolled") {
+        tick();
+        assert!(Instant::now() < end, "{}", status.text());
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(!check.is_sensitive() && !apply.is_sensitive());
+    assert!(enroll.is_sensitive());
+    assert_eq!(channel.active_id().as_deref(), Some("stable"));
+    channel.set_active_id(Some("next"));
+    assert!(!enroll.is_sensitive(),"worker start must synchronously disable other actions, not silently drop enabled clicks before the next timer tick");
+    let end = Instant::now() + Duration::from_secs(5);
+    while dsh_ocean::update_settings::load().unwrap().shell_channel
+        != dsh_ocean::release_feed::Channel::Next
+    {
+        tick();
+        assert!(Instant::now() < end);
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        !dsh_ocean::managed_shell::prefix().exists(),
+        "settings changes must not silently enroll/install"
+    );
+    assert!(!private.join("isolated-harness").exists());
+    fn until(stage: &str, mut ready: impl FnMut() -> bool) {
+        let end = Instant::now() + Duration::from_secs(8);
+        while !ready() {
+            tick();
+            assert!(
+                Instant::now() < end,
+                "native action did not finish: {stage}"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    fn yes(parent: &gtk::Dialog) {
+        until("confirmation or apply completion", || {
+            for window in gtk::Window::list_toplevels() {
+                if let Ok(dialog) = window.downcast::<gtk::MessageDialog>() {
+                    if dialog.is_visible()
+                        && dialog.transient_for().as_ref() == Some(parent.upcast_ref())
+                    {
+                        dialog.response(gtk::ResponseType::Yes);
+                        return true;
+                    }
+                }
+            }
+            false
+        });
+    }
+    until("enroll enabled", || enroll.is_sensitive());
+    enroll.emit_clicked();
+    yes(&window.dialog);
+    until("enrollment completion", || {
+        status.text().contains("Destination: enrolled")
+    });
+    assert!(dsh_ocean::managed_shell::status().unwrap().enrolled);
+    assert!(!check.is_sensitive() && !apply.is_sensitive());
+    assert!(!tools.join("calls").exists());
+    use dsh_ocean::{release_feed, update_settings};
+    use ed25519_dalek::{Signer, SigningKey};
+    use sha2::{Digest, Sha256};
+    let key = SigningKey::from_bytes(&[73; 32]); // Explicit fixture-only trust, not publisher keys.
+    let key_document = release_feed::PublicKeyDocument {
+        version: 1,
+        key_id: "native-fixture".into(),
+        public_key_hex: release_feed::hex(key.verifying_key().as_bytes()),
+    };
+    let feed=update_settings::Feed{manifest_url:"https://github.com/ryltsevmikhail/dsh-ocean/releases/latest/download/native-manifest.json".into(),signature_url:"https://github.com/ryltsevmikhail/dsh-ocean/releases/latest/download/native-manifest.sig.json".into(),minimum_sequence:1};
+    let mut settings = update_settings::load().unwrap();
+    settings.shell = Some(update_settings::Source {
+        key: key_document,
+        stable: feed.clone(),
+        next: feed,
+    });
+    let fingerprint = release_feed::hex(&Sha256::digest(key.verifying_key().as_bytes()));
+    update_settings::configure(
+        settings,
+        &update_settings::Confirmation {
+            shell: Some(fingerprint),
+            runtime: None,
+            replace: false,
+        },
+    )
+    .unwrap();
+    let write_feed = |sequence: u64, version: &str, payload: &[u8]| {
+        let now = chrono::Utc::now();
+        let arch = std::env::consts::ARCH;
+        let manifest = serde_json::json!({"version":1,"product":"dsh-ocean","channel":"next","sequence":sequence,"release":version,"publishedAt":(now-chrono::Duration::minutes(1)).to_rfc3339(),"expiresAt":(now+chrono::Duration::days(1)).to_rfc3339(),"artifacts":[{"target":format!("linux-{arch}"),"kind":"appimage","url":format!("https://github.com/ryltsevmikhail/dsh-ocean/releases/download/v{version}/dsh-ocean-{version}-{arch}.AppImage"),"size":payload.len(),"sha256":release_feed::hex(&Sha256::digest(payload))}]});
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        let mut message = b"DSH Ocean release manifest v1\n".to_vec();
+        message.extend_from_slice(&bytes);
+        fs::write(tools.join("manifest.json"), bytes).unwrap();
+        fs::write(tools.join("artifact"), payload).unwrap();
+        fs::write(tools.join("signature.json"),serde_json::to_vec(&serde_json::json!({"version":1,"keyId":"native-fixture","signatureHex":release_feed::hex(&key.sign(&message).to_bytes())})).unwrap()).unwrap();
+    };
+    write_feed(1, "0.2.0", b"fixture-one");
+    let button = |name: &str| {
+        named(&root, name)
+            .unwrap()
+            .downcast::<gtk::Button>()
+            .unwrap()
+    };
+    let refresh = button("shell-update-refresh");
+    let download = button("shell-update-download");
+    let rollback = button("shell-update-rollback");
+    until("refresh enabled", || refresh.is_sensitive());
+    refresh.emit_clicked();
+    until("check enabled", || check.is_sensitive());
+    let kind = named(&root, "shell-update-kind")
+        .unwrap()
+        .downcast::<gtk::ComboBoxText>()
+        .unwrap();
+    kind.set_active_id(Some("appimage"));
+    for (sequence, version, payload) in [
+        (1, "0.2.0", b"fixture-one".as_slice()),
+        (2, "0.2.1", b"fixture-two".as_slice()),
+    ] {
+        write_feed(sequence, version, payload);
+        until("check enabled", || check.is_sensitive());
+        check.emit_clicked();
+        until("verified metadata / download enabled", || {
+            download.is_sensitive()
+        });
+        if sequence == 1 {
+            assert_eq!(
+                fs::read_to_string(tools.join("calls"))
+                    .unwrap()
+                    .lines()
+                    .count(),
+                2,
+                "check only fetches metadata"
+            );
+        }
+        download.emit_clicked();
+        until("verified download / apply enabled", || apply.is_sensitive());
+        apply.emit_clicked();
+        yes(&window.dialog);
+        until("confirmation or apply completion", || {
+            status
+                .text()
+                .contains(&format!("Selected on disk: {version}"))
+        });
+        assert_eq!(
+            fs::read(dsh_ocean::managed_shell::prefix().join("current/dsh-ocean")).unwrap(),
+            payload
+        );
+    }
+    assert!(dsh_ocean::managed_shell::launcher().is_file());
+    until("rollback enabled", || rollback.is_sensitive());
+    rollback.emit_clicked();
+    yes(&window.dialog);
+    until("rollback completion", || {
+        status.text().contains("Selected on disk: 0.2.0")
+    });
+    assert_eq!(
+        dsh_ocean::release_state::read().unwrap()["next"].sequence,
+        2
+    );
+    assert!(!private.join("isolated-harness").exists());
     window
         .dialog
         .widget_for_response(gtk::ResponseType::Close)

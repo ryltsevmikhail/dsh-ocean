@@ -61,6 +61,7 @@ pub struct AppState {
     pub profile_verifying: std::sync::Arc<AtomicBool>,
     pub data_snapshot: std::sync::Arc<AtomicBool>,
     pub backup_export: std::sync::Arc<AtomicBool>,
+    pub updates: std::sync::Arc<crate::native_updates::Registry>,
     /// Cached runtime detection for the setup window's poll.
     runtime_cache: Mutex<Option<(std::time::Instant, Option<bootstrap::Runtime>)>>,
     /// Short-lived LAN pairing proxy, owned only while explicitly started.
@@ -99,6 +100,7 @@ impl Default for AppState {
             profile_verifying: std::sync::Arc::default(),
             data_snapshot: std::sync::Arc::default(),
             backup_export: std::sync::Arc::default(),
+            updates: std::sync::Arc::default(),
             runtime_cache: Mutex::new(None),
             pairing: Mutex::new(None),
             bootstrap: std::sync::Arc::default(),

@@ -133,7 +133,7 @@ struct Pending {
     after: Selectors,
 }
 
-fn absolute(prefix: &Path) -> Result<PathBuf> {
+pub(crate) fn absolute(prefix: &Path) -> Result<PathBuf> {
     anyhow::ensure!(
         prefix.is_absolute()
             && prefix != Path::new("/")
@@ -145,7 +145,7 @@ fn absolute(prefix: &Path) -> Result<PathBuf> {
     Ok(prefix.to_path_buf())
 }
 
-fn check_ancestors(path: &Path) -> Result<()> {
+pub(crate) fn check_ancestors(path: &Path) -> Result<()> {
     let uid = unsafe { libc::geteuid() };
     for ancestor in path.ancestors() {
         match fs::symlink_metadata(ancestor) {
@@ -162,7 +162,7 @@ fn check_ancestors(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn ensure_prefix(prefix: &Path) -> Result<()> {
+pub(crate) fn ensure_prefix(prefix: &Path) -> Result<()> {
     check_ancestors(prefix)?;
     match fs::symlink_metadata(prefix) {
         Ok(m) => anyhow::ensure!(m.is_dir(), "install prefix is not a directory"),
@@ -253,7 +253,7 @@ fn set_selector(prefix: &Path, name: &str, target: Option<&str>) -> Result<()> {
     sync_dir(prefix)
 }
 
-fn write_json_new(path: &Path, value: &impl Serialize) -> Result<()> {
+pub(crate) fn write_json_new(path: &Path, value: &impl Serialize) -> Result<()> {
     let parent = path.parent().context("missing receipt directory")?;
     anyhow::ensure!(
         fs::symlink_metadata(path).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
@@ -434,7 +434,7 @@ impl Activation {
 // Intentionally no automatic Drop recovery: after panic/abort the durable
 // journal survives and a later process requires explicit verified recovery.
 
-fn publish_directory(source: &Path, destination: &Path) -> Result<()> {
+pub(crate) fn publish_new(source: &Path, destination: &Path) -> Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let source = std::ffi::CString::new(source.as_os_str().as_bytes())?;
     let destination = std::ffi::CString::new(destination.as_os_str().as_bytes())?;
@@ -519,7 +519,7 @@ fn stage_version(
     sync_dir(&content)?;
     verify_directory(&content, target)?;
     guard.check()?;
-    publish_directory(&content, destination)?;
+    publish_new(&content, destination)?;
     sync_dir(parent)
 }
 
@@ -595,6 +595,56 @@ pub fn apply(
             Err(error).context("activation refused; original selectors restored")
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionInfo {
+    pub release: String,
+    pub sequence: u64,
+    pub kind: release_feed::Kind,
+}
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallationStatus {
+    pub current: Option<VersionInfo>,
+    pub previous: Option<VersionInfo>,
+    pub pending_recovery: bool,
+}
+
+/// Read-only integrity snapshot, not a mutation permit. Every mutator reacquires
+/// its locks and rechecks selectors/bytes rather than trusting this UI snapshot.
+pub fn inspect(prefix: &Path) -> Result<InstallationStatus> {
+    let prefix = absolute(prefix)?;
+    check_ancestors(&prefix)?;
+    match fs::symlink_metadata(&prefix) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(InstallationStatus::default())
+        }
+        Err(error) => return Err(error).context("inspect shell destination"),
+        Ok(meta) => anyhow::ensure!(
+            meta.is_dir() && meta.uid() == unsafe { libc::geteuid() } && meta.mode() & 0o022 == 0,
+            "unsafe shell destination"
+        ),
+    }
+    let selectors = Selectors::read(&prefix)?;
+    let info = |target: &String| -> Result<VersionInfo> {
+        let receipt = verify_retained(&prefix, target)?;
+        Ok(VersionInfo {
+            release: receipt.release,
+            sequence: receipt.sequence,
+            kind: if receipt.files.is_some() {
+                release_feed::Kind::TarGz
+            } else {
+                release_feed::Kind::AppImage
+            },
+        })
+    };
+    Ok(InstallationStatus {
+        current: selectors.current.as_ref().map(info).transpose()?,
+        previous: selectors.previous.as_ref().map(info).transpose()?,
+        pending_recovery: fs::symlink_metadata(prefix.join(PENDING)).is_ok(),
+    })
 }
 
 pub fn rollback(prefix: &Path) -> Result<Value> {

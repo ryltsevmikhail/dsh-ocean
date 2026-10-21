@@ -67,10 +67,32 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building DSH Ocean");
 
-    app.run(|app_handle, event| {
-        if let RunEvent::Exit = event {
-            app_handle.state::<state::AppState>().shutdown();
+    app.run(|app_handle, event| match event {
+        RunEvent::ExitRequested { api, .. } => {
+            let state = app_handle.state::<state::AppState>();
+            match state.updates.request_exit() {
+                dsh_ocean::native_updates::Exit::Allow => (),
+                dsh_ocean::native_updates::Exit::Waiting => api.prevent_exit(),
+                dsh_ocean::native_updates::Exit::Wait(control) => {
+                    api.prevent_exit();
+                    state.quitting.store(true, Ordering::SeqCst);
+                    let handle = app_handle.clone();
+                    gtk::glib::timeout_add_local(
+                        std::time::Duration::from_millis(100),
+                        move || {
+                            if control.snapshot().finished {
+                                handle.exit(0);
+                                gtk::glib::ControlFlow::Break
+                            } else {
+                                gtk::glib::ControlFlow::Continue
+                            }
+                        },
+                    );
+                }
+            }
         }
+        RunEvent::Exit => app_handle.state::<state::AppState>().shutdown(),
+        _ => (),
     });
 }
 
@@ -132,7 +154,12 @@ fn handle_cli() -> bool {
         "--update-settings"
         | "--configure-updates"
         | "--set-update-channel"
-        | "--check-shell-update" => {
+        | "--check-shell-update"
+        | "--managed-shell-status"
+        | "--enroll-shell"
+        | "--install-managed-shell"
+        | "--rollback-managed-shell"
+        | "--recover-managed-shell" => {
             match dsh_ocean::update_cli::run(&args) {
                 Ok(value) => println!(
                     "{}",
@@ -280,6 +307,11 @@ fn handle_cli() -> bool {
                    --restore-data SNAPSHOT --confirm-offline  replace sessions/stores; retained copies kept\n  \
                    --prune-data-backups --keep N --confirm-prune  delete older whole-data snapshots\n  \
                    --restore-profile NAME SNAPSHOT --confirm-offline  restore configuration\n  \
+                   --managed-shell-status  inspect explicitly enrolled destination (no network)\n  \
+                   --enroll-shell --confirm-managed yes  opt into a separate managed user destination\n  \
+                   --install-managed-shell [--kind appimage|tar.gz] --confirm-install yes  authenticate configured release, download and apply to enrolled destination\n  \
+                   --rollback-managed-shell --confirm-rollback yes  select verified retained managed version\n  \
+                   --recover-managed-shell --confirm-recovery yes  recover interrupted managed selector transaction\n  \
                    --update-settings  show updater channels/trust fingerprints (no network or keys)\n  \
                    --configure-updates CONFIG --confirm-shell-key SHA256 [--confirm-runtime-key SHA256] [--confirm-replace-trust yes]  provision independently authenticated public trust\n  \
                    --set-update-channel shell|runtime stable|next  change only the selected updater channel\n  \

@@ -113,7 +113,7 @@ Transport-exit polling never holds the child mutex across a blocking wait, and a
 native cancel request never waits behind worker cleanup. Hash/copy checkpoints
 clean private partial staging on cooperative cancellation. Abrupt process death
 can still skip cleanup; trusted wrappers/descendants are not a hostile sandbox.
-GUI orchestration of these backend APIs remains pending.
+The native GTK controller uses these backend APIs; see [managed destination and lifecycle policy](SHELL_UPDATES.md).
 
 The JSON receipt says `downloaded:true`, `artifactChecked:true`, `applied:false`
 and gives `stagedPath`. Explicit AppImage/tar activation and rollback below are the
@@ -121,8 +121,9 @@ next steps; download itself never executes bytes, changes the active selector,
 restarts a service or accesses a profile. Tests drive a synthetic-key download →
 apply → second release → rollback under private HOME/XDG/prefix, using a fake
 trusted curl (no live HTTP or release publication). A real published signed feed,
-production trust provisioning, GUI orchestration and signed core/bootstrap
-updates are still separate M2 work.
+production trust provisioning and signed core/bootstrap updates remain separate
+M2 work. Native shell orchestration now provides explicit configured check,
+download, managed apply/rollback/recovery and channel controls.
 
 ## Local activation and rollback (explicit, no download)
 
@@ -230,8 +231,8 @@ clock, and not a production trust root. A same-user attacker can delete or edit 
 file, and nothing here verifies that a *newer* manifest was actually published
 (no freshness/consensus). Deleting the file with `--reset-release-state` is an
 explicit operator decision, not an automatic recovery path. AppImage/tar local
-activation and configured metadata checks are explicit; native update GUI,
-runtime transactions and real production publishing remain separate work.
+activation, configured metadata checks and native shell GUI are explicit;
+signed runtime transactions and real production publishing remain separate work.
 
 
 ## Implemented boundary
@@ -543,11 +544,13 @@ cargo test --lib staging_tests
 
 Implemented CLI foundations now include persisted sequence/downgrade protection,
 operator-provisioned trust and channel settings, bounded authenticated shell-feed
-checks, artifact download and journaled AppImage activation/selector rollback.
-These are not a complete automatic updater. Production key custody/provisioning/
-rotation/revocation, signed publishing CI, package-manager behavior,
-GUI/runtime orchestration and real published-feed acceptance remain open. Core/bootstrap updates are still
-unsigned; local apply/rollback retain the recovery/durability/health limits
+checks, artifact download and journaled AppImage/tar package activation/rollback.
+The native GUI adds explicit managed enrollment, check/download/confirmed local
+transactions, channel settings, cancellation and original-installer guidance.
+These are not a complete M2 or an unattended updater. Production key custody/
+provisioning/rotation/revocation, signed publishing CI, signed runtime orchestration,
+real package/AppImage and published-feed acceptance remain open. Core/bootstrap
+updates are still unsigned; local apply/rollback retain the recovery/durability/health limits
 described above. M2 remains incomplete.
 
 The declared Rust floor is now 1.90: the already-locked Tauri 2.12 stack itself

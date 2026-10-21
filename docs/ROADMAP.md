@@ -198,13 +198,18 @@ Tests exercise all four pairs and the real multi-artifact headless draft → sig
 It creates no keys/state/files or releases; production publishing is still absent.
 See [verification, staging and publisher scope](RELEASE_VERIFICATION.md).
 
-**Shell status UX foundation:** distinct tray entries now separate npm/core
-checks from shell guidance. A native read-only version/hint screen and headless
-`--shell-status` show conservative AppImage/Flatpak/development/system-prefix/
-conflict/unknown context without package-manager, network, profile or service
-probes. Ownership/apply authority remain explicitly false and no production feed
-is configured. Conditional original-installer guidance is not an updater or
-package ownership proof. See [scope and tests](SHELL_UPDATES.md).
+**Native shell updater:** distinct tray entries separate core from shell updates.
+The GTK dialog provides current/running vs selected-on-disk version, signed
+`stable`/`next` channel settings, operator public-key fingerprints, explicit
+check/download and confirmed managed apply/rollback/recovery. Separate managed
+destination enrollment—not APPIMAGE/path hints—grants local apply authority;
+original package executables/desktop entries are never overwritten. Cancellation
+and worker gating cover publication/cleanup, and quit defers critical work.
+Restart is explicit: quit and reopen the separate managed launcher. A full
+isolated GTK fixture exercises both successful releases and retained rollback.
+The headless `--shell-status` classifier remains read-only/non-authoritative;
+production roots and actual package ownership detection are not invented.
+See [scope, guidance and acceptance](SHELL_UPDATES.md).
 
 **Persisted anti-rollback foundation:** `--accept-release` verifies then remembers
 `(channel, sequence, release, manifest digest)` in a private 0600 state file under
@@ -249,9 +254,10 @@ package (including notices) and installed-file inventory are retained. Rollback
 refuses damaged payload files or an unexpected file/directory set.
 
 **Remaining:** consistent profile/session backup and data-migration rollback
-(runtime/unit rollback alone is not data rollback), signed feeds/keys and shell
-updater, release CI, channel settings UI, managed-child updates,
-external-install migration and UI click-through. No live user server has been
+(runtime/unit rollback alone is not data rollback), production signed feeds/keys,
+release CI, signed managed-child updates and real installed-client acceptance.
+Native shell channel/settings/update click-through is implemented with synthetic
+trust in a private GTK fixture; this is not production acceptance. No live user server has been
 updated during these tests. See [real-service validation](UPDATE_TESTING.md).
 
 **Core transaction exit met locally:** update from `0.2.0-rc.2` to `0.2.1-rc.2`

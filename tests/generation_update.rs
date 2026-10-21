@@ -1,7 +1,9 @@
 //! Update transactions with a fake user manager; never invokes real systemctl.
 #![cfg(unix)]
 use std::fs;
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::{symlink, DirBuilderExt, PermissionsExt};
+use std::sync::atomic::{AtomicU64, Ordering};
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -20,13 +22,20 @@ fn executable(path: &std::path::Path, text: &str) {
 impl Fixture {
     fn new() -> Self {
         let root = std::env::temp_dir().join(format!(
-            "dsh-ocean-update-{}-{}",
+            "dsh-ocean-update-{}-{}-{}",
             std::process::id(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos()
         ));
+        // A clock value is not a unique reservation under parallel execution.
+        // Reserve the root exclusively before any nested create_dir_all/write.
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&root)
+            .unwrap_or_else(|error| panic!("reserve isolated update fixture {root:?}: {error}"));
         let prefix = root.join("runtime prefix");
         let unit = root.join("config/systemd/user/dsh-web.service");
         fs::create_dir_all(unit.parent().unwrap()).unwrap();
@@ -35,7 +44,8 @@ impl Fixture {
         for tool in [
             "flock", "cp", "chmod", "mv", "ln", "mktemp", "rm", "readlink", "dirname",
         ] {
-            symlink(format!("/usr/bin/{tool}"), root.join("bin").join(tool)).unwrap();
+            symlink(format!("/usr/bin/{tool}"), root.join("bin").join(tool))
+                .unwrap_or_else(|error| panic!("create isolated tool {tool} in {root:?}: {error}"));
         }
         for name in ["gen.old", "gen.new"] {
             let generation = prefix.join("generations").join(name);

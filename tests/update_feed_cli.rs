@@ -30,7 +30,7 @@ impl Sandbox {
         for dir in ["home", "tools", "config/dsh-ocean"] {
             fs::create_dir_all(root.join(dir)).unwrap();
         }
-        let script = "#!/usr/bin/python3\nimport sys\nfrom pathlib import Path\np=Path(__file__).parent\nu=sys.argv[sys.argv.index('--url')+1]\nwith (p/'calls').open('a') as f: f.write(u+'\\n')\nsys.stderr.write('private-feed-downloader-marker')\nsys.stdout.buffer.write((p/('signature.json' if u.endswith('.sig.json') else 'manifest.json')).read_bytes())\nsys.exit(int((p/'exit').read_text()) if (p/'exit').exists() else 0)\n";
+        let script = "#!/usr/bin/python3\nimport sys\nfrom pathlib import Path\np=Path(__file__).parent\nu=sys.argv[sys.argv.index('--url')+1]\nwith (p/'calls').open('a') as f: f.write(u+'\\n')\nsys.stderr.write('private-feed-downloader-marker')\nsys.stdout.buffer.write((p/('signature.json' if u.endswith('.sig.json') else 'artifact' if u.endswith('.AppImage') else 'manifest.json')).read_bytes())\nsys.exit(int((p/'exit').read_text()) if (p/'exit').exists() else 0)\n";
         fs::write(root.join("tools/curl"), script).unwrap();
         fs::set_permissions(root.join("tools/curl"), fs::Permissions::from_mode(0o700)).unwrap();
         let sandbox = Self {
@@ -38,6 +38,7 @@ impl Sandbox {
             key: SigningKey::from_bytes(&[37; 32]),
         };
         sandbox.feed("stable", 9, "0.2.0", false, &sandbox.key);
+        fs::write(sandbox.root.join("tools/artifact"), b"payload").unwrap();
         sandbox
     }
     fn run(&self, args: &[String]) -> Output {
@@ -88,6 +89,29 @@ impl Sandbox {
     }
     fn settings_path(&self) -> PathBuf {
         self.root.join("config/dsh-ocean/updates.json")
+    }
+    fn prefix(&self) -> PathBuf {
+        self.root.join("home/.local/share/dsh-ocean/shell")
+    }
+    fn launcher(&self) -> PathBuf {
+        self.root
+            .join("home/.local/share/applications/dev.dsh.ocean.managed.desktop")
+    }
+    fn enroll_destination(&self) -> Output {
+        self.run(&[
+            "--enroll-shell".into(),
+            "--confirm-managed".into(),
+            "yes".into(),
+        ])
+    }
+    fn install(&self) -> Output {
+        self.run(&[
+            "--install-managed-shell".into(),
+            "--kind".into(),
+            "appimage".into(),
+            "--confirm-install".into(),
+            "yes".into(),
+        ])
     }
     fn check(&self) -> Output {
         self.run(&["--check-shell-update".into()])
@@ -161,6 +185,112 @@ fn unconfigured_status_is_read_only_and_channels_do_not_change_harness_configura
             & 0o777,
         0o600
     );
+}
+
+#[test]
+fn managed_destination_requires_explicit_enrollment_and_preserves_original_installation() {
+    let s = Sandbox::new();
+    s.enroll();
+    let status = s.run(&["--managed-shell-status".into()]);
+    assert!(status.status.success(), "{}", describe(&status));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&status.stdout).unwrap()["enrolled"],
+        false
+    );
+    assert!(!s.prefix().exists());
+    assert!(!s.install().status.success());
+    assert!(!s.root.join("tools/calls").exists());
+    assert!(!s.run(&["--enroll-shell".into()]).status.success());
+    assert!(!s.prefix().exists());
+    let enrolled = s.enroll_destination();
+    assert!(enrolled.status.success(), "{}", describe(&enrolled));
+    let original = s.root.join("home/.local/bin/dsh-ocean");
+    fs::create_dir_all(original.parent().unwrap()).unwrap();
+    fs::write(&original, b"original-package-or-source-install").unwrap();
+    let installed = s.install();
+    assert!(installed.status.success(), "{}", describe(&installed));
+    let receipt: Value = serde_json::from_slice(&installed.stdout).unwrap();
+    assert_eq!(receipt["installedOnDisk"], true);
+    assert_eq!(receipt["serviceRestarted"], false);
+    assert_eq!(
+        fs::read(&original).unwrap(),
+        b"original-package-or-source-install"
+    );
+    assert_eq!(
+        fs::read(s.prefix().join("current/dsh-ocean")).unwrap(),
+        b"payload"
+    );
+    assert!(fs::read_to_string(s.launcher())
+        .unwrap()
+        .contains("DSH Ocean (managed)"));
+    let inspected = s.run(&["--managed-shell-status".into()]);
+    assert!(inspected.status.success(), "{}", describe(&inspected));
+    let status: Value = serde_json::from_slice(&inspected.stdout).unwrap();
+    assert_eq!(status["enrolled"], true);
+    assert_eq!(status["installation"]["current"]["release"], "0.2.0");
+    assert!(!s.root.join("home/.dsh").exists());
+}
+
+#[test]
+fn managed_update_never_silently_downgrades_the_disk_version_even_after_floor_removal() {
+    let s = Sandbox::new();
+    s.enroll();
+    assert!(s.enroll_destination().status.success());
+    s.feed("stable", 10, "0.3.0", false, &s.key);
+    let installed = s.install();
+    assert!(installed.status.success(), "{}", describe(&installed));
+    let original = fs::read_link(s.prefix().join("current")).unwrap();
+    let floor = s.root.join("state/dsh-ocean/release-state.json");
+    assert!(floor.is_file());
+    fs::remove_file(&floor).unwrap();
+    s.feed("stable", 11, "0.2.0", false, &s.key);
+    let refused = s.install();
+    assert!(
+        !refused.status.success(),
+        "managed updates must compare the disk version, not only the old running package"
+    );
+    assert_eq!(fs::read_link(s.prefix().join("current")).unwrap(), original);
+}
+
+#[test]
+fn managed_enrollment_and_launcher_refuse_unknown_contents_without_overwrite() {
+    let s = Sandbox::new();
+    s.enroll();
+    fs::create_dir_all(s.prefix()).unwrap();
+    let unknown = s.prefix().join("keep");
+    fs::write(&unknown, b"user-owned-not-updater-data").unwrap();
+    assert!(!s.enroll_destination().status.success());
+    assert_eq!(fs::read(&unknown).unwrap(), b"user-owned-not-updater-data");
+    assert_eq!(
+        fs::read_dir(s.prefix()).unwrap().count(),
+        1,
+        "refusal must not even create an operation lock in unknown contents"
+    );
+    let s = Sandbox::new();
+    s.enroll();
+    assert!(s.enroll_destination().status.success());
+    fs::create_dir_all(s.launcher().parent().unwrap()).unwrap();
+    fs::write(s.launcher(), b"user desktop entry").unwrap();
+    let refused = s.install();
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert_eq!(fs::read(s.launcher()).unwrap(), b"user desktop entry");
+    assert!(!s.prefix().join("current").exists());
+    assert!(!s.root.join("state/dsh-ocean/release-state.json").exists());
+}
+
+#[test]
+fn failed_managed_download_never_activates_or_accepts_a_release() {
+    let s = Sandbox::new();
+    s.enroll();
+    assert!(s.enroll_destination().status.success());
+    fs::write(s.root.join("tools/artifact"), b"tampered-body").unwrap();
+    let failed = s.install();
+    assert!(!failed.status.success(), "{}", describe(&failed));
+    assert!(!s.prefix().join("current").exists());
+    assert!(!s.launcher().exists());
+    assert!(!s.root.join("state/dsh-ocean/release-state.json").exists());
+    let cache = s.root.join("state/dsh-ocean/shell-downloads");
+    assert!(!cache.exists() || fs::read_dir(cache).unwrap().count() == 0);
 }
 
 #[test]
