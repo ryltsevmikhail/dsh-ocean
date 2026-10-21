@@ -117,9 +117,11 @@ updates are still separate M2 work.
 
 `--apply-release MANIFEST SIGNATURE TRUSTED_KEY <policy> --artifact STAGED
 --prefix DIR --confirm-apply yes` activates an **already verified local** artifact
-into a private, user-owned prefix. Only `--kind appimage` is supported for
-activation: `tar.gz` may be verified/downloaded/staged but is refused by apply
-before creating a prefix. No archive extraction is implemented:
+into a private, user-owned prefix. Both `--kind appimage` and `--kind tar.gz`
+are supported; tar bytes are never mistaken for an executable. A tar package must
+have the builder's `dsh-ocean-<release>-linux-<arch>` root and an executable
+`dsh-ocean` entry. The updater retains the **whole package**, including notices;
+it does not invoke its installer scripts.
 
 
 ```
@@ -136,6 +138,24 @@ Bytes use the existing bounded/hash-checked no-overwrite staging engine, then
 0755 permissions and a retained receipt binding the manifest digest, version,
 sequence, byte size and SHA-256. Current/previous retained receipts and bytes
 must validate before changing selectors; symlink directory aliases are refused.
+
+Versions are prepared in an owned private temporary directory and published with
+`RENAME_NOREPLACE` only after complete validation. Invalid archives cannot leave a
+partially prepared active version or overwrite an existing version. Cleanup of the
+exact owned temporary inode is best effort; abrupt termination/filesystem failure
+can leave private inactive scratch material for investigation.
+
+Tar/gzip handling uses standard crates with a raw-header preflight before logical
+PAX/GNU path processing: extension bodies are capped at 64 KiB, paths at 4096 bytes
+and 128 components, entry count at 200,000, individual files at 512 MiB and file data
+at 2 GiB (with separately bounded stream overhead/padding). Links, sparse/special
+files, traversal/non-canonical paths, duplicate entries, unsafe permissions,
+corrupt/trailing payloads and missing entrypoints are refused. New content is
+private and never merged into an existing directory. A retained installed-file
+index is size/hash-bound by the local receipt (64 MiB maximum) and checks the exact
+file/directory set, normalized modes and every file hash on reuse/rollback;
+damaged notices or unexpected code files block selection just like a damaged
+executable. These are local integrity checks, not fresh publisher signatures.
 
 A synced `.activation-pending.json` records original and intended selectors before
 the switch. If normal activation/state recording fails, the original verified
@@ -198,9 +218,9 @@ Limits: this is local replay/downgrade protection, not a signature, not a truste
 clock, and not a production trust root. A same-user attacker can delete or edit the
 file, and nothing here verifies that a *newer* manifest was actually published
 (no freshness/consensus). Deleting the file with `--reset-release-state` is an
-explicit operator decision, not an automatic recovery path. AppImage local
-activation is explicit; tar extraction and update-feed configuration remain
-unimplemented.
+explicit operator decision, not an automatic recovery path. AppImage/tar local
+activation and configured metadata checks are explicit; native update GUI,
+runtime transactions and real production publishing remain separate work.
 
 
 ## Implemented boundary
@@ -514,7 +534,7 @@ Implemented CLI foundations now include persisted sequence/downgrade protection,
 operator-provisioned trust and channel settings, bounded authenticated shell-feed
 checks, artifact download and journaled AppImage activation/selector rollback.
 These are not a complete automatic updater. Production key custody/provisioning/
-rotation/revocation, signed publishing CI, tar extraction, package-manager behavior,
+rotation/revocation, signed publishing CI, package-manager behavior,
 GUI/runtime orchestration and real published-feed acceptance remain open. Core/bootstrap updates are still
 unsigned; local apply/rollback retain the recovery/durability/health limits
 described above. M2 remains incomplete.

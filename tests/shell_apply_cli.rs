@@ -95,6 +95,32 @@ impl Sandbox {
         (manifest_path, signature_path, artifact)
     }
 
+    fn tar_release(
+        &self,
+        name: &str,
+        sequence: u64,
+        version: &str,
+        bytes: &[u8],
+    ) -> (PathBuf, PathBuf, PathBuf) {
+        let (manifest, signature, artifact) = self.release(name, sequence, version, bytes);
+        let raw = fs::read_to_string(&manifest)
+            .unwrap()
+            .replace("\"kind\":\"appimage\"", "\"kind\":\"tar.gz\"")
+            .replace(".AppImage", ".tar.gz");
+        fs::write(&manifest, &raw).unwrap();
+        let mut message = DOMAIN.to_vec();
+        message.extend_from_slice(raw.as_bytes());
+        fs::write(
+            &signature,
+            format!(
+                "{{\"version\":1,\"keyId\":\"{KEY_ID}\",\"signatureHex\":\"{}\"}}",
+                hex(&self.key.sign(&message).to_bytes())
+            ),
+        )
+        .unwrap();
+        (manifest, signature, artifact)
+    }
+
     fn run(&self, arguments: &[String]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_dsh-ocean"))
             .args(arguments)
@@ -672,8 +698,136 @@ fn interrupted_activation_requires_explicit_verified_recovery() {
     );
 }
 
+fn shell_tar(version: &str, paths: &[(&str, &[u8], u32)]) -> Vec<u8> {
+    use std::io::Write;
+    let mut builder = tar::Builder::new(Vec::new());
+    for (name, bytes, mode) in paths {
+        let mut header = tar::Header::new_ustar();
+        header.set_mode(*mode);
+        header.set_size(bytes.len() as u64);
+        header.set_cksum();
+        builder
+            .append_data(
+                &mut header,
+                format!("dsh-ocean-{version}-linux-x86_64/{name}"),
+                *bytes,
+            )
+            .unwrap();
+    }
+    let mut output = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    output.write_all(&builder.into_inner().unwrap()).unwrap();
+    output.finish().unwrap()
+}
+
 #[test]
-fn tar_archive_is_not_activated_as_an_executable() {
+fn signed_tar_package_retains_notices_and_rollback_verifies_the_entire_tree() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let bytes = shell_tar(
+        "0.2.0",
+        &[
+            ("dsh-ocean", b"tar-binary", 0o755),
+            ("docs/NOTICE", b"complete-public-notice", 0o644),
+        ],
+    );
+    let (m, s, a) = sandbox.tar_release("tar-first", 5, "0.2.0", &bytes);
+    let mut args = sandbox.apply_args(&m, &s, &a, &prefix, true);
+    let position = args.iter().position(|arg| arg == "--kind").unwrap();
+    args[position + 1] = "tar.gz".into();
+    let result = sandbox.run(&args);
+    assert!(result.status.success(), "{}", describe(&result));
+    let first = current_target(&prefix);
+    assert_eq!(
+        fs::read(prefix.join(&first).join("docs/NOTICE")).unwrap(),
+        b"complete-public-notice"
+    );
+    assert_eq!(
+        fs::read(prefix.join(&first).join("dsh-ocean")).unwrap(),
+        b"tar-binary"
+    );
+    assert_eq!(
+        fs::read(&a).unwrap(),
+        bytes,
+        "operator's original artifact is never removed"
+    );
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"appimage-second");
+    let result = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    assert!(result.status.success(), "{}", describe(&result));
+    let second = current_target(&prefix);
+    let rollback = vec![
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ];
+    let notice = prefix.join(&first).join("docs/NOTICE");
+    fs::write(&notice, b"damaged-notice").unwrap();
+    let refused = sandbox.run(&rollback);
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert_eq!(current_target(&prefix), second);
+    fs::write(&notice, b"complete-public-notice").unwrap();
+    let extra = prefix.join(&first).join("unexpected.js");
+    fs::write(&extra, b"unknown").unwrap();
+    assert!(!sandbox.run(&rollback).status.success());
+    assert_eq!(current_target(&prefix), second);
+    fs::remove_file(&extra).unwrap();
+    let restored = sandbox.run(&rollback);
+    assert!(restored.status.success(), "{}", describe(&restored));
+    assert_eq!(current_target(&prefix), first);
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 6);
+}
+
+#[test]
+#[ignore = "requires a freshly generated package via DSH_OCEAN_TEST_PACKAGE_TAR"]
+fn packaged_tar_round_trip_uses_real_bytes_but_only_an_isolated_test_trust_root() {
+    let package =
+        std::env::var_os("DSH_OCEAN_TEST_PACKAGE_TAR").expect("set generated package path");
+    let bytes = fs::read(package).unwrap();
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (manifest, signature, artifact) =
+        sandbox.tar_release("packaged", 5, env!("CARGO_PKG_VERSION"), &bytes);
+    let arch = std::env::consts::ARCH;
+    let raw = fs::read_to_string(&manifest)
+        .unwrap()
+        .replace("x86_64", arch);
+    fs::write(&manifest, &raw).unwrap();
+    let mut message = DOMAIN.to_vec();
+    message.extend_from_slice(raw.as_bytes());
+    fs::write(
+        &signature,
+        format!(
+            "{{\"version\":1,\"keyId\":\"{KEY_ID}\",\"signatureHex\":\"{}\"}}",
+            hex(&sandbox.key.sign(&message).to_bytes())
+        ),
+    )
+    .unwrap();
+    let mut arguments = sandbox.apply_args(&manifest, &signature, &artifact, &prefix, true);
+    let kind = arguments.iter().position(|arg| arg == "--kind").unwrap();
+    arguments[kind + 1] = "tar.gz".into();
+    let target = arguments.iter().position(|arg| arg == "--target").unwrap();
+    arguments[target + 1] = format!("linux-{arch}");
+    let applied = sandbox.run(&arguments);
+    assert!(applied.status.success(), "{}", describe(&applied));
+    let selected = prefix.join(current_target(&prefix));
+    assert!(selected.join("THIRD_PARTY_NOTICES.txt").is_file());
+    assert!(selected.join("docs/third-party/inventory.json").is_file());
+    let probe = Command::new(selected.join("dsh-ocean"))
+        .arg("--version")
+        .env_clear()
+        .env("HOME", sandbox.root.join("home"))
+        .env("XDG_STATE_HOME", sandbox.root.join("state"))
+        .env("XDG_CONFIG_HOME", sandbox.root.join("config"))
+        .output()
+        .unwrap();
+    assert!(probe.status.success(), "{}", describe(&probe));
+    assert!(String::from_utf8_lossy(&probe.stdout).contains(env!("CARGO_PKG_VERSION")));
+    assert!(!sandbox.root.join("home/.dsh").exists());
+}
+
+#[test]
+fn invalid_tar_archive_is_not_activated_as_an_executable() {
     let sandbox = Sandbox::new();
     let prefix = sandbox.root.join("prefix");
     let (manifest, signature, artifact) =
@@ -699,11 +853,11 @@ fn tar_archive_is_not_activated_as_an_executable() {
     let refused = sandbox.run(&args);
     assert!(!refused.status.success(), "{}", describe(&refused));
     assert!(
-        describe(&refused).contains("AppImage"),
+        describe(&refused).contains("archive"),
         "{}",
         describe(&refused)
     );
-    assert!(!prefix.exists());
+    assert!(!prefix.join("current").exists());
     assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
 }
 

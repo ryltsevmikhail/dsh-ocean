@@ -235,16 +235,18 @@ expiry/floor are rechecked at use. The native GUI and runtime verifier remain th
 next integration steps; no production source is silently configured.
 
 **Local activation foundation:** `--apply-release` activates an already verified
-local AppImage into a private owned prefix (no download; tar.gz activation is
-refused until extraction is implemented), re-verifying bytes after
-they land, retaining the previous version and recording the remembered sequence
+local AppImage or complete tar.gz package into a private owned prefix (no download),
+re-verifying bytes after they land, retaining the previous version and recording the remembered sequence
 only on success; `--rollback-shell` switches the selector back. No service restart
 or process replacement occurs, and this is not a filesystem transaction or
 system-wide install. A global floor guard and per-prefix operation lock now span
 activation/state commit. Synced selector journals restore originals on normal
 errors and require explicit `--recover-shell` after interruption; rollback verifies
 retained receipts/bytes and never lowers the accepted floor. This is recoverable
-coordination, not an executable health check or a kernel transaction.
+coordination, not an executable health check or a kernel transaction. Tar extraction
+is bounded/path/type checked before no-overwrite version publication; the entire
+package (including notices) and installed-file inventory are retained. Rollback
+refuses damaged payload files or an unexpected file/directory set.
 
 **Remaining:** consistent profile/session backup and data-migration rollback
 (runtime/unit rollback alone is not data rollback), signed feeds/keys and shell

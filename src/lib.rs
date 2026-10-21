@@ -10,6 +10,7 @@ pub mod backup_export_ui;
 pub mod backup_staging;
 pub mod bootstrap;
 pub mod bootstrap_supervisor;
+pub mod checked_archive;
 pub mod commands;
 pub mod config;
 pub mod data_backup;

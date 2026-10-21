@@ -1,5 +1,5 @@
 {
-  "cargo_lock_sha256": "4a4ca8c54dbe83b9d7fbba5f5367ae47886d22297d75e7eaed42becf3b248524",
+  "cargo_lock_sha256": "5f0a8ba7aa85a3459421164b2cba9a6a5da9a5420e2a2f9ea91653f0fcccf450",
   "metadata_command": "cargo metadata --locked --format-version 1 --filter-platform TARGET (from root, no feature overrides)",
   "packages": [
     {
@@ -8238,6 +8238,68 @@
         }
       ],
       "version": "0.3.6"
+    },
+    {
+      "archive_sha256": "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759",
+      "conservative_graph_contexts": [
+        "normal"
+      ],
+      "dependency_modes": [
+        "normal"
+      ],
+      "evidence": [
+        {
+          "origin": "published crate",
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "origin": "published crate",
+          "path": "LICENSE-MIT",
+          "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+        }
+      ],
+      "features": {
+        "aarch64-unknown-linux-gnu": [],
+        "x86_64-unknown-linux-gnu": []
+      },
+      "incoming_edge_kinds": [
+        {
+          "kind": "normal",
+          "platform": "aarch64-unknown-linux-gnu",
+          "target_predicate": null
+        },
+        {
+          "kind": "normal",
+          "platform": "x86_64-unknown-linux-gnu",
+          "target_predicate": null
+        }
+      ],
+      "license": "MIT/Apache-2.0",
+      "license_file": null,
+      "manifest_sha256": "8a1481456d219f3ba699e39d32727a76a5bd4ed72608d57cdd4cd682a950feda",
+      "manual_review": true,
+      "modifications": "No local modification asserted; license files checked against published extraction checksums.",
+      "name": "filetime",
+      "platforms": [
+        "aarch64-unknown-linux-gnu",
+        "x86_64-unknown-linux-gnu"
+      ],
+      "proc_macro": false,
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source_url": "https://crates.io/api/v1/crates/filetime/0.2.29/download",
+      "targets": [
+        {
+          "crate_types": [
+            "lib"
+          ],
+          "kind": [
+            "lib"
+          ],
+          "name": "filetime"
+        }
+      ],
+      "version": "0.2.29"
     },
     {
       "archive_sha256": "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484",
@@ -24901,6 +24963,122 @@
       "version": "0.37.1"
     },
     {
+      "archive_sha256": "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840",
+      "conservative_graph_contexts": [
+        "normal"
+      ],
+      "dependency_modes": [
+        "normal"
+      ],
+      "evidence": [
+        {
+          "origin": "published crate",
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "origin": "published crate",
+          "path": "LICENSE-MIT",
+          "sha256": "8ca6b96cea9e67c6c5c63f452c31bd396db8bd2406231fdea5d48ef462b48077"
+        }
+      ],
+      "features": {
+        "aarch64-unknown-linux-gnu": [],
+        "x86_64-unknown-linux-gnu": []
+      },
+      "incoming_edge_kinds": [
+        {
+          "kind": "normal",
+          "platform": "aarch64-unknown-linux-gnu",
+          "target_predicate": null
+        },
+        {
+          "kind": "normal",
+          "platform": "x86_64-unknown-linux-gnu",
+          "target_predicate": null
+        }
+      ],
+      "license": "MIT OR Apache-2.0",
+      "license_file": null,
+      "manifest_sha256": "6185fe2807daac38478968f7fc596d5b82d90be70a5856f557fac4f0da53bf91",
+      "manual_review": true,
+      "modifications": "No local modification asserted; license files checked against published extraction checksums.",
+      "name": "tar",
+      "platforms": [
+        "aarch64-unknown-linux-gnu",
+        "x86_64-unknown-linux-gnu"
+      ],
+      "proc_macro": false,
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source_url": "https://crates.io/api/v1/crates/tar/0.4.46/download",
+      "targets": [
+        {
+          "crate_types": [
+            "lib"
+          ],
+          "kind": [
+            "lib"
+          ],
+          "name": "tar"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "example"
+          ],
+          "name": "extract_file"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "example"
+          ],
+          "name": "list"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "example"
+          ],
+          "name": "raw_list"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "example"
+          ],
+          "name": "write"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "test"
+          ],
+          "name": "all"
+        },
+        {
+          "crate_types": [
+            "bin"
+          ],
+          "kind": [
+            "test"
+          ],
+          "name": "entry"
+        }
+      ],
+      "version": "0.4.46"
+    },
+    {
       "archive_sha256": "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1",
       "conservative_graph_contexts": [
         "build"
@@ -32282,7 +32460,7 @@
     "aarch64-unknown-linux-gnu": [],
     "x86_64-unknown-linux-gnu": []
   },
-  "root_manifest_sha256": "bb516edd7af55258e51a8995bd020e886903c5486a1370fd622a7ca10e9736cf",
+  "root_manifest_sha256": "aeff2a477cab1b76899e835d28f2146b13f84cf48e89854ee23963b07575ed44",
   "schema_version": 1,
   "scope": [
     "Conservative default-feature Cargo source graph union, not an exact linked SBOM. Build/proc-macro edges and target predicates are recorded, not a precise host/target compilation simulation.",
@@ -32476,6 +32654,7 @@
     "8b43ce8accd61e9d370b5ca9e9c4f953279b5c239926c62315b40e24df51b726",
     "8bb1b50b0e5c9399ae33bd35fab2769010fa6c14e8860c729a52295d84896b7a",
     "8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b",
+    "8ca6b96cea9e67c6c5c63f452c31bd396db8bd2406231fdea5d48ef462b48077",
     "8ce0830173fdac609dfb4ea603fdc002c2f4af0dc9b1a005653f5da9cf534b18",
     "8cf56d10131ce201cf69ab74b111d3ebac1acca3833d7efb39ae357224b70edb",
     "8ea93490d74a5a1b1af3ff71d786271b3f1e5f0bea79ac16e02ec533cef040d6",

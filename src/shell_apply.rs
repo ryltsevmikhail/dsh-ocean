@@ -20,6 +20,15 @@ const BINARY: &str = "dsh-ocean";
 const RECEIPT: &str = "receipt.json";
 const PENDING: &str = ".activation-pending.json";
 const LOCK: &str = ".shell-update.lock";
+const FILES: &str = ".ocean-files.json";
+const MAX_FILES: u64 = 64 * 1024 * 1024;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FilesReceipt {
+    size: u64,
+    sha256: String,
+}
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,6 +40,8 @@ struct Receipt {
     manifest_sha256: String,
     artifact_sha256: String,
     size: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    files: Option<FilesReceipt>,
 }
 impl Receipt {
     fn from_verified(release: &Verified) -> Self {
@@ -41,6 +52,7 @@ impl Receipt {
             manifest_sha256: release.manifest_sha256().to_owned(),
             artifact_sha256: release.artifact().sha256.clone(),
             size: release.artifact().size,
+            files: None,
         }
     }
     fn target(&self) -> Result<String> {
@@ -52,7 +64,16 @@ impl Receipt {
             "invalid retained receipt"
         );
         semver::Version::parse(&self.release).context("invalid retained version")?;
-        for digest in [&self.manifest_sha256, &self.artifact_sha256] {
+        if let Some(files) = &self.files {
+            anyhow::ensure!(
+                files.size > 0 && files.size <= MAX_FILES,
+                "invalid installed inventory size"
+            );
+        }
+        for digest in [&self.manifest_sha256, &self.artifact_sha256]
+            .into_iter()
+            .chain(self.files.iter().map(|files| &files.sha256))
+        {
             anyhow::ensure!(
                 digest.len() == 64
                     && digest
@@ -265,7 +286,7 @@ fn write_json_new(path: &Path, value: &impl Serialize) -> Result<()> {
     result
 }
 
-fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+fn read_owned(path: &Path, limit: u64) -> Result<Vec<u8>> {
     let metadata = fs::symlink_metadata(path)?;
     anyhow::ensure!(
         metadata.is_file()
@@ -273,14 +294,20 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
             && metadata.mode() & 0o022 == 0,
         "activation metadata must be owned and not writable by others"
     );
-    let bytes = release_feed::read_input(path, release_feed::MAX_MANIFEST)?;
+    release_feed::read_input(path, limit)
+}
+fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+    let bytes = read_owned(path, release_feed::MAX_MANIFEST)?;
     serde_json::from_slice(&bytes).context("invalid activation metadata")
 }
 
 fn verify_retained(prefix: &Path, target: &str) -> Result<Receipt> {
+    verify_directory(&prefix.join(target), target)
+}
+fn verify_directory(directory: &Path, target: &str) -> Result<Receipt> {
+    use sha2::{Digest, Sha256};
     validate_target(target)?;
-    let directory = prefix.join(target);
-    check_ancestors(&directory)?;
+    check_ancestors(directory)?;
     let receipt: Receipt = read_json(&directory.join(RECEIPT))?;
     anyhow::ensure!(
         receipt.target()? == target,
@@ -295,11 +322,30 @@ fn verify_retained(prefix: &Path, target: &str) -> Result<Receipt> {
             && m.mode() & 0o111 != 0,
         "unsafe retained executable"
     );
-    let (_, digest) = release_feed::artifact_digest(&binary, Some(receipt.size))?;
-    anyhow::ensure!(
-        digest == receipt.artifact_sha256,
-        "retained executable SHA-256 mismatch"
-    );
+    if let Some(files) = &receipt.files {
+        let bytes = read_owned(&directory.join(FILES), MAX_FILES)?;
+        anyhow::ensure!(
+            bytes.len() as u64 == files.size
+                && release_feed::hex(&Sha256::digest(&bytes)) == files.sha256,
+            "installed inventory integrity mismatch"
+        );
+        let inventory: crate::checked_archive::Inventory = serde_json::from_slice(&bytes)
+            .map_err(|_| anyhow::anyhow!("invalid installed inventory"))?;
+        anyhow::ensure!(
+            inventory
+                .files
+                .get(BINARY)
+                .is_some_and(|entry| entry.executable),
+            "package does not contain its executable entrypoint"
+        );
+        inventory.verify(directory, &[RECEIPT, FILES])?;
+    } else {
+        let (_, digest) = release_feed::artifact_digest(&binary, Some(receipt.size))?;
+        anyhow::ensure!(
+            digest == receipt.artifact_sha256,
+            "retained executable SHA-256 mismatch"
+        );
+    }
     Ok(receipt)
 }
 
@@ -388,6 +434,95 @@ impl Activation {
 // Intentionally no automatic Drop recovery: after panic/abort the durable
 // journal survives and a later process requires explicit verified recovery.
 
+fn publish_directory(source: &Path, destination: &Path) -> Result<()> {
+    use std::os::unix::ffi::OsStrExt;
+    let source = std::ffi::CString::new(source.as_os_str().as_bytes())?;
+    let destination = std::ffi::CString::new(destination.as_os_str().as_bytes())?;
+    // SAFETY: normalized paths inside the owned locked prefix; NUL-terminated
+    // CStrings outlive renameat2 and NOREPLACE cannot clobber an existing version.
+    let rc = unsafe {
+        libc::renameat2(
+            libc::AT_FDCWD,
+            source.as_ptr(),
+            libc::AT_FDCWD,
+            destination.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    };
+    if rc != 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("publish new version without overwrite");
+    }
+    Ok(())
+}
+fn stage_version(
+    source: &Path,
+    release: &Verified,
+    destination: &Path,
+    target: &str,
+    receipt: &mut Receipt,
+) -> Result<()> {
+    use sha2::{Digest, Sha256};
+    let parent = destination.parent().context("missing versions directory")?;
+    let temporary = parent.join(format!(".new-{}", crate::downloads::unique_id()));
+    let guard = crate::checked_archive::NewDirectory::create(&temporary)?;
+    let content = temporary.join("content");
+    match release.artifact().kind {
+        release_feed::Kind::AppImage => {
+            fs::DirBuilder::new().mode(0o700).create(&content)?;
+            let staged = release_feed::stage_artifact(source, &content.join(BINARY), release)?;
+            staged
+                .reader()
+                .set_permissions(fs::Permissions::from_mode(0o755))?;
+            staged.reader().sync_all()?;
+        }
+        release_feed::Kind::TarGz => {
+            let archive =
+                release_feed::stage_artifact(source, &temporary.join("archive.tar.gz"), release)?;
+            let arch = match release.artifact().target {
+                release_feed::Target::LinuxX86_64 => "x86_64",
+                release_feed::Target::LinuxAarch64 => "aarch64",
+            };
+            let root = format!("dsh-ocean-{}-linux-{arch}", release.manifest().release);
+            let mut input = archive.reader().try_clone()?;
+            let inventory = crate::checked_archive::extract(
+                &mut input,
+                &root,
+                &content,
+                crate::checked_archive::Limits::default(),
+            )
+            .context("extract authenticated shell archive")?;
+            anyhow::ensure!(
+                inventory
+                    .files
+                    .get(BINARY)
+                    .is_some_and(|entry| entry.executable),
+                "archive lacks its executable shell entrypoint"
+            );
+            anyhow::ensure!(
+                !inventory.files.contains_key(RECEIPT) && !inventory.files.contains_key(FILES),
+                "archive collides with updater metadata"
+            );
+            let bytes = serde_json::to_vec(&inventory)?;
+            anyhow::ensure!(
+                bytes.len() as u64 <= MAX_FILES,
+                "installed inventory exceeds limit"
+            );
+            receipt.files = Some(FilesReceipt {
+                size: bytes.len() as u64,
+                sha256: release_feed::hex(&Sha256::digest(&bytes)),
+            });
+            write_json_new(&content.join(FILES), &inventory)?;
+        }
+    }
+    write_json_new(&content.join(RECEIPT), receipt)?;
+    sync_dir(&content)?;
+    verify_directory(&content, target)?;
+    guard.check()?;
+    publish_directory(&content, destination)?;
+    sync_dir(parent)
+}
+
 fn prepare(staged: &Path, release: &Verified, prefix: &Path) -> Result<Activation> {
     let prefix = absolute(prefix)?;
     ensure_prefix(&prefix)?;
@@ -395,36 +530,25 @@ fn prepare(staged: &Path, release: &Verified, prefix: &Path) -> Result<Activatio
     no_pending(&prefix)?;
     let before = Selectors::read(&prefix)?;
     before.verify(&prefix)?;
-    let expected = Receipt::from_verified(release);
+    let mut expected = Receipt::from_verified(release);
     let target = expected.target()?;
     let directory = prefix.join(&target);
-    ensure_prefix(&directory)?;
-    let binary = directory.join(BINARY);
-    match fs::symlink_metadata(&binary) {
-        Ok(_) => release_feed::verify_artifact(&binary, release)
-            .context("existing version does not match the verified release")?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let staged = release_feed::stage_artifact(staged, &binary, release)?;
-            staged
-                .reader()
-                .set_permissions(fs::Permissions::from_mode(0o755))?;
-            staged.reader().sync_all()?;
-            sync_dir(&directory)?;
+    ensure_prefix(&prefix.join("versions"))?;
+    match fs::symlink_metadata(&directory) {
+        Ok(_) => {
+            let existing = verify_retained(&prefix, &target)?;
+            anyhow::ensure!(
+                existing.files.is_some() == (release.artifact().kind == release_feed::Kind::TarGz),
+                "existing package kind mismatch"
+            );
+            expected.files = existing.files.clone();
+            anyhow::ensure!(existing == expected, "existing activation receipt mismatch");
         }
-        Err(e) => return Err(e).context("inspect staged version"),
-    }
-    let receipt_path = directory.join(RECEIPT);
-    match fs::symlink_metadata(&receipt_path) {
-        Ok(_) => anyhow::ensure!(
-            read_json::<Receipt>(&receipt_path)? == expected,
-            "existing activation receipt mismatch"
-        ),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            write_json_new(&receipt_path, &expected)?
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            stage_version(staged, release, &directory, &target, &mut expected)?
         }
-        Err(e) => return Err(e).context("inspect activation receipt"),
+        Err(error) => return Err(error).context("inspect retained version directory"),
     }
-    verify_retained(&prefix, &target)?;
     let mut after = before.clone();
     if before.current.as_ref() != Some(&target) {
         after.previous = before.current.clone();
@@ -442,10 +566,6 @@ pub fn apply(
     release: &Verified,
     prefix: &Path,
 ) -> Result<(Value, release_state::Entry)> {
-    anyhow::ensure!(
-        release.artifact().kind == release_feed::Kind::AppImage,
-        "local activation currently supports AppImage only; tar.gz extraction is not implemented"
-    );
     let channel = match release.manifest().channel {
         release_feed::Channel::Stable => "stable",
         release_feed::Channel::Next => "next",
