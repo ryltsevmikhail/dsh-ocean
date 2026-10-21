@@ -145,22 +145,7 @@ pub(crate) fn absolute(prefix: &Path) -> Result<PathBuf> {
     Ok(prefix.to_path_buf())
 }
 
-pub(crate) fn check_ancestors(path: &Path) -> Result<()> {
-    let uid = unsafe { libc::geteuid() };
-    for ancestor in path.ancestors() {
-        match fs::symlink_metadata(ancestor) {
-            Ok(m) => anyhow::ensure!(
-                m.is_dir()
-                    && (m.uid() == 0 || m.uid() == uid)
-                    && (m.mode() & 0o022 == 0 || (m.uid() == 0 && m.mode() & libc::S_ISVTX != 0)),
-                "unsafe install directory ancestor; must be owned and not writable by others"
-            ),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
-            Err(e) => return Err(e).context("inspect install directory"),
-        }
-    }
-    Ok(())
-}
+pub(crate) use crate::util::check_owned_ancestors as check_ancestors;
 
 pub(crate) fn ensure_prefix(prefix: &Path) -> Result<()> {
     check_ancestors(prefix)?;

@@ -3,6 +3,28 @@ use std::io::{self, Read};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 
+/// Check existing ancestry without creating anything. A root-owned sticky
+/// shared parent (e.g. /tmp) is permitted; symlinks and other writable ancestors
+/// are not. This does not sandbox hostile code running under the same UID.
+pub(crate) fn check_owned_ancestors(path: &Path) -> anyhow::Result<()> {
+    use anyhow::Context;
+    use std::os::unix::fs::MetadataExt;
+    let uid = unsafe { libc::geteuid() };
+    for ancestor in path.ancestors() {
+        match fs::symlink_metadata(ancestor) {
+            Ok(m) => anyhow::ensure!(
+                m.is_dir()
+                    && (m.uid() == 0 || m.uid() == uid)
+                    && (m.mode() & 0o022 == 0 || (m.uid() == 0 && m.mode() & libc::S_ISVTX != 0)),
+                "unsafe install directory ancestor; must be owned and not writable by others"
+            ),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e).context("inspect install directory"),
+        }
+    }
+    Ok(())
+}
+
 /// Bounded UTF-8 metadata read. Never follows the final symlink or blocks
 /// opening a FIFO; re-check the byte count in case a regular file grows.
 pub fn read_regular_text(path: &Path, limit: u64) -> io::Result<String> {

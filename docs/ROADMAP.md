@@ -198,6 +198,16 @@ Tests exercise all four pairs and the real multi-artifact headless draft → sig
 It creates no keys/state/files or releases; production publishing is still absent.
 See [verification, staging and publisher scope](RELEASE_VERIFICATION.md).
 
+**Signed runtime metadata foundation:** complete per-architecture bundle metadata
+has a separate Ed25519 domain/product, exact Node/DSH/pnpm versions, archive/source
+checksums and explicit writable-state scope. Runtime trust/channel and private
+sequence floor are independent of shell; configured checking and explicit metadata
+acceptance never install/execute or access a profile. Cross-product signatures,
+replay, malformed/unsafe policy and storage tests pass. Ready-generation import,
+owned controller integration and exact data rollback are still pending; the old
+bootstrap/core installer is not made signed by this verifier alone. See
+[runtime boundary](RUNTIME_RELEASES.md).
+
 **Native shell updater:** distinct tray entries separate core from shell updates.
 The GTK dialog provides current/running vs selected-on-disk version, signed
 `stable`/`next` channel settings, operator public-key fingerprints, explicit

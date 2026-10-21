@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
@@ -21,6 +21,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 
 use crate::config;
+use crate::update_settings::Product;
 
 pub const SCHEMA: u32 = 1;
 pub const MAX_STATE: u64 = 64 * 1024;
@@ -45,7 +46,19 @@ struct Document {
 }
 
 pub fn path() -> PathBuf {
-    config::state_dir().join(FILE)
+    path_for(Product::Shell)
+}
+pub fn path_for(product: Product) -> PathBuf {
+    config::state_dir().join(match product {
+        Product::Shell => FILE,
+        Product::Runtime => "runtime-release-state.json",
+    })
+}
+fn lock_name(product: Product) -> &'static str {
+    match product {
+        Product::Shell => LOCK,
+        Product::Runtime => ".runtime-release-state.lock",
+    }
 }
 
 fn valid_channel(channel: &str) -> Result<()> {
@@ -83,6 +96,7 @@ fn decode_document(bytes: &[u8]) -> Result<BTreeMap<String, Entry>> {
 }
 
 fn read_at(path: &Path) -> Result<BTreeMap<String, Entry>> {
+    crate::util::check_owned_ancestors(path.parent().context("release state has no directory")?)?;
     // Inspect the opened descriptor, but never wait for a FIFO writer first.
     let mut file = match OpenOptions::new()
         .read(true)
@@ -95,8 +109,12 @@ fn read_at(path: &Path) -> Result<BTreeMap<String, Entry>> {
     };
     let metadata = file.metadata()?;
     anyhow::ensure!(
-        metadata.is_file() && metadata.len() <= MAX_STATE,
-        "release state must be a bounded regular file"
+        metadata.is_file()
+            && metadata.len() <= MAX_STATE
+            && metadata.uid() == unsafe { libc::geteuid() }
+            && metadata.mode() & 0o022 == 0
+            && metadata.nlink() == 1,
+        "release state must be an owned single-linked bounded regular file, not writable by others"
     );
     let mut bytes = Vec::new();
     (&mut file).take(MAX_STATE + 1).read_to_end(&mut bytes)?;
@@ -109,7 +127,10 @@ fn read_at(path: &Path) -> Result<BTreeMap<String, Entry>> {
 
 /// Reads the remembered state without creating or modifying anything.
 pub fn read() -> Result<BTreeMap<String, Entry>> {
-    read_at(&path())
+    read_for(Product::Shell)
+}
+pub fn read_for(product: Product) -> Result<BTreeMap<String, Entry>> {
+    read_at(&path_for(product))
 }
 
 /// Decides whether `(channel, sequence, release, digest)` may be accepted given
@@ -165,9 +186,11 @@ fn write_at(path: &Path, channels: &BTreeMap<String, Entry>) -> Result<()> {
         "release state grew beyond its bound"
     );
     let temporary = directory.join(format!(
-        ".release-state.tmp.{}.{}",
-        std::process::id(),
-        Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ".{}.tmp.{}",
+        path.file_name()
+            .context("state filename missing")?
+            .to_string_lossy(),
+        crate::downloads::unique_id()
     ));
     let result = (|| -> Result<()> {
         let mut file = OpenOptions::new()
@@ -205,14 +228,19 @@ pub struct Transaction {
 
 impl Transaction {
     pub fn begin() -> Result<Self> {
-        let path = path();
+        Self::begin_for(Product::Shell)
+    }
+    pub fn begin_for(product: Product) -> Result<Self> {
+        let path = path_for(product);
         let directory = path.parent().context("release state has no directory")?;
+        crate::util::check_owned_ancestors(directory)?;
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
             .create(directory)
             .context("create private state directory")?;
-        let lock = crate::profile_backup::operation_lock(&directory.join(LOCK))
+        crate::util::check_owned_ancestors(directory)?;
+        let lock = crate::profile_backup::operation_lock(&directory.join(lock_name(product)))
             .context("another release state update is in progress")?;
         let existing = read_at(&path)?;
         Ok(Self {
@@ -257,6 +285,7 @@ pub fn record(channel: &str, sequence: u64, release: &str, manifest_sha256: &str
 pub fn reset() -> Result<bool> {
     let path = path();
     let directory = path.parent().context("release state has no directory")?;
+    crate::util::check_owned_ancestors(directory)?;
     if !directory.exists() {
         return Ok(false);
     }

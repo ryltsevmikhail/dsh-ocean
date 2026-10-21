@@ -84,6 +84,31 @@ impl TrustedKey {
     pub fn id(&self) -> &str {
         &self.id
     }
+    /// Authenticate bounded exact bytes before parsing their product schema.
+    /// Only internal product verifiers choose a fixed domain; never a feed field.
+    pub(crate) fn authenticate(&self, domain: &[u8], bytes: &[u8], detached: &[u8]) -> Result<()> {
+        anyhow::ensure!(
+            !bytes.is_empty() && bytes.len() as u64 <= MAX_MANIFEST,
+            "release manifest size refused"
+        );
+        anyhow::ensure!(
+            detached.len() as u64 <= MAX_AUXILIARY,
+            "release signature size refused"
+        );
+        let signature: Detached = serde_json::from_slice(detached)
+            .map_err(|_| anyhow!("invalid detached signature format"))?;
+        anyhow::ensure!(
+            signature.version == 1 && signature.key_id == self.id,
+            "untrusted release signing key"
+        );
+        let signature = Signature::from_bytes(&decode::<64>(&signature.signature_hex)?);
+        let mut message = Vec::with_capacity(domain.len() + bytes.len());
+        message.extend_from_slice(domain);
+        message.extend_from_slice(bytes);
+        self.key
+            .verify_strict(&message, &signature)
+            .map_err(|_| anyhow!("release signature verification failed"))
+    }
 
     /// This file must be provisioned independently of the feed. Parsing it does
     /// not establish publisher trust; that is the operator/caller's decision.
@@ -142,7 +167,7 @@ fn valid_id(id: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
 }
-fn decode<const N: usize>(value: &str) -> Result<[u8; N]> {
+pub(crate) fn decode<const N: usize>(value: &str) -> Result<[u8; N]> {
     anyhow::ensure!(
         value.len() == N * 2
             && value
@@ -166,28 +191,7 @@ pub fn verify(
     trust: &TrustedKey,
     policy: &Policy,
 ) -> Result<Verified> {
-    anyhow::ensure!(
-        !bytes.is_empty() && bytes.len() as u64 <= MAX_MANIFEST,
-        "release manifest size refused"
-    );
-    anyhow::ensure!(
-        detached.len() as u64 <= MAX_AUXILIARY,
-        "release signature size refused"
-    );
-    let signature: Detached = serde_json::from_slice(detached)
-        .map_err(|_| anyhow!("invalid detached signature format"))?;
-    anyhow::ensure!(
-        signature.version == 1 && signature.key_id == trust.id,
-        "untrusted release signing key"
-    );
-    let signature = Signature::from_bytes(&decode::<64>(&signature.signature_hex)?);
-    let mut message = Vec::with_capacity(DOMAIN.len() + bytes.len());
-    message.extend_from_slice(DOMAIN);
-    message.extend_from_slice(bytes);
-    trust
-        .key
-        .verify_strict(&message, &signature)
-        .map_err(|_| anyhow!("release signature verification failed"))?;
+    trust.authenticate(DOMAIN, bytes, detached)?;
     // Parse and apply policy only after authenticating the exact raw bytes.
     let manifest: Manifest = serde_json::from_slice(bytes)
         .map_err(|_| anyhow!("invalid authenticated release manifest format"))?;
@@ -201,8 +205,16 @@ pub fn verify(
 }
 // This validates metadata only. It must never produce an authenticated proof.
 fn validate_policy(manifest: &Manifest, policy: &Policy) -> Result<Artifact> {
+    validate_metadata(manifest, policy, "dsh-ocean", artifact_url)
+}
+pub(crate) fn validate_metadata(
+    manifest: &Manifest,
+    policy: &Policy,
+    product: &str,
+    expected_url: impl Fn(&Version, Target, Kind) -> String,
+) -> Result<Artifact> {
     anyhow::ensure!(
-        manifest.version == 1 && manifest.product == "dsh-ocean",
+        manifest.version == 1 && manifest.product == product,
         "unsupported release manifest scope"
     );
     anyhow::ensure!(
@@ -257,7 +269,7 @@ fn validate_policy(manifest: &Manifest, policy: &Policy) -> Result<Artifact> {
             "release artifact size refused"
         );
         decode::<32>(&artifact.sha256)?;
-        let expected = artifact_url(&release, artifact.target, artifact.kind);
+        let expected = expected_url(&release, artifact.target, artifact.kind);
         anyhow::ensure!(
             artifact.url == expected,
             "release artifact location or filename refused"

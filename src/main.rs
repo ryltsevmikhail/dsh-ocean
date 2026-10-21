@@ -159,8 +159,19 @@ fn handle_cli() -> bool {
         | "--enroll-shell"
         | "--install-managed-shell"
         | "--rollback-managed-shell"
-        | "--recover-managed-shell" => {
-            match dsh_ocean::update_cli::run(&args) {
+        | "--recover-managed-shell"
+        | "--verify-runtime-release"
+        | "--accept-runtime-release"
+        | "--check-runtime-update" => {
+            let result = if matches!(
+                args[0].as_str(),
+                "--verify-runtime-release" | "--accept-runtime-release" | "--check-runtime-update"
+            ) {
+                dsh_ocean::runtime_cli::run(&args)
+            } else {
+                dsh_ocean::update_cli::run(&args)
+            };
+            match result {
                 Ok(value) => println!(
                     "{}",
                     serde_json::to_string_pretty(&value).expect("serialize updater result")
@@ -307,6 +318,9 @@ fn handle_cli() -> bool {
                    --restore-data SNAPSHOT --confirm-offline  replace sessions/stores; retained copies kept\n  \
                    --prune-data-backups --keep N --confirm-prune  delete older whole-data snapshots\n  \
                    --restore-profile NAME SNAPSHOT --confirm-offline  restore configuration\n  \
+                   --verify-runtime-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target TARGET --min-sequence N --current-runtime-version VERSION  verify complete runtime metadata (no execution)\n  \
+                   --accept-runtime-release ... --confirm-accept yes  remember a verified runtime floor separately from shell\n  \
+                   --check-runtime-update --current-runtime-version VERSION  check configured signed runtime source without installation\n  \
                    --managed-shell-status  inspect explicitly enrolled destination (no network)\n  \
                    --enroll-shell --confirm-managed yes  opt into a separate managed user destination\n  \
                    --install-managed-shell [--kind appimage|tar.gz] --confirm-install yes  authenticate configured release, download and apply to enrolled destination\n  \
