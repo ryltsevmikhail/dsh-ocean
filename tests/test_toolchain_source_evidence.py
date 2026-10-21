@@ -1,5 +1,6 @@
 """Private mutation controls for pinned compiler source terms, not legal approval."""
 import importlib.util
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -24,6 +25,18 @@ class SourceProfile(unittest.TestCase):
 
     def test_checked_in_profile_is_valid(self):
         self.assertEqual(audit.validate(self.root)['compiler_source_commit'], audit.COMMIT)
+
+    def test_unicode_terms_are_pinned_and_mutations_rejected(self):
+        path = self.profile / 'LICENSE-RUST-UNICODE'
+        self.assertTrue(path.is_file(), 'retain the exact upstream Unicode-3.0 text')
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),
+                         'f5062c9a188d81dfe66b56db4182dcf9e4b17c0d9b0d311a8e20b3a1b075c443')
+        index = audit.validate(self.root)
+        row = next(row for row in index['files'] if row['file'] == path.name)
+        self.assertEqual(row['upstream_path'], 'LICENSES/Unicode-3.0.txt')
+        path.write_bytes(path.read_bytes() + b'changed')
+        with self.assertRaisesRegex(ValueError, 'hash mismatch'):
+            audit.validate(self.root)
 
     def test_license_mutation_is_not_accepted(self):
         with (self.profile / 'LICENSE-COMPILER-BUILTINS').open('ab') as out:
