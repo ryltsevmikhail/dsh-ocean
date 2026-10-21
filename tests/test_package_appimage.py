@@ -37,6 +37,9 @@ else:
  for desktop in [appdir/"dsh-ocean.desktop", appdir/"usr/share/applications/dsh-ocean.desktop"]:
   assert "Exec=dsh-ocean" in desktop.read_text() and "%U" not in desktop.read_text()
  assert (appdir/"usr/share/doc/dsh-ocean/LICENSE").is_file()
+ assert b"fixture THIRD_PARTY_NOTICES.txt" in (appdir/"usr/share/doc/dsh-ocean/THIRD_PARTY_NOTICES.txt").read_bytes()
+ assert (appdir/"usr/share/doc/dsh-ocean/docs/third-party/inventory.json").is_file()
+ assert len(list((appdir/"usr/share/doc/dsh-ocean/docs/third-party/sources").glob("*.crate"))) == 5
  assert not (appdir/"install.sh").exists() and not (appdir/"install.py").exists()
  assert '"$@"' in (appdir/"AppRun").read_text()
  for path in appdir.rglob("*"):

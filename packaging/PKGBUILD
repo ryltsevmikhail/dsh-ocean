@@ -5,7 +5,9 @@ pkgrel=1
 pkgdesc="DSH Ocean — native desktop client for the DeepSeek Harness web UI"
 arch=('x86_64' 'aarch64')
 url="https://github.com/ryltsevmikhail/dsh-ocean"
-license=('MIT')
+# Original code is MIT; mixed dependency evidence is not a blanket MIT grant.
+# Reconcile the final linked payload before publishing this packaging template.
+license=('MIT' 'LicenseRef-ThirdParty-Notices')
 depends=('gtk3' 'webkit2gtk-4.1' 'libayatana-appindicator')
 makedepends=('cargo')
 options=('!lto')
@@ -19,6 +21,35 @@ build() {
 
 package() {
   cd "$srcdir/$pkgname-$pkgver"
+  local -a payload=() required=(LICENSE NOTICE THIRD_PARTY_NOTICES.txt docs/third-party/inventory.json docs/BINARY_LICENSE_AUDIT.md
+    docs/third-party/sources/cssparser-0.37.0.crate docs/third-party/sources/cssparser-macros-0.7.1.crate
+    docs/third-party/sources/dtoa-short-0.3.5.crate docs/third-party/sources/option-ext-0.2.0.crate
+    docs/third-party/sources/selectors-0.38.0.crate)
+  local -A seen=()
+  local relative name current component
+  local -a components=()
+  [ -f packaging/license-inputs.txt ] && [ ! -L packaging/license-inputs.txt ] || return 1
+  while IFS= read -r relative || [ -n "$relative" ]; do
+    [[ -z "$relative" || "$relative" == \#* ]] && continue
+    case "$relative" in
+      LICENSE|NOTICE|THIRD_PARTY_NOTICES.txt|docs/third-party/inventory.json|docs/BINARY_LICENSE_AUDIT.md) ;;
+      *) [[ "$relative" =~ ^docs/third-party/sources/[a-z0-9][a-z0-9_-]*-[0-9][0-9A-Za-z._+-]*\.crate$ ]] || return 1 ;;
+    esac
+    [[ -z "${seen[$relative]+yes}" ]] || return 1
+    seen[$relative]=1
+    payload+=("$relative")
+  done < packaging/license-inputs.txt
+  [ "${#payload[@]}" -eq "${#required[@]}" ] || return 1
+  for name in "${required[@]}"; do
+    [[ -n "${seen[$name]+yes}" ]] || return 1
+    IFS=/ read -r -a components <<< "$name"
+    current=.
+    for component in "${components[@]}"; do
+      current="$current/$component"
+      [ ! -L "$current" ] || return 1
+    done
+    [ -f "$current" ] || return 1
+  done
   install -Dm755 target/release/dsh-ocean "$pkgdir/usr/bin/dsh-ocean"
 
   for size in 32 64 128 256 512; do
@@ -40,4 +71,9 @@ package() {
 
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 NOTICE "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+  install -Dm644 THIRD_PARTY_NOTICES.txt "$pkgdir/usr/share/licenses/$pkgname/THIRD_PARTY_NOTICES.txt"
+  for relative in "${payload[@]}"; do
+    install -Dm644 "$relative" "$pkgdir/usr/share/doc/$pkgname/$relative"
+  done
+  install -Dm644 packaging/license-inputs.txt "$pkgdir/usr/share/doc/$pkgname/packaging/license-inputs.txt"
 }

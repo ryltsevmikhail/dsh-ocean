@@ -17,6 +17,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 from test_package_tar import ROOT
+from license_payload_fixture import populate as license_fixture, NAMES as LICENSE_NAMES
 
 INSTALL = runpy.run_path(str(ROOT / "packaging/install-from-package.py"))
 
@@ -77,6 +78,7 @@ class PortableInstall(unittest.TestCase):
             path.write_bytes(b"synthetic-icon")
         (self.package / "packaging").mkdir()
         (self.package / "packaging/dsh-ocean.desktop").write_text("[Desktop Entry]\nType=Application\nName=Fixture\nExec=dsh-ocean %U\nIcon=dsh-ocean\n")
+        license_fixture(self.package)
         self.home = self.root / "private-home"
         self.home.mkdir()
         self.bin = self.home / "bin odd & quote\" dollar$ tick` percent% slash\\ apostrophe'"
@@ -110,6 +112,10 @@ class PortableInstall(unittest.TestCase):
         self.assertEqual(binary.stat().st_mode & 0o777, 0o755)
         self.assertEqual(binary.stat().st_nlink, 1)
         self.assertEqual(self.desktop.stat().st_mode & 0o777, 0o644)
+        for name in LICENSE_NAMES:
+            installed = self.data / "doc/dsh-ocean" / name
+            self.assertEqual(installed.read_bytes(), (self.package / name).read_bytes())
+            self.assertEqual(installed.stat().st_mode & 0o777, 0o644)
         arguments = desktop_arguments(self.desktop)
         self.assertEqual(arguments, [str(binary).replace("%", "%%")])
         self.assertEqual(arguments[0].replace("%%", "%"), str(binary))
@@ -119,6 +125,39 @@ class PortableInstall(unittest.TestCase):
         refused = self.cli()
         self.assertNotEqual(refused.returncode, 0)
         self.assertEqual(binary.read_bytes(), before)
+
+    def test_covered_source_entries_are_mandatory_even_if_files_exist(self):
+        manifest = self.package / "packaging/license-inputs.txt"
+        rows = manifest.read_text().splitlines()
+        manifest.write_text("\n".join(row for row in rows if not row.startswith("docs/third-party/sources/")) + "\n")
+        self.assertNotEqual(self.cli().returncode, 0)
+        self.assert_no_install()
+
+    def test_modified_notice_survives_uninstall(self):
+        result = self.cli()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        notice = self.data / "doc/dsh-ocean/THIRD_PARTY_NOTICES.txt"
+        notice.write_bytes(b"operator annotation retained")
+        result = self.cli("--uninstall")
+        # Preserve the existing all-or-nothing refusal, not a partial uninstall.
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(notice.read_bytes(), b"operator annotation retained")
+        self.assertTrue((self.bin / "dsh-ocean").exists())
+        self.assertTrue((self.data / "doc/dsh-ocean/LICENSE").exists())
+        self.assertTrue(self.ledger().exists())
+
+    def test_license_manifest_rejects_private_paths_and_missing_text(self):
+        manifest = self.package / "packaging/license-inputs.txt"
+        original = manifest.read_bytes()
+        manifest.write_bytes(original + b"../../private-key\n")
+        self.assertNotEqual(self.cli().returncode, 0)
+        self.assert_no_install()
+        manifest.write_bytes(original)
+        notice = self.package / "THIRD_PARTY_NOTICES.txt"
+        self.assertEqual(notice.parent, self.package)
+        notice.unlink()
+        self.assertNotEqual(self.cli().returncode, 0)
+        self.assert_no_install()
 
     def test_empty_overrides_use_private_home_defaults(self):
         result = self.cli(DSH_OCEAN_BIN_DIR="", XDG_DATA_HOME="")
@@ -194,7 +233,7 @@ class PortableInstall(unittest.TestCase):
         document = json.loads(ledger.read_text())
         self.assertEqual(document["schema"], 1)
         paths = {entry["path"] for entry in document["files"]}
-        self.assertEqual(len(paths), 7)
+        self.assertEqual(len(paths), 8 + len(LICENSE_NAMES))
         self.assertIn(str(self.bin / "dsh-ocean"), paths)
         for entry in document["files"]:
             self.assertEqual(set(entry), {"path", "mode", "size", "sha256"})
@@ -377,7 +416,7 @@ def real_smoke():
         prefix = archives[0].name.removesuffix(".tar.gz")
         package = root / "trusted-package"
         package.mkdir()
-        paths = ["dsh-ocean", "install.sh", "install.py", "packaging/dsh-ocean.desktop"] + [f"icons/{size}x{size}.png" for size in (32,64,128,256,512)]
+        paths = ["dsh-ocean", "install.sh", "install.py", "packaging/dsh-ocean.desktop", "packaging/license-inputs.txt", *LICENSE_NAMES] + [f"icons/{size}x{size}.png" for size in (32,64,128,256,512)]
         with tarfile.open(archives[0]) as archive:
             for relative in paths:
                 target = package / relative
@@ -405,6 +444,10 @@ def real_smoke():
         assert desktop_arguments(home / "data/applications/dev.dsh.ocean.desktop")[0].replace("%%", "%") == str(binary)
         ledger = home / "state/dsh-ocean/installed-portable.json"
         assert ledger.is_file() and (ledger.stat().st_mode & 0o777) == 0o600
+        for relative in LICENSE_NAMES:
+            installed_notice = home / "data/doc/dsh-ocean" / relative
+            assert installed_notice.read_bytes() == (package / relative).read_bytes()
+        assert len(list((home / "data/doc/dsh-ocean/docs/third-party/sources").glob("*.crate"))) == 5
         operator_note = Path(environment["DSH_OCEAN_BIN_DIR"]) / "operator-note"
         operator_note.write_bytes(b"unrelated operator file")
         subprocess.run(["bash", str(package / "install.sh"), "--uninstall"], env=environment, check=True)

@@ -23,7 +23,7 @@ def stage_inputs(appdir, opened, epoch):
         elif key.startswith("icons/"):
             size = key.split("/")[1].removesuffix(".png")
             relative = f"usr/share/icons/hicolor/{size}/apps/dsh-ocean.png"
-        elif key == "assets/ocean-ice.svg" or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"):
+        elif key in ("assets/ocean-ice.svg", "packaging/license-inputs.txt") or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"):
             relative = "usr/share/doc/dsh-ocean/" + key
         else:
             raise ValueError("unknown AppImage payload input")

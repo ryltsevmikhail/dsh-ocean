@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 from test_package_install import desktop_arguments
+from license_payload_fixture import populate as license_fixture, NAMES as LICENSE_NAMES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,6 +26,7 @@ class SourceInstall(unittest.TestCase):
         shutil.copyfile(ROOT / "packaging/dsh-ocean.desktop", self.source / "packaging/dsh-ocean.desktop")
         for name in ("32x32.png", "64x64.png", "128x128.png", "128x128@2x.png", "icon.png"):
             (self.source / "icons" / name).write_bytes(b"fixture icon")
+        license_fixture(self.source)
         self.binary = self.source / "target/release/dsh-ocean"
         self.binary.write_text("#!/bin/sh\nexit 99\n")
         self.binary.chmod(0o755)
@@ -75,9 +77,44 @@ class SourceInstall(unittest.TestCase):
                          [line for line in original.splitlines() if not line.startswith("Exec=")])
         for size in (32, 64, 128, 256, 512):
             self.assertEqual((self.data / f"icons/hicolor/{size}x{size}/apps/dsh-ocean.png").read_bytes(), b"fixture icon")
+        for name in LICENSE_NAMES:
+            self.assertEqual((self.data / "doc/dsh-ocean" / name).read_bytes(), (self.source / name).read_bytes())
+        self.assertEqual((self.data / "doc/dsh-ocean/packaging/license-inputs.txt").read_bytes(),
+                         (self.source / "packaging/license-inputs.txt").read_bytes())
         self.assertEqual(self.calls(), [["update-desktop-database", str(desktop.parent)],
                                        ["gtk-update-icon-cache", "-f", "-t", str(self.data / "icons/hicolor")]])
         self.assertFalse((self.home / ".config").exists())
+
+    def test_covered_source_entries_are_mandatory(self):
+        manifest = self.source / "packaging/license-inputs.txt"
+        rows = manifest.read_text().splitlines()
+        manifest.write_text("\n".join(row for row in rows if not row.startswith("docs/third-party/sources/")) + "\n")
+        result = self.run_install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.bin / "dsh-ocean").exists())
+
+    def test_missing_or_linked_notice_fails_before_replacing_binary(self):
+        notice = self.source / "THIRD_PARTY_NOTICES.txt"
+        self.assertEqual(notice.parent, self.source)
+        saved = notice.read_bytes()
+        notice.unlink()
+        result = self.run_install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.bin / "dsh-ocean").exists())
+        outside = self.root / "outside-notice"
+        outside.write_bytes(saved)
+        notice.symlink_to(outside)
+        result = self.run_install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.bin / "dsh-ocean").exists())
+        self.assertEqual(outside.read_bytes(), saved)
+
+    def test_payload_manifest_cannot_name_private_paths(self):
+        with (self.source / "packaging/license-inputs.txt").open("a") as out:
+            out.write("../../private-key\n")
+        result = self.run_install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.bin / "dsh-ocean").exists())
 
     def test_no_build_default_prefix(self):
         del self.env["DSH_OCEAN_BIN_DIR"]
