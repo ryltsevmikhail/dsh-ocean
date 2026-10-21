@@ -9,6 +9,12 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+- Update the direct SHA-256 dependency to `sha2 0.11` without changing backup
+  manifest hashes: use the existing byte-wise lowercase hex encoder instead of
+  depending on the digest output container's formatting traits. Fixed vectors
+  cover leading zeroes, binary data and multi-buffer copying; manifest format
+  and verification policy are unchanged.
+
 - Source builds select a checksum-verified local backport of the upstream
   RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g iterator fix for GTK3-compatible
   `glib 0.18.5`. The version is not disguised as 0.20; version-based alerts may
