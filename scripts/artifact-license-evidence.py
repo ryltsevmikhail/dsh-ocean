@@ -60,9 +60,13 @@ def open_regular(path, limit, single_link=True):
     finally:
         os.close(parent)
     s = os.fstat(fd)
-    if not stat.S_ISREG(s.st_mode) or s.st_uid != os.getuid() or (single_link and s.st_nlink != 1) or s.st_size > limit:
+    refusal = ('nonregular input' if not stat.S_ISREG(s.st_mode) else
+               'input owner mismatch' if s.st_uid != os.getuid() else
+               'input hardlink refused' if single_link and s.st_nlink != 1 else
+               'input size exceeds limit' if s.st_size > limit else None)
+    if refusal:
         os.close(fd)
-        raise EvidenceError('input must be owned, single-link regular file within size limit')
+        raise EvidenceError(refusal)
     return fd, s
 
 
@@ -334,9 +338,16 @@ def main(argv=None):
                 raise EvidenceError('notice requires LABEL=FILE')
             notices.append((label, path))
         create_evidence(args.binary, args.output_dir, args.rustc, notices)
-    except (OSError, ValueError, subprocess.SubprocessError):
-        # Avoid exception text: OS and compiler failures may contain private paths.
-        print('artifact evidence failed; inputs/output must be safe and supported; any private partial output is retained', file=sys.stderr)
+    except EvidenceError as error:
+        # This class is raised only with fixed collector-authored explanations.
+        # Never print arbitrary OS/JSON/compiler exception text or source paths.
+        print('artifact evidence refused: ' + str(error), file=sys.stderr)
+        return 1
+    except OSError as error:
+        print('artifact evidence failed: filesystem errno ' + str(error.errno), file=sys.stderr)
+        return 1
+    except (ValueError, subprocess.SubprocessError):
+        print('artifact evidence failed: unsupported input or compiler observation; private partial output retained', file=sys.stderr)
         return 1
     return 0
 
