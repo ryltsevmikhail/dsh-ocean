@@ -1,5 +1,11 @@
 # Preserve the published crate bytes; the archive verifier, not reformatting,
 # enforces their integrity. The separate two-line patch remains reviewable.
-vendor/glib/** linguist-vendored -whitespace
+vendor/glib/** linguist-vendored -text -whitespace
 # Unified-diff context includes a literal space on otherwise blank lines.
 vendor/patches/*.patch whitespace=-blank-at-eol
+# Exact upstream evidence is byte-pinned, not reformatted. No secret-scan skip.
+THIRD_PARTY_NOTICES.txt -text -whitespace linguist-generated
+docs/third-party/evidence/** -text -whitespace
+docs/third-party/sources/*.crate -text
+docs/third-party/inventory.json linguist-generated
+packaging/license-inputs.txt -text
