@@ -84,6 +84,9 @@ class RuntimePackage(unittest.TestCase):
                 else:(source/".versions").write_text("026.12.0\n0.2.1\n10.34.7\n"+"ab"*32+"\n")
                 result=run(root/"dist")
                 self.assertNotEqual(result.returncode,0);self.assertFalse(list((root/"dist").glob("*.tar.gz")));self.assertNotIn("synthetic-token-never-publish",result.stdout+result.stderr)
+                self.assertNotIn(str(source),result.stderr)
+                if case=="credential":
+                    self.assertIn("publisher payload contains credential/manager-only input",result.stderr)
 
 if __name__ == "__main__":
     unittest.main()
