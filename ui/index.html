@@ -174,6 +174,7 @@
       </section>
 
       <div class="actions">
+        <button id="recover" class="primary hidden" type="button">Recover runtime…</button>
         <button id="retry" class="primary hidden" type="button">Retry</button>
         <button id="install" class="primary hidden" type="button">Install runtime</button>
         <button id="cancel-install" class="hidden" type="button">Cancel install</button>
@@ -201,6 +202,8 @@
       let autoStarted = false;
       let lastLogText = null;
       let busy = false;
+      let recoveryRequired = false;
+      let recoveryBlocked = true;
       // True while start_bootstrap is in flight in this webview.
       let installing = false;
 
@@ -250,7 +253,17 @@
         }
 
         const canInstall = Boolean(state.canInstall);
-        el("install").classList.toggle("hidden", !canInstall || state.phase === "ready" || state.phase === "preparing");
+        recoveryRequired = Boolean(state.recoveryRequired);
+        recoveryBlocked = Boolean(state.updating || state.installing) || state.phase === "preparing";
+        el("recover").classList.toggle("hidden", !recoveryRequired);
+        el("recover").disabled = busy || recoveryBlocked;
+        if (recoveryRequired) {
+          el("status-title").textContent = "Runtime recovery required";
+          el("status-text").textContent = state.updating
+            ? "A runtime operation is in progress. Wait for it to finish."
+            : "Choose Recover runtime to review the pending transaction and confirm restoration of the previous runtime. Ordinary startup stays blocked until recovery succeeds. If inspection fails, save diagnostics.";
+        }
+        el("install").classList.toggle("hidden", recoveryRequired || !canInstall || state.phase === "ready" || state.phase === "preparing");
         el("retry").disabled = busy;
         const installingNow = Boolean(state.installing);
         el("install").disabled = busy || installingNow;
@@ -263,12 +276,12 @@
         // reachable when no runtime is available even in the idle phase.
         el("retry").classList.toggle(
           "hidden",
-          state.phase !== "failed" && !(state.phase === "idle" && !canInstall && !installingNow),
+          recoveryRequired || (state.phase !== "failed" && !(state.phase === "idle" && !canInstall && !installingNow)),
         );
         el("diagnostics").disabled = busy;
         el("folder").disabled = busy;
 
-        if (state.phase === "idle" && !autoStarted) {
+        if (state.phase === "idle" && !autoStarted && !recoveryRequired) {
           autoStarted = true;
           setTimeout(() => runPrepare(), 350);
         }
@@ -306,8 +319,24 @@
         return refreshPending;
       }
 
+      async function runRecover() {
+        if (busy || !recoveryRequired || recoveryBlocked) return;
+        busy = true;
+        el("recover").disabled = true;
+        try {
+          // The native entry re-inspects pending state and asks for consent.
+          // This never starts recovery or checks/downloads a release by itself.
+          await invoke("recover_runtime");
+        } catch (error) {
+          console.error(error);
+        } finally {
+          busy = false;
+          await refresh();
+        }
+      }
+
       async function runPrepare() {
-        if (busy) return;
+        if (busy || recoveryRequired) return;
         busy = true;
         try {
           await invoke("prepare_service");
@@ -322,7 +351,7 @@
       async function runInstall() {
         // Deliberately not the shared `busy` flag: the cancel control must stay
         // usable while start_bootstrap is still awaiting the installer.
-        if (installing) return;
+        if (installing || recoveryRequired) return;
         installing = true;
         el("install").disabled = true;
         el("retry").disabled = true;
@@ -351,6 +380,7 @@
         }
       }
 
+      el("recover").addEventListener("click", runRecover);
       el("retry").addEventListener("click", runPrepare);
       el("install").addEventListener("click", runInstall);
       el("cancel-install").addEventListener("click", runCancelInstall);

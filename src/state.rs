@@ -39,6 +39,9 @@ pub struct SetupState {
     pub server: Option<ServerInfo>,
     pub runtime: Option<RuntimeInfo>,
     pub can_install: bool,
+    /// UI affordance only: native recovery still validates the journal and ownership.
+    pub recovery_required: bool,
+    pub updating: bool,
     pub config_path: String,
     pub diagnostics_path: String,
 }
@@ -369,6 +372,10 @@ impl AppState {
             server,
             runtime: probe.as_ref().map(|runtime| runtime.info()),
             can_install: probe.is_none(),
+            recovery_required: config::checked_server_url()
+                .is_ok_and(|base| crate::service::permits_local_start(&base))
+                && crate::runtime_switch::ensure_no_pending(&config::data_dir()).is_err(),
+            updating: self.is_updating(),
             config_path: config::config_path().display().to_string(),
             diagnostics_path: config::diagnostics_dir().display().to_string(),
         }

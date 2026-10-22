@@ -253,6 +253,29 @@ fn setup_page_calls_the_documented_commands_and_keeps_cancel_reachable() {
     }
     assert!(commands.contains("cancel_bootstrap"), "{commands}");
 
+    // Complete the installer, then exercise the shipped recovery control in
+    // real WebKit. The stub is only the IPC boundary, not rendering behavior.
+    evaluate(&view, "window.__state.installing=false; window.__pending.shift()(null); window.__state.phase='failed'; window.__state.recoveryRequired=true; window.__state.updating=false; 'pending'");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let controls = evaluate(&view, "JSON.stringify({recover: !!document.getElementById('recover') && !document.getElementById('recover').classList.contains('hidden') && !document.getElementById('recover').disabled, retry: document.getElementById('retry').classList.contains('hidden'), install: document.getElementById('install').classList.contains('hidden')})");
+        if controls == r#"{"recover":true,"retry":true,"install":true}"# {
+            break;
+        }
+        assert!(Instant::now() < deadline, "pending controls: {controls}");
+        pump_once();
+    }
+    evaluate(
+        &view,
+        "window.__calls=[]; document.getElementById('recover').click(); 'recover'",
+    );
+    let calls = evaluate(&view, "JSON.stringify(window.__calls.map(c=>c.command))");
+    assert!(calls.contains("recover_runtime"), "{calls}");
+    assert!(
+        !calls.contains("prepare_service") && !calls.contains("start_bootstrap"),
+        "{calls}"
+    );
+
     // The auxiliary actions use their documented command names too.
     evaluate(&view, "document.getElementById('diagnostics').click(); document.getElementById('folder').click(); document.getElementById('quit').click(); 'aux'");
     let deadline = Instant::now() + Duration::from_secs(10);

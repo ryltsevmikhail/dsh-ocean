@@ -64,6 +64,8 @@ fn setup_page_fields_exist_in_the_setup_payload() {
             ready: true,
         }),
         can_install: true,
+        recovery_required: false,
+        updating: false,
         config_path: "/tmp/config.json".into(),
         diagnostics_path: "/tmp/diagnostics".into(),
     };
@@ -217,6 +219,7 @@ fn every_mutating_command_is_bound_to_an_owning_window() {
     let guarded = [
         ("get_setup_state", &source, "\"setup\""),
         ("prepare_service", &source, "\"setup\""),
+        ("recover_runtime", &source, "\"setup\""),
         ("start_bootstrap", &source, "\"setup\""),
         ("cancel_bootstrap", &source, "\"setup\""),
         ("save_diagnostics", &source, "\"setup\""),

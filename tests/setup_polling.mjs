@@ -46,6 +46,49 @@ function fixture(hidden = false) {
   };
 }
 
+test('pending recovery replaces startup controls and opens only explicit recovery', async () => {
+  const f = fixture();
+  Object.assign(f.state, { phase: 'idle', canInstall: true, recoveryRequired: true });
+  await f.respond();
+  const recover = f.elements.get('recover');
+  assert.ok(recover, 'pending recovery must have a dedicated control');
+  assert.equal(recover.classList.contains('hidden'), false);
+  assert.equal(f.elements.get('retry').classList.contains('hidden'), true);
+  assert.equal(f.elements.get('install').classList.contains('hidden'), true);
+  await f.tick();
+  assert.equal(f.calls.includes('prepare_service'), false);
+  recover.click();
+  await settle();
+  assert.equal(f.calls.filter(x => x === 'recover_runtime').length, 1);
+  assert.equal(f.calls.includes('start_bootstrap'), false);
+  Object.assign(f.state, { phase: 'failed', canInstall: false, recoveryRequired: false });
+  await f.respond();
+  assert.equal(recover.classList.contains('hidden'), true);
+  assert.equal(f.elements.get('retry').classList.contains('hidden'), false);
+});
+
+test('recovery presentation uses structured state, not an error substring', async () => {
+  const f = fixture();
+  Object.assign(f.state, { phase: 'failed', message: 'pending runtime transaction', recoveryRequired: false });
+  await f.respond();
+  const recover = f.elements.get('recover');
+  assert.ok(recover);
+  assert.equal(recover.classList.contains('hidden'), true);
+  assert.equal(f.elements.get('retry').classList.contains('hidden'), false);
+});
+
+test('ongoing native update disables recovery even for a dispatched click', async () => {
+  const f = fixture();
+  Object.assign(f.state, { phase: 'failed', recoveryRequired: true, updating: true });
+  await f.respond();
+  const recover = f.elements.get('recover');
+  assert.ok(recover);
+  assert.equal(recover.disabled, true);
+  recover.click();
+  await settle();
+  assert.equal(f.calls.includes('recover_runtime'), false);
+});
+
 test('ready page pauses while hidden and refreshes immediately when shown', async () => {
   const f = fixture();
   await f.respond();

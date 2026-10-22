@@ -17,6 +17,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_setup_state,
             commands::prepare_service,
+            commands::recover_runtime,
             commands::start_bootstrap,
             commands::cancel_bootstrap,
             commands::save_diagnostics,
