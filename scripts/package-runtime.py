@@ -32,6 +32,18 @@ def regular(path):
     return os.fdopen(fd, "rb")
 
 
+def node_entry(path):
+    if path.suffix in {".js", ".cjs", ".mjs"}:
+        return True
+    if path.suffix:
+        return False
+    # npm bin targets may be extensionless (e.g. @anthropic-ai/sdk/bin/cli).
+    # Do not reinterpret native/shell/unknown entrypoints as Node programs.
+    with regular(path) as handle:
+        first_line = handle.read(128).split(b"\n", 1)[0]
+    return first_line in {b"#!/usr/bin/env node", b"#!/usr/bin/node"}
+
+
 def build(args):
     source = args.root.absolute()
     if source.is_symlink() or not source.is_dir():
@@ -73,6 +85,18 @@ def build(args):
             current = source / relative
             target = stage / relative
             info = current.lstat()
+            # The checksum-pinned Node distribution ships this EMPTY builtin
+            # npm config. Preserve only its proven empty bytes, never a user,
+            # project, symlinked or credential-bearing npm configuration.
+            if relative == Path("runtime/node/lib/node_modules/npm/.npmrc") and stat.S_ISREG(info.st_mode) and not info.st_mode & 0o7000:
+                with regular(current) as handle:
+                    if handle.read(1):
+                        raise Refused("publisher payload contains credential/manager-only input")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("xb"):
+                    pass
+                target.chmod(0o644)
+                continue
             if relative.name in {".npmrc", ".env", ".previous", ".ocean-runtime.json", ".ocean-runtime-files.json"}:
                 raise Refused("publisher payload contains credential/manager-only input")
             if info.st_mode & 0o7000:
@@ -83,7 +107,7 @@ def build(args):
                 if source not in resolved.parents or not resolved.is_file():
                     raise Refused("runtime link leaves source or points to a directory")
                 bin_entry = relative.parent.name == ".bin" or relative.parent == Path("runtime/node/bin")
-                if not bin_entry or resolved.suffix not in {".js", ".cjs", ".mjs"}:
+                if not bin_entry or not node_entry(resolved):
                     raise Refused("publisher must resolve non-JS-entry symlinks explicitly")
                 entry = os.path.relpath(resolved, current.parent)
                 # execve replaces this Node process in-place: correct package-relative
