@@ -46,6 +46,7 @@ env:
 
 jobs:
   language-pack:
+    if: ${{ inputs.product == 'shell' }}
     uses: ./.github/workflows/language-pack.yml
     with:
       retain_candidate: ${{ inputs.product == 'shell' && !inputs.dry_run && github.ref == 'refs/heads/main' }}
@@ -158,7 +159,7 @@ jobs:
 
   draft:
     needs: [build, language-pack]
-    if: ${{ !inputs.dry_run && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    if: ${{ !cancelled() && needs.build.result == 'success' && (inputs.product != 'shell' || needs.language-pack.result == 'success') && !inputs.dry_run && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Owner must configure required reviewers on BOTH product environments.
