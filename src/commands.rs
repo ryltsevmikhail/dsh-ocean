@@ -47,6 +47,15 @@ pub async fn prepare_service(
     Ok(app.state::<AppState>().snapshot())
 }
 
+/// Only the bundled setup page may request the existing native recovery prompt.
+/// The renderer supplies no paths, tokens or journal contents as authority.
+#[tauri::command]
+pub fn recover_runtime(window: tauri::WebviewWindow, app: AppHandle) -> Result<(), String> {
+    require_window(&window, &["setup"])?;
+    crate::update::recover_and_show(&app);
+    Ok(())
+}
+
 /// Clears the installer lifecycle state whenever the bootstrap scope ends.
 struct BootstrapLifecycle<'a>(&'a AppState);
 

@@ -262,7 +262,13 @@ layout migration and explicit post-success history/rollback are separate work.
 
 Ordinary local prepare/restart/health-monitor recovery now refuse pending entries,
 even corrupt/dangling ones; remote attachment is not made an update authority.
-Only explicit transaction recovery may proceed with a pending record. No new
+Only explicit transaction recovery may proceed with a pending record. The bundled
+setup window shows **Recover runtime…** instead of Retry/Install when the local
+pending gate is present. It re-inspects the journal and opens the same native
+confirmation as tray → Check for DSH core updates; declining changes nothing.
+Malformed journals still produce an inspection error, not an automatic repair.
+If another operation already cleared the journal, the action reports that nothing
+is pending: it never falls through to a network update check. No new
 remote-webview updater API/capability is exposed.
 
 [Filesystem transaction tests](../tests/runtime_switch.rs) use real snapshots,

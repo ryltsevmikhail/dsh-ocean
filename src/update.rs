@@ -12,6 +12,16 @@ use crate::{auth, ui};
 /// runtime Source (settings/key/channel) and never queries `npm view`. A pending
 /// transaction routes to explicit recovery instead.
 pub fn check_and_show(app: &AppHandle) {
+    check_and_show_mode(app, false);
+}
+
+/// Setup recovery never falls through to release checks when its state is stale.
+/// Both entry points reuse the same fresh inspection and explicit confirmation.
+pub fn recover_and_show(app: &AppHandle) {
+    check_and_show_mode(app, true);
+}
+
+fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
     let app = app.clone();
     // Detection, feed checks and downloads must not block GTK's event loop.
     tauri::async_runtime::spawn_blocking(move || {
@@ -19,6 +29,15 @@ pub fn check_and_show(app: &AppHandle) {
             Ok(Some(info)) => {
                 let app_for_main = app.clone();
                 let _ = app.run_on_main_thread(move || present_recovery(&app_for_main, &info));
+                return;
+            }
+            Ok(None) if recovery_only => {
+                show_message(
+                    &app,
+                    "Runtime recovery",
+                    "No runtime recovery is pending. Retry the normal startup if needed.",
+                    gtk::MessageType::Info,
+                );
                 return;
             }
             Ok(None) => {}
