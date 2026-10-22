@@ -1,0 +1,93 @@
+{
+  "ru": {
+    "common": "cbdd47454ffbbe1574dbe3eb41182a17e3c1d530935c2c45db9af29b179bf364",
+    "settings.locale": "6ddeebd882745364b2cbbd9aae2b08e998c16c5ad42815b72960dd84140d8192",
+    "settings": "6e24262e7bef1ddf071c0a5aabe04b8c0dd0f7b19304321f85beec88fc9620bf",
+    "chat": "b6261c8f0df9a1adf281d025c0cc896f19db7dd1dc98fff8d44bc9d27a41b953",
+    "workspace": "7d47592281dc643f6f92d5279b87a4e5771ad106499be6d0112d7d556be5da85",
+    "model": "b9433a7dbd3864230b4dcb276b4bebc2a759cd627fa0f49ac2c8b019114e5869",
+    "conversation": "7b942e63c23835373730546ad7a912f487162fcc3a4fd78c640083a2f18f5548",
+    "settings.models": "184ce1c53f07eb5b15f8c7bcd1e101c47dc66ef252e6b61c066407c6c6d8478e",
+    "settings.plugins": "ee2470bdb08782c71e5b68a309cbad5f3d743170cb2d63221d3934df103e9ffa",
+    "settings.pluginInventory": "317e8045747bab517f72294be97c3af0ba363d1951f69aaadd44828b4f2bb002",
+    "pluginManager": "6170ce049863121cb40ae2286e071b3a7faec2cf8ab6125311bbc706b9bbe1fa"
+  },
+  "es": {
+    "common": "f635ffee92a0e32adca95a5eb29d14e841d915a816332e245577627927c285a3",
+    "settings.locale": "39ee311859cbe27ee00ecde50e43f28013990ded306b1ae79ff5bda71a73a9d1",
+    "settings": "0a41b2f2e5d485ee36b78db5244f50063f9a74a0416cb4c7f3ab27ea6a327c4d",
+    "chat": "f89ad29a30d715ababf53241f75f71b6beba2642e77e40d8a526fa4f1eddb805",
+    "workspace": "803925c1a8e59d0be2e749d9fd342b67f52c278438f1088cccb828f2ceabbffe",
+    "model": "9b633bb9178918e89d295917ba236190491c6994effcb3c35000feac891518ce",
+    "conversation": "4dab953cd0d447583d6d1f2cf9b2610192bd6e1688108fb61666854b63efff2d",
+    "settings.models": "57cbe0b00fe885a1d1ce767618de1520c8d7009166e4ec482a2f2ec70dad21f0",
+    "settings.plugins": "549d658a99f6c0390c7f81bca62881ca93e526e8138a4d45f17ceff60834e67a",
+    "settings.pluginInventory": "7a38005c5919d49f6202b88cfc56bdd66bf47285fbbe0c994db32d80b78b7ec6",
+    "pluginManager": "782d97c2afce2199c896b6db136cf5f32f51052ed13ef377c25e32d544bef35e"
+  },
+  "pt-BR": {
+    "common": "dcb13ef76676232c73136578951a68cde7f5c63094b36a0e0d31460d24ca345b",
+    "settings.locale": "39ee311859cbe27ee00ecde50e43f28013990ded306b1ae79ff5bda71a73a9d1",
+    "settings": "70647503126285091ff362b10d6578b62e97b086dcdcef3cafe900d47b129209",
+    "chat": "4cd1f2832136cefb21429f18f10e722210396d24b0b076b52157660ee00510cb",
+    "workspace": "d5288be7457fef429a86f5e2a25a129875176436f3065a6123fc9051934092bc",
+    "model": "fd51d96120b0db69c811bd403ddf2d8ac9652f4116c7a788fe012faa36886737",
+    "conversation": "90d881316e97f6108b152266277b01b551b61ca92f240e7061f4be9a6aa8a926",
+    "settings.models": "baaef2f4582311a6da8192aa68f6df0a33f03de9f51dc5d55ac891ebbf680288",
+    "settings.plugins": "73fa6591b37af6476023ce8e0e63878c6342c44a45fa0d6b2da12fecae310f7d",
+    "settings.pluginInventory": "e1091c7822f79e9cde09761c567a17dc63ca90df5ba7086d463ae6e7a82866b3",
+    "pluginManager": "efb097da989136e35a967c1b4b73ebe07e19d73461cf8ffd64741ed161217025"
+  },
+  "de": {
+    "common": "17c766a67476300d6450cd1d0bd55ceb73eaf8518f1846b692b4f25d27bc2a18",
+    "settings.locale": "931b5bc66d25023ea4c20dbeef8582041e2b2f5e3130c3aace1d7690e7f3aabc",
+    "settings": "13aa5f2ac6bdf41434d78c829e98944a815cc78eab0b59e9f8c317b019c755f0",
+    "chat": "4c395ac301899da38ab3df0867be9a41ad8661c9b1ed638f10f83548b7cfe823",
+    "workspace": "ef8c76a390576bf9e2803b1f2a22709ad39b066f6679cc8376ab052619e4902e",
+    "model": "b6509941aafcd8a3a60b1b1414c0a359e4440ea2da9321485e87aa45c63356cd",
+    "conversation": "6f482e5653e114ce7b1947aa3b8235a6b802936836ddddaf776b9722a7bafd2c",
+    "settings.models": "84c9834cbf4eead9792f8efb331aed360adceef53e7c33d59f9b0caedd29a821",
+    "settings.plugins": "8859d993aa8f36ae9cb576228388234ef96a3607b45469eadcce6b8f953a10ad",
+    "settings.pluginInventory": "0e4f070ef859543e309466a2bec7976203dcd1cdbb521932c3b4052d71984669",
+    "pluginManager": "530b2a88bc3e7e3d771562a6dbcddafb0957a8fd96a672080e5a34557d2be970"
+  },
+  "fr": {
+    "common": "6b4a8b5650430899c3c06174d78dd68b010b53d180e64561c25105659f580866",
+    "settings.locale": "48eb155327dd0c199e65ccc04be22d99eeddfa985eb9af5f543ea900146afea7",
+    "settings": "8a5d56aab2d63c44622a21bf17ca8edf37268260577e2019dd59295c54745fd0",
+    "chat": "244c4791fe9fd91e38c7f73ac685316c878eacab141bf9032bb24d90c32e8557",
+    "workspace": "1f86f25a574cfbb8ccdcf67a50e20bed0288fc398b561c474f632c52d812ac4d",
+    "model": "48da43a581ec4e09f2e2302bba3815b332d67d23e270efc2350e547bb9d6a354",
+    "conversation": "ab802d32f8a4fe8f7393f6ab4ea96192bde67aa34d1c4acb69142112aa892dd4",
+    "settings.models": "21f4ea6af34150ab0d26a9f4b635d66686bdd2299a0397a578736b1f327418e3",
+    "settings.plugins": "489a15ce83087f6dffdb5c33038dd62c0dca56e32cdc618e7110840a66534280",
+    "settings.pluginInventory": "2e1dc24e74ca9dbaf9d30e7f1aa2e54e87dce77014a679ceb63f078ac5352e77",
+    "pluginManager": "cb92cb6262bbb237d3356bc9a413dee8b3b1f6eed1892e03a47f478fbfb31227"
+  },
+  "ja": {
+    "common": "6b3925cb9df94d8eae2e7f7c12542f86fd2d43c9d212985269fe2aa03c79b68f",
+    "settings.locale": "66d77437a3e39fceec470548f3697ad11f4728c83a6f046968612524be7f9162",
+    "settings": "27bb53c84af6a20fe6f01ae122b1c29762e2ecdb4671f2a035cca443d09c1ad2",
+    "chat": "3fd95e2944f1c71c3814df10815ee77134bead3ba127e9b12acabede9dfdc042",
+    "workspace": "d2ec4eec16e84d690337701f86a6a0891274cf6ff36dc24eb9d7d645054ba043",
+    "model": "3fcdad846fefea032fc1163519a17551aa4443024558a9f3cb8841696a4e7cca",
+    "conversation": "24650fb843fa6a69ddfb5c901ee2a01e95453b5e1ed281476d8997917efde84e",
+    "settings.models": "025b5a33c113668fa95db89ad00ec4048ef2c65efe889775cbeffc8dd720590f",
+    "settings.plugins": "468c99f0d0195e2efeda1f49ee1ae741bd04201dddb6610bb963ce73017ac9da",
+    "settings.pluginInventory": "8b31fe6eababfd83a1e8a57b402d1320789837de07b635e12cdcd622ecd5e812",
+    "pluginManager": "fff2184874431baa9709561184edc5736ff620228894e6e49f04cbb864e02687"
+  },
+  "ko": {
+    "common": "371e472356b24adb4dd3122c6811c8c5db84c9cc44bcb2bf05dcb8e24a372fb3",
+    "settings.locale": "b8337c0f19692a000e2cf9e1b542b7f60232b640c4ba44ace1b1574e69a5cc84",
+    "settings": "ecf75f16ae93b14586e6fecaab7925084010e36832b20d8a9334e3a42299c3dd",
+    "chat": "0f710a59f76d4cc150bc57ef21ad8fca35158b8ec435e5207d3a63466099c721",
+    "workspace": "c83fd124b2ef1fec1e7001058b5f233b99ceea00353a39761be2f9d8ec0522e4",
+    "model": "2f3703d38cc0606f22f309e27cfe3c26e1280fd5ad37d454f63ef7c877e82b21",
+    "conversation": "b09bf72fb719be847fd7498cef8ca31bbd0014cea4db783c7b42320d60dc0449",
+    "settings.models": "8c59473fba51b84f844b84809b75d1e3e758349673179da26da9f050cf316361",
+    "settings.plugins": "2d633ec2e5afb46496737ff657d39d05c2fe20f1c34118400d679ffa5f7867cd",
+    "settings.pluginInventory": "66628bc633ad25db9907fbd6dfa94866b3e0b37758c8c1a8859107239b3e0162",
+    "pluginManager": "7dd7c48ab966b6330bde37b0234c0e4a2a7f3d73506df4bef1874365169bf96a"
+  }
+}

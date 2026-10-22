@@ -1,0 +1,36 @@
+name: optional desktop language pack
+
+on:
+  workflow_call:
+    inputs:
+      retain_candidate:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install bootstrap prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates xz-utils python3 make g++ jq
+      - name: Test with pinned isolated runtime and build exact optional asset
+        run: bash scripts/test-language-pack.sh "$RUNNER_TEMP/language-pack-release"
+      - name: Retain candidate only for an explicitly requested shell draft
+        if: ${{ inputs.retain_candidate }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-language-pack
+          path: |
+            ${{ runner.temp }}/language-pack-release/*.tgz
+            ${{ runner.temp }}/language-pack-release/language-pack-artifact.json
+          retention-days: 2
+          if-no-files-found: error

@@ -1,0 +1,3 @@
+- insert:
+    - id: ocean-desktop-language-pack
+      name: '@dsh-ocean/desktop-language-pack'

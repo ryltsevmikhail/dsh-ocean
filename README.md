@@ -39,6 +39,25 @@ names and marks belong to their respective owners.
 The actual chat, providers, tools, plugins and sessions belong to DSH. Ocean shares
 its profile data; it is not a sandbox for actions the runtime performs.
 
+## Optional desktop language pack
+
+The [desktop language pack](language-pack/README.md) adds Russian, Spanish,
+Brazilian Portuguese, German, French, Japanese and Korean UI dictionaries for
+**DSH 0.2.0-rc.2**. Shell release candidates include its separately versioned
+`dsh-ocean-desktop-language-pack-0.4.0.tgz` and checksum metadata as optional assets.
+It is **not auto-installed**, does not change permission settings, and is not part
+of the signed shell/runtime updater manifests. A checksum detects corruption; it
+is not an independent publisher signature.
+
+After reviewing the asset and choosing the intended profile, install through DSH:
+
+```bash
+dsh plugin --profile <intended-profile> add /absolute/path/to/dsh-ocean-desktop-language-pack-0.4.0.tgz --ignore-scripts
+```
+
+Refresh the client afterwards. Ocean's native setup/tray dialogs are not translated
+by this client plugin. See its README for tested coverage and approval-dialog limits.
+
 ## Build and install
 
 ### Requirements

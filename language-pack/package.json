@@ -1,0 +1,35 @@
+{
+  "name": "@dsh-ocean/desktop-language-pack",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Main Harness desktop, chat and settings language pack: Russian, Spanish, Brazilian Portuguese, German, French, Japanese and Korean",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": ["lib", "cordis.patch.yml", "README.md", "LICENSE", "data/inventory.json", "data/unchanged.json"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-locale"]
+    }
+  },
+  "engines": { "dsh": "0.2.0-rc.2", "node": ">=22" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "extract": "node scripts/extract-catalog.mjs",
+    "verify:fixture": "node scripts/verify-fixture.mjs"
+  }
+}

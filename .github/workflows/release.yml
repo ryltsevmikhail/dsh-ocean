@@ -45,6 +45,12 @@ env:
   SEQUENCE: ${{ inputs.sequence }}
 
 jobs:
+  language-pack:
+    if: ${{ inputs.product == 'shell' }}
+    uses: ./.github/workflows/language-pack.yml
+    with:
+      retain_candidate: ${{ inputs.product == 'shell' && !inputs.dry_run && github.ref == 'refs/heads/main' }}
+
   build:
     strategy:
       fail-fast: false
@@ -152,8 +158,8 @@ jobs:
           if-no-files-found: error
 
   draft:
-    needs: build
-    if: ${{ !inputs.dry_run && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    needs: [build, language-pack]
+    if: ${{ !cancelled() && needs.build.result == 'success' && (inputs.product != 'shell' || needs.language-pack.result == 'success') && !inputs.dry_run && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Owner must configure required reviewers on BOTH product environments.
@@ -184,6 +190,14 @@ jobs:
           done
           python3 -B scripts/release-artifacts.py manifest --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" --artifact "$RUNNER_TEMP/final-linux-x86_64/artifact.json" --artifact "$RUNNER_TEMP/final-linux-aarch64/artifact.json" > "$RUNNER_TEMP/manifest.json"
           cargo build --locked --bin dsh-ocean
+      - name: Verify optional shell language asset from this exact workflow run
+        if: ${{ inputs.product == 'shell' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name release-language-pack --dir "$RUNNER_TEMP/final-language-pack"
+          python3 -B scripts/package-language-pack.py --verify "$RUNNER_TEMP/final-language-pack"
       - name: Require explicit owner clearance and an existing release tag before accessing keys
         env:
           GH_TOKEN: ${{ github.token }}
@@ -241,5 +255,11 @@ jobs:
             file="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["url"].rsplit("/",1)[1])' "$RUNNER_TEMP/final-$target/artifact.json")"
             assets+=("$RUNNER_TEMP/final-$target/$file")
           done
+          if [ "$PRODUCT" = shell ]; then
+            python3 -B scripts/package-language-pack.py --verify "$RUNNER_TEMP/final-language-pack"
+            locale_file="$(jq -er '.filename' "$RUNNER_TEMP/final-language-pack/language-pack-artifact.json")"
+            assets+=("$RUNNER_TEMP/final-language-pack/$locale_file" "$RUNNER_TEMP/final-language-pack/language-pack-artifact.json")
+          fi
+          # Locale assets are optional/manual and not part of signed updater manifests.
           # Tag must already exist; publication remains a separate owner action.
           gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$PRODUCT $RELEASE ($CHANNEL)" --notes 'Signed release candidate; owner acceptance/publication is still required.' "${assets[@]}"
