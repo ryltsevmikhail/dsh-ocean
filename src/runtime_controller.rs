@@ -437,13 +437,14 @@ impl OwnedController {
             self.verify_provenance()?;
             return Ok(());
         }
-        let rendered = systemd::render_unit(&self.old, &self.base).into_bytes();
         anyhow::ensure!(
-            on_disk == rendered,
+            systemd::is_generated_unit(&self.old, &self.base, &on_disk),
             "the managed unit differs from the exact generated unit; automatic switch refused"
         );
         self.verify_provenance()?;
-        self.old_unit = Some(rendered);
+        // Preserve even the exact legacy pre-UMask image for rollback. The
+        // candidate is rendered with the current private-creation policy.
+        self.old_unit = Some(on_disk);
         Ok(())
     }
 
@@ -569,13 +570,14 @@ impl Controller for OwnedController {
     fn health(&mut self) -> Result<()> {
         match self.mode {
             ServerMode::Systemd => {
-                // Authenticated fresh launch token, not merely a listening port.
-                let token = auth::resolve_token(&self.base, Some(&self.unit_name))?;
-                anyhow::ensure!(
-                    crate::http::status(&self.base) == Some(401),
-                    "server did not enforce the anonymous gate"
-                );
-                auth::cache_token(&token);
+                // Type=simple start is not application readiness. The same
+                // bounded authenticated wait covers candidate, rollback and
+                // fresh-session recovery without publishing an early success.
+                let token = self.handle.block_on(auth::wait_for_systemd(
+                    &self.base,
+                    &self.unit_name,
+                    std::time::Duration::from_secs(30),
+                ))?;
                 self.permit.publish_server(Server {
                     base_url: self.base.clone(),
                     token,

@@ -182,6 +182,31 @@ not restoration of inode identity, hard-link topology, ACLs or extended attribut
 Those unsupported forms require an operator-managed migration, not a partial
 automatic rollback disguised as success.
 
+### Existing profile permissions and private creation
+
+Ocean-owned web children create new files with a child-local `umask 0077`; newly
+generated systemd units use `UMask=0077`. The GUI's own process mask is not changed.
+This prevents a permissive inherited user-manager mask such as `0002` from making
+new session locks or other normal DSH state group-writable. DSH subprocesses inherit
+that policy; independent CLI commands and attached/external servers do not.
+
+**Existing files are not repaired or chmodded.** A profile already containing
+`0664`/`0666` files or group/other-writable directories remains ineligible for an
+automatic transaction snapshot. Before retrying, stop every DSH writer, verify the
+actual profile/home and ownership, retain a trusted backup, and review the affected
+permissions individually. If shared write access is intentional, use an
+operator-managed migration instead. Do not use a blanket recursive chmod, follow
+outside links, or weaken the snapshot check to make an update pass. For separate
+CLI provisioning of a new private profile, use a restrictive mask in that CLI's
+own shell before it creates data; it is not a repair of existing permissions.
+
+Previously generated units without `UMask` are recognized **only when every byte
+matches the exact historical generated template**, with the same fragment/no-drop-in
+and manager-home proofs. Their exact bytes are retained for rollback; a successful
+owned runtime update installs the new private-policy after-image. Merely attaching
+or upgrading the GUI does not rewrite a running unit or change old file modes.
+Custom units, including a different `UMask`, remain outside automatic ownership.
+
 Restore first verifies the private snapshot and builds a verified replacement in
 a private sibling container. Linux atomic directory exchange switches a present
 home; an absent original home is reestablished as absent. Candidate-created state
@@ -217,6 +242,19 @@ and records the monotonic floor only on success. Candidate failure stops it firs
 restores data/absence before old selector/unit and **only then** starts/checks the
 old runtime. Restore/stop/unknown selector or unit failures retain pending recovery
 and backups; they never intentionally restart old against unrestored data.
+The owned systemd adapter does not treat `systemctl start` / `Type=simple` as
+application readiness. Candidate, rollback and explicit recovery share a bounded
+30-second authenticated wait: the anonymous origin must return 401 and the current
+launch-token exchange must return 303. Journal candidates are refreshed from the
+fixed owned unit; journal output, helper lifetime and HTTP probes are bounded by
+the readiness budget (failed helper cleanup may take up to two additional seconds).
+This uses stock `journalctl --no-pager`, not wrapper scripts which detach their
+own workers: timeout/oversize cleanup signals the retained helper group, while an
+already exited helper is reaped without signalling a recycled numeric group ID.
+Only successful authenticated readiness publishes the new server/token. A permanent
+failure still follows the existing rollback/pending-recovery rules; waiting is not
+permission to accept an anonymous server or to clear an incomplete transaction.
+
 Explicit recovery uses the private home/backup-bound journal and refuses foreign
 selector/unit images or a new selector without a durable snapshot. Current engine
 support requires an existing `generations/gen.<alphanumeric>` selector; legacy

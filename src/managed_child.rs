@@ -80,7 +80,18 @@ pub async fn start(
     // Own process group: the harness starts shells and tools, and a failed start or
     // a quit must not leave them behind as orphans.
     #[cfg(unix)]
-    command.process_group(0);
+    {
+        command.process_group(0);
+        // SAFETY: umask is async-signal-safe. Change only the forked child,
+        // never the multi-threaded GUI's process-global mask. This affects new
+        // data, not permissions on an existing user profile.
+        unsafe {
+            command.pre_exec(|| {
+                libc::umask(0o077);
+                Ok(())
+            });
+        }
+    }
     let mut child = command.spawn().context("spawn DSH web process")?;
     let stdout = child.stdout.take().context("capture DSH stdout")?;
     let stderr = child.stderr.take().context("capture DSH stderr")?;

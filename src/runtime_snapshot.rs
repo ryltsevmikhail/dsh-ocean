@@ -114,6 +114,13 @@ fn stamp(metadata: &fs::Metadata) -> (u64, u64, u64, i64, i64, i64, i64, u32) {
         metadata.mode(),
     )
 }
+fn require_controlled_permissions(mode: u32) -> Result<()> {
+    anyhow::ensure!(
+        mode & 0o022 == 0,
+        "runtime snapshot refuses group/other-writable existing data; stop all DSH writers and review profile permissions before retrying. Ocean does not change existing permissions; see the runtime snapshot eligibility guidance."
+    );
+    Ok(())
+}
 fn digest(
     path: &Path,
     mut output: Option<&mut File>,
@@ -126,12 +133,10 @@ fn digest(
     let before = file.metadata()?;
     owned(&before)?;
     anyhow::ensure!(
-        before.is_file()
-            && before.nlink() == 1
-            && before.len() <= MAX_FILE
-            && before.mode() & 0o022 == 0,
-        "runtime snapshot requires bounded single-linked regular files not writable by others"
+        before.is_file() && before.nlink() == 1 && before.len() <= MAX_FILE,
+        "runtime snapshot requires bounded single-linked regular files"
     );
+    require_controlled_permissions(before.mode())?;
     let mut total = 0u64;
     let mut hash = Sha256::new();
     let mut buffer = [0u8; 65536];
@@ -205,10 +210,7 @@ fn inventory(
             let seconds = metadata.mtime();
             let nanos = metadata.mtime_nsec();
             if metadata.is_dir() {
-                anyhow::ensure!(
-                    mode & 0o022 == 0,
-                    "runtime snapshot refuses other-writable source directories"
-                );
+                require_controlled_permissions(mode)?;
                 for child in fs::read_dir(&path)? {
                     pending.push(relative.join(child?.file_name()));
                 }

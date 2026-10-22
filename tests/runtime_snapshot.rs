@@ -167,6 +167,35 @@ fn transaction_snapshot_refuses_other_writable_source_state() {
 }
 
 #[test]
+fn existing_group_writable_data_is_refused_with_guidance_not_silently_repaired() {
+    for mode in [0o664, 0o666] {
+        let f = Fixture::new();
+        f.write(
+            "sessions/private-name-must-not-leak",
+            b"existing-data-must-survive",
+        );
+        let path = f.home.join("sessions/private-name-must-not-leak");
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+        let error = runtime_snapshot::capture(&f.home, &f.backups, || Ok(()))
+            .err()
+            .expect("other-writable data remains ineligible");
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("group/other-writable")
+                && message.contains("stop")
+                && message.contains("review"),
+            "actionable eligibility guidance: {message}"
+        );
+        assert!(!message.contains("private-name") && !message.contains("existing-data"));
+        assert_eq!(fs::read(&path).unwrap(), b"existing-data-must-survive");
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            mode
+        );
+    }
+}
+
+#[test]
 fn reopened_transaction_snapshots_must_remain_private() {
     let f = Fixture::new();
     f.write("credentials.json", b"synthetic-only-secret");
