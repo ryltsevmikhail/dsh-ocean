@@ -1,0 +1,1899 @@
+{
+  "ru": {
+    "namespaces": {
+      "common": 41,
+      "settings.locale": 1,
+      "settings": 34,
+      "chat": 186,
+      "conversation": 369,
+      "workspace": 112,
+      "model": 23,
+      "settings.models": 113,
+      "settings.plugins": 5,
+      "settings.pluginInventory": 40,
+      "pluginManager": 189,
+      "sidebar": 5,
+      "settings.agentPreset": 41,
+      "settings.theme": 9,
+      "shortcuts": 56,
+      "settings.permission": 12,
+      "permission.access": 17,
+      "approval": 5
+    },
+    "total": 1258,
+    "changed": 1225,
+    "unchanged": [
+      {
+        "namespace": "common",
+        "key": "json.label",
+        "value": "JSON"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.progress",
+        "value": "{percent}%"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.versionDetail",
+        "value": "{label}: {version}"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.comma",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.sharedPrefix",
+        "value": ""
+      },
+      {
+        "namespace": "chat",
+        "key": "message.referenceSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.compaction.commandTitle",
+        "value": "compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.separator",
+        "value": " · "
+      },
+      {
+        "namespace": "chat",
+        "key": "clock.ymd",
+        "value": "{y}-{m}-{d}"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.schedule.cron",
+        "value": "Cron {expression} ({zone})"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.weekday.join",
+        "value": ", "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.id",
+        "value": "ID"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.bash",
+        "value": "Bash"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.pwsh",
+        "value": "Pwsh"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.grep",
+        "value": "Grep"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.glob",
+        "value": "Glob"
+      },
+      {
+        "namespace": "conversation",
+        "key": "web.http",
+        "value": "HTTP"
+      },
+      {
+        "namespace": "workspace",
+        "key": "archive.confirm.listSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "workspace",
+        "key": "date.ymd",
+        "value": "{y}-{m}-{d}"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "deepSeekBaseUrl",
+        "value": "https://api.deepseek.com/anthropic"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiCompletions",
+        "value": "OpenAI Chat Completions"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiResponses",
+        "value": "OpenAI Responses"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolAnthropicMessages",
+        "value": "Anthropic Messages"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customBaseUrlPlaceholder",
+        "value": "https://gateway.example/v1"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customAnthropicBaseUrlPlaceholder",
+        "value": "https://gateway.example"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "versionTag",
+        "value": "v{version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installGuideIdExample",
+        "value": "dsh-plugin-whale-pet"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryCustomPlaceholder",
+        "value": "https://npm.example.com/"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryListSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "sentenceSeparator",
+        "value": " "
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "fontSize.unit",
+        "value": "px"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "desktop-document",
+        "value": "userData/keybindings.json"
+      },
+      {
+        "namespace": "permission.access",
+        "key": "auto.badge",
+        "value": "EXP"
+      }
+    ]
+  },
+  "es": {
+    "namespaces": {
+      "common": 41,
+      "settings.locale": 1,
+      "settings": 34,
+      "chat": 186,
+      "conversation": 369,
+      "workspace": 112,
+      "model": 23,
+      "settings.models": 113,
+      "settings.plugins": 5,
+      "settings.pluginInventory": 40,
+      "pluginManager": 189,
+      "sidebar": 5,
+      "settings.agentPreset": 41,
+      "settings.theme": 9,
+      "shortcuts": 56,
+      "settings.permission": 12,
+      "permission.access": 17,
+      "approval": 5
+    },
+    "total": 1258,
+    "changed": 1194,
+    "unchanged": [
+      {
+        "namespace": "common",
+        "key": "json.label",
+        "value": "JSON"
+      },
+      {
+        "namespace": "common",
+        "key": "number.thousand",
+        "value": "{value}K"
+      },
+      {
+        "namespace": "common",
+        "key": "number.million",
+        "value": "{value}M"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.progress",
+        "value": "{percent}%"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.versionDetail",
+        "value": "{label}: {version}"
+      },
+      {
+        "namespace": "settings",
+        "key": "general.nav",
+        "value": "General"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.comma",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.sharedPrefix",
+        "value": ""
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.more",
+        "value": "{title}, etc."
+      },
+      {
+        "namespace": "chat",
+        "key": "view.chat",
+        "value": "Chat"
+      },
+      {
+        "namespace": "chat",
+        "key": "number.groupSeparator",
+        "value": ","
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.compactSeconds",
+        "value": "{seconds}s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.compactMinutes",
+        "value": "{minutes}m{seconds}s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.milliseconds",
+        "value": "{milliseconds}ms"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.referenceSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.compaction.commandTitle",
+        "value": "compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.separator",
+        "value": " · "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.retry.status",
+        "value": "{label} ({retry}/{maximum}) · {seconds}s"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.tokensPerSecond",
+        "value": "{tps} tok/s"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnUsage.count",
+        "value": "{count} tok"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.secondUnit",
+        "value": "s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.minuteUnit",
+        "value": "m "
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.hourUnit",
+        "value": "h "
+      },
+      {
+        "namespace": "chat",
+        "key": "clock.md",
+        "value": "{m}/{d}"
+      },
+      {
+        "namespace": "chat",
+        "key": "clock.ymd",
+        "value": "{y}-{m}-{d}"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.days",
+        "value": "{count} d"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.hours",
+        "value": "{count} h"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.minutes",
+        "value": "{count} min"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.seconds",
+        "value": "{count} s"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.schedule.cron",
+        "value": "Cron {expression} ({zone})"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.weekday.join",
+        "value": ", "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.no",
+        "value": "No"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.id",
+        "value": "ID"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.bash",
+        "value": "Bash"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.pwsh",
+        "value": "Pwsh"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.grep",
+        "value": "Grep"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.glob",
+        "value": "Glob"
+      },
+      {
+        "namespace": "conversation",
+        "key": "web.http",
+        "value": "HTTP"
+      },
+      {
+        "namespace": "conversation",
+        "key": "terminal.session",
+        "value": "Terminal {sessionId}"
+      },
+      {
+        "namespace": "workspace",
+        "key": "orderBy.manual",
+        "value": "Manual"
+      },
+      {
+        "namespace": "workspace",
+        "key": "archive.confirm.listSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "workspace",
+        "key": "date.ymd",
+        "value": "{y}-{m}-{d}"
+      },
+      {
+        "namespace": "workspace",
+        "key": "time.minutes",
+        "value": "{n}min"
+      },
+      {
+        "namespace": "workspace",
+        "key": "time.hours",
+        "value": "{n}h"
+      },
+      {
+        "namespace": "workspace",
+        "key": "time.days",
+        "value": "{n}d"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "deepSeekBaseUrl",
+        "value": "https://api.deepseek.com/anthropic"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiCompletions",
+        "value": "OpenAI Chat Completions"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiResponses",
+        "value": "OpenAI Responses"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolAnthropicMessages",
+        "value": "Anthropic Messages"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customBaseUrlPlaceholder",
+        "value": "https://gateway.example/v1"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customAnthropicBaseUrlPlaceholder",
+        "value": "https://gateway.example"
+      },
+      {
+        "namespace": "settings.pluginInventory",
+        "key": "countUnit",
+        "value": "plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "panel",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "title",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "statusBeta",
+        "value": "Experimental"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "versionTag",
+        "value": "v{version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "crumbRoot",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installGuideIdExample",
+        "value": "dsh-plugin-whale-pet"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryCustomPlaceholder",
+        "value": "https://npm.example.com/"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryListSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "sentenceSeparator",
+        "value": " "
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "fontSize.unit",
+        "value": "px"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "desktop-document",
+        "value": "userData/keybindings.json"
+      },
+      {
+        "namespace": "permission.access",
+        "key": "auto.badge",
+        "value": "EXP"
+      }
+    ]
+  },
+  "pt-BR": {
+    "namespaces": {
+      "common": 41,
+      "settings.locale": 1,
+      "settings": 34,
+      "chat": 186,
+      "conversation": 369,
+      "workspace": 112,
+      "model": 23,
+      "settings.models": 113,
+      "settings.plugins": 5,
+      "settings.pluginInventory": 40,
+      "pluginManager": 189,
+      "sidebar": 5,
+      "settings.agentPreset": 41,
+      "settings.theme": 9,
+      "shortcuts": 56,
+      "settings.permission": 12,
+      "permission.access": 17,
+      "approval": 5
+    },
+    "total": 1258,
+    "changed": 1193,
+    "unchanged": [
+      {
+        "namespace": "common",
+        "key": "ok",
+        "value": "OK"
+      },
+      {
+        "namespace": "common",
+        "key": "brand.localBuild",
+        "value": "DSH Local Build"
+      },
+      {
+        "namespace": "common",
+        "key": "json.label",
+        "value": "JSON"
+      },
+      {
+        "namespace": "common",
+        "key": "number.thousand",
+        "value": "{value}K"
+      },
+      {
+        "namespace": "common",
+        "key": "number.million",
+        "value": "{value}M"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.progress",
+        "value": "{percent}%"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.versionDetail",
+        "value": "{label}: {version}"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.comma",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.sharedPrefix",
+        "value": ""
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.more",
+        "value": "{title}, etc."
+      },
+      {
+        "namespace": "chat",
+        "key": "view.chat",
+        "value": "Chat"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.compactSeconds",
+        "value": "{seconds}s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.compactMinutes",
+        "value": "{minutes}m{seconds}s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.milliseconds",
+        "value": "{milliseconds}ms"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.referenceSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.compaction.commandTitle",
+        "value": "compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.separator",
+        "value": " · "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.retry.status",
+        "value": "{label} ({retry}/{maximum}) · {seconds}s"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.tokensPerSecond",
+        "value": "{tps} tok/s"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnUsage.count",
+        "value": "{count} tok"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.secondUnit",
+        "value": "s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.minuteUnit",
+        "value": "m "
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.hourUnit",
+        "value": "h "
+      },
+      {
+        "namespace": "chat",
+        "key": "clock.md",
+        "value": "{m}/{d}"
+      },
+      {
+        "namespace": "chat",
+        "key": "clock.ymd",
+        "value": "{y}-{m}-{d}"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.state",
+        "value": "Status"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.days",
+        "value": "{count} d"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.hours",
+        "value": "{count} h"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.minutes",
+        "value": "{count} min"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.seconds",
+        "value": "{count} s"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.schedule.cron",
+        "value": "Cron {expression} ({zone})"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.weekday.join",
+        "value": ", "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.id",
+        "value": "ID"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.bash",
+        "value": "Bash"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.pwsh",
+        "value": "Pwsh"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.grep",
+        "value": "Grep"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.glob",
+        "value": "Glob"
+      },
+      {
+        "namespace": "conversation",
+        "key": "web.http",
+        "value": "HTTP"
+      },
+      {
+        "namespace": "conversation",
+        "key": "terminal.session",
+        "value": "Terminal {sessionId}"
+      },
+      {
+        "namespace": "workspace",
+        "key": "orderBy.manual",
+        "value": "Manual"
+      },
+      {
+        "namespace": "workspace",
+        "key": "archive.confirm.listSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "workspace",
+        "key": "date.ymd",
+        "value": "{y}-{m}-{d}"
+      },
+      {
+        "namespace": "workspace",
+        "key": "time.minutes",
+        "value": "{n}min"
+      },
+      {
+        "namespace": "workspace",
+        "key": "time.hours",
+        "value": "{n}h"
+      },
+      {
+        "namespace": "workspace",
+        "key": "time.days",
+        "value": "{n}d"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "deepSeekBaseUrl",
+        "value": "https://api.deepseek.com/anthropic"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiCompletions",
+        "value": "OpenAI Chat Completions"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiResponses",
+        "value": "OpenAI Responses"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolAnthropicMessages",
+        "value": "Anthropic Messages"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customBaseUrlPlaceholder",
+        "value": "https://gateway.example/v1"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customAnthropicBaseUrlPlaceholder",
+        "value": "https://gateway.example"
+      },
+      {
+        "namespace": "settings.pluginInventory",
+        "key": "countUnit",
+        "value": "plugins"
+      },
+      {
+        "namespace": "settings.pluginInventory",
+        "key": "runtime",
+        "value": "Status"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "panel",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "title",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "statusBeta",
+        "value": "Experimental"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "versionTag",
+        "value": "v{version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "crumbRoot",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installGuideIdExample",
+        "value": "dsh-plugin-whale-pet"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryCustomPlaceholder",
+        "value": "https://npm.example.com/"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryListSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "sentenceSeparator",
+        "value": " "
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "fontSize.unit",
+        "value": "px"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "desktop-document",
+        "value": "userData/keybindings.json"
+      },
+      {
+        "namespace": "permission.access",
+        "key": "auto.badge",
+        "value": "EXP"
+      }
+    ]
+  },
+  "de": {
+    "namespaces": {
+      "common": 41,
+      "settings.locale": 1,
+      "settings": 34,
+      "chat": 186,
+      "conversation": 369,
+      "workspace": 112,
+      "model": 23,
+      "settings.models": 113,
+      "settings.plugins": 5,
+      "settings.pluginInventory": 40,
+      "pluginManager": 189,
+      "sidebar": 5,
+      "settings.agentPreset": 41,
+      "settings.theme": 9,
+      "shortcuts": 56,
+      "settings.permission": 12,
+      "permission.access": 17,
+      "approval": 5
+    },
+    "total": 1258,
+    "changed": 1203,
+    "unchanged": [
+      {
+        "namespace": "common",
+        "key": "ok",
+        "value": "OK"
+      },
+      {
+        "namespace": "common",
+        "key": "brand.localBuild",
+        "value": "DSH Local Build"
+      },
+      {
+        "namespace": "common",
+        "key": "json.label",
+        "value": "JSON"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.progress",
+        "value": "{percent}%"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.versionDetail",
+        "value": "{label}: {version}"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.comma",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.sharedPrefix",
+        "value": ""
+      },
+      {
+        "namespace": "chat",
+        "key": "view.chat",
+        "value": "Chat"
+      },
+      {
+        "namespace": "chat",
+        "key": "settings.transcript.standard",
+        "value": "Standard"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.referenceSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.compaction.commandTitle",
+        "value": "compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.separator",
+        "value": " · "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.tokensPerSecond",
+        "value": "{tps} tok/s"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnUsage.count",
+        "value": "{count} tok"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.secondUnit",
+        "value": "s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.hourUnit",
+        "value": "h "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.state",
+        "value": "Status"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.schedule.cron",
+        "value": "Cron {expression} ({zone})"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.weekday.join",
+        "value": ", "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.id",
+        "value": "ID"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.revision",
+        "value": "Revision"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.props",
+        "value": "Props"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.signal",
+        "value": "Signal"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.bash",
+        "value": "Bash"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.code",
+        "value": "Code"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.pwsh",
+        "value": "Pwsh"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.grep",
+        "value": "Grep"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.glob",
+        "value": "Glob"
+      },
+      {
+        "namespace": "conversation",
+        "key": "web.http",
+        "value": "HTTP"
+      },
+      {
+        "namespace": "conversation",
+        "key": "terminal.session",
+        "value": "Terminal {sessionId}"
+      },
+      {
+        "namespace": "workspace",
+        "key": "archive.confirm.listSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "settings.models",
+        "key": "deepSeekBaseUrl",
+        "value": "https://api.deepseek.com/anthropic"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "modelInputText",
+        "value": "Text"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiCompletions",
+        "value": "OpenAI Chat Completions"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiResponses",
+        "value": "OpenAI Responses"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolAnthropicMessages",
+        "value": "Anthropic Messages"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customBaseUrlPlaceholder",
+        "value": "https://gateway.example/v1"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customAnthropicBaseUrlPlaceholder",
+        "value": "https://gateway.example"
+      },
+      {
+        "namespace": "settings.pluginInventory",
+        "key": "runtime",
+        "value": "Status"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "panel",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "title",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "statusProblem",
+        "value": "Problem"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "versionTag",
+        "value": "v{version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "rowPhaseFailed",
+        "value": "Problem"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "crumbRoot",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installGuideIdExample",
+        "value": "dsh-plugin-whale-pet"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryToggle",
+        "value": "Registry"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryCustomPlaceholder",
+        "value": "https://npm.example.com/"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryListSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "sentenceSeparator",
+        "value": " "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installVersion",
+        "value": "Version {version}"
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "appearance.system",
+        "value": "System"
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "fontSize.unit",
+        "value": "px"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "desktop-document",
+        "value": "userData/keybindings.json"
+      },
+      {
+        "namespace": "permission.access",
+        "key": "auto.badge",
+        "value": "EXP"
+      }
+    ]
+  },
+  "fr": {
+    "namespaces": {
+      "common": 41,
+      "settings.locale": 1,
+      "settings": 34,
+      "chat": 186,
+      "conversation": 369,
+      "workspace": 112,
+      "model": 23,
+      "settings.models": 113,
+      "settings.plugins": 5,
+      "settings.pluginInventory": 40,
+      "pluginManager": 189,
+      "sidebar": 5,
+      "settings.agentPreset": 41,
+      "settings.theme": 9,
+      "shortcuts": 56,
+      "settings.permission": 12,
+      "permission.access": 17,
+      "approval": 5
+    },
+    "total": 1258,
+    "changed": 1191,
+    "unchanged": [
+      {
+        "namespace": "common",
+        "key": "ok",
+        "value": "OK"
+      },
+      {
+        "namespace": "common",
+        "key": "json.label",
+        "value": "JSON"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.comma",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.sharedPrefix",
+        "value": ""
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.more",
+        "value": "{title}, etc."
+      },
+      {
+        "namespace": "chat",
+        "key": "settings.performance.compact",
+        "value": "Compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "settings.transcript.compact",
+        "value": "Compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "settings.transcript.standard",
+        "value": "Standard"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.referenceSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.compaction.commandTitle",
+        "value": "compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.messages.one",
+        "value": "{count} message"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.messages.other",
+        "value": "{count} messages"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.separator",
+        "value": " · "
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.secondUnit",
+        "value": "s"
+      },
+      {
+        "namespace": "chat",
+        "key": "duration.hourUnit",
+        "value": "h "
+      },
+      {
+        "namespace": "conversation",
+        "key": "image.label",
+        "value": "Image"
+      },
+      {
+        "namespace": "conversation",
+        "key": "context.messages",
+        "value": "Messages"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.hours",
+        "value": "{count} h"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.minutes",
+        "value": "{count} min"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.seconds",
+        "value": "{count} s"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.schedule.cron",
+        "value": "Cron {expression} ({zone})"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.weekday.join",
+        "value": ", "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.id",
+        "value": "ID"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.diagnostics",
+        "value": "Diagnostics"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.source",
+        "value": "Source"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.message",
+        "value": "Message"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.type",
+        "value": "Type"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.parent",
+        "value": "Parent"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.signal",
+        "value": "Signal"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.agents.count",
+        "value": "{count} agents"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.bash",
+        "value": "Bash"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.code",
+        "value": "Code"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.pwsh",
+        "value": "Pwsh"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.grep",
+        "value": "Grep"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.glob",
+        "value": "Glob"
+      },
+      {
+        "namespace": "conversation",
+        "key": "web.http",
+        "value": "HTTP"
+      },
+      {
+        "namespace": "conversation",
+        "key": "terminal.signal",
+        "value": "signal {signal}"
+      },
+      {
+        "namespace": "conversation",
+        "key": "terminal.session",
+        "value": "Terminal {sessionId}"
+      },
+      {
+        "namespace": "workspace",
+        "key": "section.sessions",
+        "value": "Sessions"
+      },
+      {
+        "namespace": "workspace",
+        "key": "archive.confirm.listSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "workspace",
+        "key": "sessions.count.one",
+        "value": "{n} session"
+      },
+      {
+        "namespace": "workspace",
+        "key": "sessions.count.other",
+        "value": "{n} sessions"
+      },
+      {
+        "namespace": "model",
+        "key": "menu.effort",
+        "value": "Effort"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "deepSeekBaseUrl",
+        "value": "https://api.deepseek.com/anthropic"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "modelInputImage",
+        "value": "Image"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiCompletions",
+        "value": "OpenAI Chat Completions"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiResponses",
+        "value": "OpenAI Responses"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolAnthropicMessages",
+        "value": "Anthropic Messages"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customBaseUrlPlaceholder",
+        "value": "https://gateway.example/v1"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customAnthropicBaseUrlPlaceholder",
+        "value": "https://gateway.example"
+      },
+      {
+        "namespace": "settings.pluginInventory",
+        "key": "countUnit",
+        "value": "plugins"
+      },
+      {
+        "namespace": "settings.pluginInventory",
+        "key": "moduleLabel",
+        "value": "Module"
+      },
+      {
+        "namespace": "settings.pluginInventory",
+        "key": "configuration",
+        "value": "Configuration"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "panel",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "title",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "versionTag",
+        "value": "v{version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "crumbRoot",
+        "value": "Plugins"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installGuideIdExample",
+        "value": "dsh-plugin-whale-pet"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryCustomPlaceholder",
+        "value": "https://npm.example.com/"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryListSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "sentenceSeparator",
+        "value": " "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installVersion",
+        "value": "Version {version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "terminalSignal",
+        "value": "signal {signal}"
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "fontSize.unit",
+        "value": "px"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "desktop-document",
+        "value": "userData/keybindings.json"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "application",
+        "value": "Application"
+      },
+      {
+        "namespace": "permission.access",
+        "key": "auto.badge",
+        "value": "EXP"
+      }
+    ]
+  },
+  "ja": {
+    "namespaces": {
+      "common": 41,
+      "settings.locale": 1,
+      "settings": 34,
+      "chat": 186,
+      "conversation": 369,
+      "workspace": 112,
+      "model": 23,
+      "settings.models": 113,
+      "settings.plugins": 5,
+      "settings.pluginInventory": 40,
+      "pluginManager": 189,
+      "sidebar": 5,
+      "settings.agentPreset": 41,
+      "settings.theme": 9,
+      "shortcuts": 56,
+      "settings.permission": 12,
+      "permission.access": 17,
+      "approval": 5
+    },
+    "total": 1258,
+    "changed": 1231,
+    "unchanged": [
+      {
+        "namespace": "common",
+        "key": "ok",
+        "value": "OK"
+      },
+      {
+        "namespace": "common",
+        "key": "json.label",
+        "value": "JSON"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.progress",
+        "value": "{percent}%"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.versionDetail",
+        "value": "{label}: {version}"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.sharedPrefix",
+        "value": ""
+      },
+      {
+        "namespace": "chat",
+        "key": "number.groupSeparator",
+        "value": ","
+      },
+      {
+        "namespace": "chat",
+        "key": "message.compaction.commandTitle",
+        "value": "compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.separator",
+        "value": " · "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.id",
+        "value": "ID"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.bash",
+        "value": "Bash"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.pwsh",
+        "value": "Pwsh"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.grep",
+        "value": "Grep"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.glob",
+        "value": "Glob"
+      },
+      {
+        "namespace": "conversation",
+        "key": "web.http",
+        "value": "HTTP"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "deepSeekBaseUrl",
+        "value": "https://api.deepseek.com/anthropic"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiCompletions",
+        "value": "OpenAI Chat Completions"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiResponses",
+        "value": "OpenAI Responses"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolAnthropicMessages",
+        "value": "Anthropic Messages"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customBaseUrlPlaceholder",
+        "value": "https://gateway.example/v1"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customAnthropicBaseUrlPlaceholder",
+        "value": "https://gateway.example"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "versionTag",
+        "value": "v{version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installGuideIdExample",
+        "value": "dsh-plugin-whale-pet"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryCustomPlaceholder",
+        "value": "https://npm.example.com/"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "sentenceSeparator",
+        "value": " "
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "fontSize.unit",
+        "value": "px"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "desktop-document",
+        "value": "userData/keybindings.json"
+      },
+      {
+        "namespace": "permission.access",
+        "key": "auto.badge",
+        "value": "EXP"
+      }
+    ]
+  },
+  "ko": {
+    "namespaces": {
+      "common": 41,
+      "settings.locale": 1,
+      "settings": 34,
+      "chat": 186,
+      "conversation": 369,
+      "workspace": 112,
+      "model": 23,
+      "settings.models": 113,
+      "settings.plugins": 5,
+      "settings.pluginInventory": 40,
+      "pluginManager": 189,
+      "sidebar": 5,
+      "settings.agentPreset": 41,
+      "settings.theme": 9,
+      "shortcuts": 56,
+      "settings.permission": 12,
+      "permission.access": 17,
+      "approval": 5
+    },
+    "total": 1258,
+    "changed": 1226,
+    "unchanged": [
+      {
+        "namespace": "common",
+        "key": "json.label",
+        "value": "JSON"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.progress",
+        "value": "{percent}%"
+      },
+      {
+        "namespace": "settings",
+        "key": "desktop.update.versionDetail",
+        "value": "{label}: {version}"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.comma",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.stepProcess.sharedPrefix",
+        "value": ""
+      },
+      {
+        "namespace": "chat",
+        "key": "number.groupSeparator",
+        "value": ","
+      },
+      {
+        "namespace": "chat",
+        "key": "message.referenceSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "chat",
+        "key": "message.compaction.commandTitle",
+        "value": "compact"
+      },
+      {
+        "namespace": "chat",
+        "key": "message.turnProcess.separator",
+        "value": " · "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.schedule.cron",
+        "value": "Cron {expression} ({zone})"
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.weekday.join",
+        "value": ", "
+      },
+      {
+        "namespace": "conversation",
+        "key": "detail.field.id",
+        "value": "ID"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.bash",
+        "value": "Bash"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.pwsh",
+        "value": "Pwsh"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.grep",
+        "value": "Grep"
+      },
+      {
+        "namespace": "conversation",
+        "key": "tool.title.glob",
+        "value": "Glob"
+      },
+      {
+        "namespace": "conversation",
+        "key": "web.http",
+        "value": "HTTP"
+      },
+      {
+        "namespace": "workspace",
+        "key": "archive.confirm.listSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "settings.models",
+        "key": "deepSeekBaseUrl",
+        "value": "https://api.deepseek.com/anthropic"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiCompletions",
+        "value": "OpenAI Chat Completions"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolOpenAiResponses",
+        "value": "OpenAI Responses"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "protocolAnthropicMessages",
+        "value": "Anthropic Messages"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customBaseUrlPlaceholder",
+        "value": "https://gateway.example/v1"
+      },
+      {
+        "namespace": "settings.models",
+        "key": "customAnthropicBaseUrlPlaceholder",
+        "value": "https://gateway.example"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "versionTag",
+        "value": "v{version}"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "installGuideIdExample",
+        "value": "dsh-plugin-whale-pet"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryCustomPlaceholder",
+        "value": "https://npm.example.com/"
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "registryListSeparator",
+        "value": ", "
+      },
+      {
+        "namespace": "pluginManager",
+        "key": "sentenceSeparator",
+        "value": " "
+      },
+      {
+        "namespace": "settings.theme",
+        "key": "fontSize.unit",
+        "value": "px"
+      },
+      {
+        "namespace": "shortcuts",
+        "key": "desktop-document",
+        "value": "userData/keybindings.json"
+      },
+      {
+        "namespace": "permission.access",
+        "key": "auto.badge",
+        "value": "EXP"
+      }
+    ]
+  }
+}

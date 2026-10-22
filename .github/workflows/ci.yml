@@ -19,6 +19,9 @@ env:
   CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
+  language-pack:
+    uses: ./.github/workflows/language-pack.yml
+
   # The declared MSRV in Cargo.toml is a promise to users who build from
   # source; check it separately so a stable-only feature cannot sneak in.
   msrv:

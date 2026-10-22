@@ -1,0 +1,11 @@
+# Isolated runtime/browser profiles, npm tarballs, logs and screenshots.
+artifacts/*
+!artifacts/dsh-ocean-desktop-language-pack-0.1.0.tgz
+!artifacts/dsh-ocean-desktop-language-pack-0.2.0.tgz
+!artifacts/dsh-ocean-desktop-language-pack-0.3.0.tgz
+lib/
+node_modules/
+# Translator staging shards; only assembled data/<language>.json is authoritative.
+data/*-main.json
+data/*-conversation.json
+data/*-plugins.json

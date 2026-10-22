@@ -1,0 +1,172 @@
+{
+  "runtime": {
+    "package": "@deepseek-ai/dsh",
+    "version": "0.2.0-rc.2",
+    "sha256": "0a85203e3e907dd2e3bec34324a2494758ca6cdee234b07090a7c8df0b11acac"
+  },
+  "sources": [
+    {
+      "namespace": "common",
+      "package": "@deepseek-ai/dsh-client-locale",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en$1",
+      "sha256": "bad8fe9bfb07af2a60c80933be65ceafdaab5386f404fb264401c7e540a36e16",
+      "keys": 41
+    },
+    {
+      "namespace": "settings.locale",
+      "package": "@deepseek-ai/dsh-client-locale",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "bad8fe9bfb07af2a60c80933be65ceafdaab5386f404fb264401c7e540a36e16",
+      "keys": 1
+    },
+    {
+      "namespace": "settings",
+      "package": "@deepseek-ai/dsh-client-ui-settings-general",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "e91fd0db8ffea4646a5ec4aaceb6ddaa62ff727e0f698ef75858a4a18df30460",
+      "keys": 34
+    },
+    {
+      "namespace": "chat",
+      "package": "@deepseek-ai/dsh-client-ui-chat",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "575de08018f49053a58680fbd62d5b9832a93aafc385217cc4331d5fed6d0dc0",
+      "keys": 186
+    },
+    {
+      "namespace": "conversation",
+      "package": "@deepseek-ai/dsh-client-ui-conversation",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "c1d1c1e38ebb2f78972124f066b4ff3084206cc013c29e4aec2f754a3db06256",
+      "keys": 369
+    },
+    {
+      "namespace": "workspace",
+      "package": "@deepseek-ai/dsh-client-ui-workspace",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "e784543780fb8ac7c38c853afd26b9b1713c6907eec2b07eff37461e07bd3be9",
+      "keys": 112
+    },
+    {
+      "namespace": "model",
+      "package": "@deepseek-ai/dsh-client-ui-model-selection",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "2ca82227074f2d78f15588364368d27e4d58b1abcd7f9fc01f368fab64bc6696",
+      "keys": 23
+    },
+    {
+      "namespace": "settings.models",
+      "package": "@deepseek-ai/dsh-client-ui-settings-models",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "7674ed0ba2eef60fa7db91b4bf8cea4dc23e1f0a2f3dd1e6a2a67ad4c0d005fa",
+      "keys": 113
+    },
+    {
+      "namespace": "settings.plugins",
+      "package": "@deepseek-ai/dsh-client-ui-settings-plugins",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "9a83a5b1a312ca1fc3ff44cde7b9f3481305ff40f92f74bad7e95af80fdd94aa",
+      "keys": 5
+    },
+    {
+      "namespace": "settings.pluginInventory",
+      "package": "@deepseek-ai/dsh-client-ui-settings-plugin-inventory",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "2ca9094639925b9427003c4481689d42b6840cf00537738f0ace961dafc51815",
+      "keys": 40
+    },
+    {
+      "namespace": "pluginManager",
+      "package": "@deepseek-ai/dsh-client-ui-plugin-manager",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "bf25686c575d598b91a5dec43cc725d9c1066c801555ce06e6f12f0f72e94f77",
+      "keys": 189
+    },
+    {
+      "namespace": "sidebar",
+      "package": "@deepseek-ai/dsh-client-ui-sidebar",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "88d7e6d2f65350a62f1d97d0ce9be34643c73e9825243ae9307dae55094896a2",
+      "keys": 5
+    },
+    {
+      "namespace": "settings.agentPreset",
+      "package": "@deepseek-ai/dsh-client-ui-agent-preset",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "e47add2b538ef882fca0880ecb56557d3a2998089708ada96a45c9dc0c7f14a4",
+      "keys": 41
+    },
+    {
+      "namespace": "settings.theme",
+      "package": "@deepseek-ai/dsh-client-ui-theme",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "b1c1d19438c15717dec571032a3c911eed4038d4dab8b4975ca797b7b7afd6ab",
+      "keys": 9
+    },
+    {
+      "namespace": "shortcuts",
+      "package": "@deepseek-ai/dsh-client-ui-shortcuts",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "437b043d2b9d914f799e963584bf4e6d2c96f3267bb7c50851f54b47098c1395",
+      "keys": 56
+    },
+    {
+      "namespace": "settings.permission",
+      "package": "@deepseek-ai/dsh-client-ui-permission-presets",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "7f89170dd32aff34961cc86d388eb8f800fbfdab87b88894c991d28ee0f92c4f",
+      "keys": 12
+    },
+    {
+      "namespace": "permission.access",
+      "package": "@deepseek-ai/dsh-client-ui-permission-presets",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "accessEn",
+      "sha256": "7f89170dd32aff34961cc86d388eb8f800fbfdab87b88894c991d28ee0f92c4f",
+      "keys": 17
+    },
+    {
+      "namespace": "approval",
+      "package": "@deepseek-ai/dsh-client-ui-approval",
+      "version": "0.2.0-rc.2",
+      "artifact": "lib/client.js",
+      "variable": "en",
+      "sha256": "d5ae6ff6ebdef5bfa1ef76e3c10024095ed5b6c51ce793abb9e8af3781a9eae4",
+      "keys": 5
+    }
+  ],
+  "totalKeys": 1258
+}
