@@ -48,6 +48,11 @@ if [ "$MODE" != check ]; then
     exec 9>"$PREFIX/.bootstrap.lock"
   fi
   flock -n 9 || die "another bootstrap is already running for $PREFIX"
+  # The signed transaction owns its generations/scratch until explicit recovery.
+  # Recheck under the same prefix lock, including dangling/corrupt journal entries.
+  if [ -e "$PREFIX/.runtime-pending.json" ] || [ -L "$PREFIX/.runtime-pending.json" ]; then
+    die 'signed runtime recovery is pending; use the native recovery action before maintenance'
+  fi
 fi
 
 # A forced stop (SIGKILL, app exit) can leave the installer's own transient

@@ -150,8 +150,15 @@ jobs:
             exit 1
           }
 
-      - name: Task observer and offline signer tests
-        run: node --test tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs
+      - name: Task observer, isolated runtime health and offline signer tests
+        run: node --test tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs tests/runtime_health.mjs tests/publisher_signer.mjs
+        env:
+          DSH_OCEAN_TEST_VERIFIER: ${{ github.workspace }}/target/debug/dsh-ocean
+
+      - name: Public release metadata and independent Rust policy bridge
+        run: python3 -B -m unittest discover -s tests -p 'test_release_artifacts.py' -v
+        env:
+          DSH_OCEAN_TEST_VERIFIER: ${{ github.workspace }}/target/debug/dsh-ocean
 
       - name: Private desktop notification bus
         run: timeout --kill-after=5s 45s bash scripts/test-native.sh cargo test --locked --test desktop_notifications -- --ignored --test-threads=1 --nocapture

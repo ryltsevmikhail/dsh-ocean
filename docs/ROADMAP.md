@@ -41,10 +41,17 @@ never deleting or following links. The packaged client exposes `--runtime-mainte
 
 ## Milestones
 
+**Owner acceptance (2026-10-21): M0 and M1 are accepted/closed.** The owner
+reports having checked them. Repeat acceptance on a second laptop is deferred
+until the milestones are complete, before final release readiness. Historical
+validation notes below remain provenance, not a reason to restart M0/M1.
+Current implementation priority is M2; signed production delivery is not implied
+by acceptance of bootstrap/first-run behavior.
+
 Estimates assume one experienced engineer full-time. Part-time work is roughly
 1.5–2× longer.
 
-### M0 — Testable foundation (2–3 days) — in progress
+### M0 — Testable foundation (2–3 days) — owner accepted
 
 - Add an integration harness that runs a fake DSH server on `127.0.0.1:39080`
   and a disposable `DSH_HOME`.
@@ -81,12 +88,12 @@ including same-group tool sentinels. MSRV, native GTK/WebKit and package smoke
 steps also passed. This is not a claim of local Xvfb execution or a signed release.
 See [CI GUI acceptance](UPDATE_TESTING.md#ci-gui-fallback-and-automatic-recovery-controlled-child-fixture).
 
-**Remaining:** real DSH HTML/window acceptance and the clean desktop/distro matrix. Neither the real-runtime helper test nor the fake-child
+**Final cross-laptop recheck:** real DSH HTML/window acceptance and the clean desktop/distro matrix. Neither the real-runtime helper test nor the fake-child
 GUI scenario is a model/provider or bootstrap-UI acceptance test. Package/private
 install smoke and 0.1.1 preparation have local evidence; hosted publication and
 signed release delivery remain separate gates.
 
-### M1 — Bootstrap 1.0 (5–7 days) — in progress
+### M1 — Bootstrap 1.0 (5–7 days) — owner accepted
 
 - Signed/checksummed runtime manifest: Node.js, DSH, pnpm, architecture,
   channel and minimum versions.
@@ -117,10 +124,12 @@ health-helper auth, child cleanup, early exits, unsafe URLs, and token redaction
 The opt-in clean-bootstrap workflow exercises the real runtime without system
 Node. Neither test path uses the live profile or :3080.
 
-Still missing: signed manifest, cancellation/progress UI, clean-room UI
-click-through test and offline bundle. Running-server restart/rollback and
-systemd unit migration belong to M2; selecting a generation does not change an
-already running server. Old generations are retained (no garbage collector).
+**Acceptance tracking:** first-run/bootstrap is accepted by the owner; repeat
+UI/clean-room acceptance on the second laptop is deferred to the final check.
+Production signed runtime delivery and running-server restart/rollback belong to
+M2; selecting a generation does not change an already running server. The optional
+offline bundle is deferred. Existing generation retention/explicit GC need not be
+reimplemented.
 
 ### M2 — Signed updates and releases (7–10 days) — in progress
 
@@ -189,13 +198,48 @@ Tests exercise all four pairs and the real multi-artifact headless draft → sig
 It creates no keys/state/files or releases; production publishing is still absent.
 See [verification, staging and publisher scope](RELEASE_VERIFICATION.md).
 
-**Shell status UX foundation:** distinct tray entries now separate npm/core
-checks from shell guidance. A native read-only version/hint screen and headless
-`--shell-status` show conservative AppImage/Flatpak/development/system-prefix/
-conflict/unknown context without package-manager, network, profile or service
-probes. Ownership/apply authority remain explicitly false and no production feed
-is configured. Conditional original-installer guidance is not an updater or
-package ownership proof. See [scope and tests](SHELL_UPDATES.md).
+**Signed runtime metadata foundation:** complete per-architecture bundle metadata
+has a separate Ed25519 domain/product, exact Node/DSH/pnpm versions, archive/source
+checksums and explicit writable-state scope. Runtime trust/channel and private
+sequence floor are independent of shell; configured checking and explicit metadata
+acceptance never install/execute or access a profile. Cross-product signatures,
+replay, malformed/unsafe policy and storage tests pass. Complete signed generation
+import now captures/hash-checks/extracts all payload bytes, protects a retained
+inventory and holds the shared installer lock without executing/selecting runtime
+or advancing the floor. Separate explicit isolated candidate checking validates
+native Node, exact signed versions/native bindings and authenticated server health,
+with clean disposable state and bounded cancellable process-group ownership.
+A separate stopped-writer transaction snapshot primitive now captures/restores
+supported full managed-home bytes/modes/mtime/internal links, plugin dependencies
+and original absence; sensitive snapshots/candidate retention stay private. It is
+not a manual export. A durable shared switch engine now orders stop/snapshot/
+selection/live-health/floor and stop/restore-before-old-start recovery; real private
+filesystem tests inject an owned controller, and ordinary local starts refuse
+pending records. Real owned Systemd/Child adapters now retain the permit, prove
+manager/unit/child authority and effective service data-home scope, stop/reap,
+start explicit roots and refresh authenticated origins/tokens. Native configured
+check/consent/apply/recovery now replace the installed npm-update path, retain
+settings/floor/prefix guards and revalidate before new start after snapshotting.
+Fresh-session Systemd journal recovery works without a previously published server;
+lost child ownership refuses safely. Post-success core history/rollback is not
+provided; same-session failure data rollback is. Offline signing, complete publisher
+archive assembly and manual dry-run-default native build/signed-draft CI are wired.
+Whole-M2 final review/exact-head CI and owner trust/real-artifact/laptop acceptance
+remain separate gates. See
+[runtime boundary](RUNTIME_RELEASES.md).
+
+**Native shell updater:** distinct tray entries separate core from shell updates.
+The GTK dialog provides current/running vs selected-on-disk version, signed
+`stable`/`next` channel settings, operator public-key fingerprints, explicit
+check/download and confirmed managed apply/rollback/recovery. Separate managed
+destination enrollment—not APPIMAGE/path hints—grants local apply authority;
+original package executables/desktop entries are never overwritten. Cancellation
+and worker gating cover publication/cleanup, and quit defers critical work.
+Restart is explicit: quit and reopen the separate managed launcher. A full
+isolated GTK fixture exercises both successful releases and retained rollback.
+The headless `--shell-status` classifier remains read-only/non-authoritative;
+production roots and actual package ownership detection are not invented.
+See [scope, guidance and acceptance](SHELL_UPDATES.md).
 
 **Persisted anti-rollback foundation:** `--accept-release` verifies then remembers
 `(channel, sequence, release, manifest digest)` in a private 0600 state file under
@@ -205,23 +249,61 @@ blocks acceptance, and `--release-state`/`--reset-release-state --confirm-reset`
 expose and clear it. `--verify-release` stays stateless. This is local
 replay/downgrade protection, not a signature, trusted clock or freshness proof.
 
+**Signed shell download:** `--download-release` authenticates the local manifest
+and independently provisioned key, enforces explicit policy and the remembered
+floor before networking, then streams the signed GitHub artifact URL through
+trusted system curl into existing exact-size/SHA-256/no-overwrite private staging.
+Curl config is disabled, HTTPS-only redirects/time/size bounds apply, curl errors
+cannot publish even a matching body, and early failures kill/reap curl. No key is
+fetched, no sequence accepted and no bytes executed. Synthetic-key/fake-curl tests
+cover authenticated download → explicit two-version apply → rollback, tampering,
+truncation/excess bytes, HTTP/timeout exit, overwrite and pre-network replay refusal.
+Real production feed/keys and GUI delivery remain pending.
+
+**Configured feed/trust foundation:** updater settings are stored separately from
+Harness/npm configuration, with independent shell/runtime trust and stable/next
+channels. Public-key fingerprint confirmation is required for import and explicit
+extra confirmation for replacement. Bounded metadata fetches authenticate exact
+bytes before policy, never fetch a key or advance a floor. Existing invalid or
+unsafe settings fail closed; channel/key changes invalidate held candidates and
+expiry/floor are rechecked at use. The native GUI and runtime verifier remain the
+next integration steps; no production source is silently configured.
+
 **Local activation foundation:** `--apply-release` activates an already verified
-local artifact into a private owned prefix (no download), re-verifying bytes after
-they land, retaining the previous version and recording the remembered sequence
+local AppImage or complete tar.gz package into a private owned prefix (no download),
+re-verifying bytes after they land, retaining the previous version and recording the remembered sequence
 only on success; `--rollback-shell` switches the selector back. No service restart
 or process replacement occurs, and this is not a filesystem transaction or
-system-wide install.
+system-wide install. A global floor guard and per-prefix operation lock now span
+activation/state commit. Synced selector journals restore originals on normal
+errors and require explicit `--recover-shell` after interruption; rollback verifies
+retained receipts/bytes and never lowers the accepted floor. This is recoverable
+coordination, not an executable health check or a kernel transaction. Tar extraction
+is bounded/path/type checked before no-overwrite version publication; the entire
+package (including notices) and installed-file inventory are retained. Rollback
+refuses damaged payload files or an unexpected file/directory set.
 
-**Remaining:** consistent profile/session backup and data-migration rollback
-(runtime/unit rollback alone is not data rollback), signed feeds/keys and shell
-updater, release CI, channel settings UI, managed-child updates,
-external-install migration and UI click-through. No live user server has been
-updated during these tests. See [real-service validation](UPDATE_TESTING.md).
+**Software M2 implementation:** signed complete-runtime delivery, owned Systemd/
+managed-child activation, consistent supported-home config/plugin/session snapshots
+and restore-before-old-start failure rollback are wired into native consent/apply/
+recovery. Manual native publisher/build/sign/strict-verify CI defaults to dry-run;
+its protected operation creates drafts only. Whole-branch review and exact-head CI
+are the final software-readiness gates, not production acceptance.
 
-**Core transaction exit met locally:** update from `0.2.0-rc.2` to `0.2.1-rc.2`
-in the isolated test profile, with live runtime/unit rollback proven. M2 is
-still incomplete: production signed feed/release delivery and the remaining
-safety/UI work above are not implied by this result or the offline verifier.
+**Remaining owner gates:** authenticated production feeds/key custody and rotation,
+protected CI environments/independently confirmed public fingerprints, genuine
+native artifact/ABI/license/assets/migration and installed-client/laptop acceptance.
+Lost fresh-session child ownership refuses safely; post-success core history
+rollback is not provided. Native shell click-through and runtime transaction tests
+use private synthetic trust/state and never update the live user server/profile.
+See [runtime boundaries](RUNTIME_RELEASES.md) and
+[real-service validation](UPDATE_TESTING.md).
+
+**Earlier local core proof:** the isolated `0.2.0-rc.2` → `0.2.1-rc.2` runtime/unit
+rollback remains historical evidence, not proof of signed delivery or data recovery.
+The M2 private signed-runtime tests additionally prove config/session/plugin data
+restoration before the explicit old runtime restarts; neither result substitutes
+for owner production-feed and compatibility acceptance.
 
 ### M3 — Desktop layer (10–15 days) — in progress
 
@@ -646,8 +728,9 @@ M0
 M7 after M1–M6
 ```
 
-M1 and M0 are the immediate work. M2 and M5 both depend on a trustworthy
-bootstrap. M3 and M4 can run in parallel with M2. M6 is gated by its spike.
+M0/M1 are owner-accepted; M2 is the current implementation priority. M2 and M5
+both depend on the bootstrap foundation. M3 and M4 can run in parallel with M2.
+M6 is gated by its spike. Final cross-laptop acceptance stays deferred, not waived.
 
 ## Testing strategy
 
@@ -689,19 +772,15 @@ On a clean machine with no Node, npm or DSH:
 
 ## Immediate next sprint
 
-1. Stabilization before a new feature milestone: nonblocking regular-file reads
-   for token/release/backup metadata; no-clobber unit publication and preservation
-   of existing custom directives; source desktop Exec quoting without URL fields;
-   locked Make/install commands and explicit local AppImage tool trust.
-   Regression coverage is isolated and does not change the live service.
-2. Remove GTK-thread diagnostic collection and hidden setup polling. Native
-   installed-client acceptance remains a separate gate, not implied by pure tests.
-3. Close the remaining M0/M1 acceptance gaps above: real managed-child lifecycle,
-   clean-room setup click-through and package/install acceptance. Existing
-   bootstrap generations/cancellation and CI foundations need not be reimplemented.
-4. Review the 1.0 scope and sequence M2 signed release delivery and M5 portability;
-   M6 remains a design-gated spike, not an implicitly completed engine adapter.
-5. Prepare a versioned stabilization release only after verification. Production
-   keys, independent AppImage digests, package source checksums, tags and publication
-   require authenticated release inputs; do not invent them or treat test keys as
-   authority. Create remote milestones/issues when a writable remote is available.
+1. M2: complete signed shell delivery on top of the existing verifier, download,
+   local AppImage activation and explicit rollback. Add authenticated feed/key
+   provisioning and user-facing orchestration without treating test keys as trust.
+2. M2: connect signed runtime delivery to existing isolated health checks and
+   generation/unit rollback; preserve profile/data and external-install boundaries.
+3. Keep each change in a focused PR with isolated tests. Never update the live
+   client/server/profile or publish a release as part of implementation tests.
+4. Continue M3–M6 in the sequence above. Recheck owner-accepted M0/M1 on the second
+   laptop after the milestones are complete, before declaring final readiness.
+5. Release only after explicit authorization and authenticated inputs: production
+   trust, independent AppImage digests, required license/source payloads, package
+   checksums and signed artifact verification. No invented keys, tags or releases.

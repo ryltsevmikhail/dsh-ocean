@@ -66,18 +66,50 @@ struct Detached {
     key_id: String,
     signature_hex: String,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct KeyFile {
-    version: u32,
-    key_id: String,
-    public_key_hex: String,
+pub struct PublicKeyDocument {
+    pub version: u32,
+    pub key_id: String,
+    pub public_key_hex: String,
 }
 pub struct TrustedKey {
     id: String,
     key: VerifyingKey,
 }
 impl TrustedKey {
+    pub fn fingerprint(&self) -> String {
+        hex(&Sha256::digest(self.key.as_bytes()))
+    }
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    /// Authenticate bounded exact bytes before parsing their product schema.
+    /// Only internal product verifiers choose a fixed domain; never a feed field.
+    pub(crate) fn authenticate(&self, domain: &[u8], bytes: &[u8], detached: &[u8]) -> Result<()> {
+        anyhow::ensure!(
+            !bytes.is_empty() && bytes.len() as u64 <= MAX_MANIFEST,
+            "release manifest size refused"
+        );
+        anyhow::ensure!(
+            detached.len() as u64 <= MAX_AUXILIARY,
+            "release signature size refused"
+        );
+        let signature: Detached = serde_json::from_slice(detached)
+            .map_err(|_| anyhow!("invalid detached signature format"))?;
+        anyhow::ensure!(
+            signature.version == 1 && signature.key_id == self.id,
+            "untrusted release signing key"
+        );
+        let signature = Signature::from_bytes(&decode::<64>(&signature.signature_hex)?);
+        let mut message = Vec::with_capacity(domain.len() + bytes.len());
+        message.extend_from_slice(domain);
+        message.extend_from_slice(bytes);
+        self.key
+            .verify_strict(&message, &signature)
+            .map_err(|_| anyhow!("release signature verification failed"))
+    }
+
     /// This file must be provisioned independently of the feed. Parsing it does
     /// not establish publisher trust; that is the operator/caller's decision.
     pub fn from_json(bytes: &[u8]) -> Result<Self> {
@@ -85,7 +117,7 @@ impl TrustedKey {
             bytes.len() as u64 <= MAX_AUXILIARY,
             "trusted key file exceeds limit"
         );
-        let value: KeyFile =
+        let value: PublicKeyDocument =
             serde_json::from_slice(bytes).map_err(|_| anyhow!("invalid trusted key file"))?;
         anyhow::ensure!(
             value.version == 1 && valid_id(&value.key_id),
@@ -135,7 +167,7 @@ fn valid_id(id: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
 }
-fn decode<const N: usize>(value: &str) -> Result<[u8; N]> {
+pub(crate) fn decode<const N: usize>(value: &str) -> Result<[u8; N]> {
     anyhow::ensure!(
         value.len() == N * 2
             && value
@@ -159,28 +191,7 @@ pub fn verify(
     trust: &TrustedKey,
     policy: &Policy,
 ) -> Result<Verified> {
-    anyhow::ensure!(
-        !bytes.is_empty() && bytes.len() as u64 <= MAX_MANIFEST,
-        "release manifest size refused"
-    );
-    anyhow::ensure!(
-        detached.len() as u64 <= MAX_AUXILIARY,
-        "release signature size refused"
-    );
-    let signature: Detached = serde_json::from_slice(detached)
-        .map_err(|_| anyhow!("invalid detached signature format"))?;
-    anyhow::ensure!(
-        signature.version == 1 && signature.key_id == trust.id,
-        "untrusted release signing key"
-    );
-    let signature = Signature::from_bytes(&decode::<64>(&signature.signature_hex)?);
-    let mut message = Vec::with_capacity(DOMAIN.len() + bytes.len());
-    message.extend_from_slice(DOMAIN);
-    message.extend_from_slice(bytes);
-    trust
-        .key
-        .verify_strict(&message, &signature)
-        .map_err(|_| anyhow!("release signature verification failed"))?;
+    trust.authenticate(DOMAIN, bytes, detached)?;
     // Parse and apply policy only after authenticating the exact raw bytes.
     let manifest: Manifest = serde_json::from_slice(bytes)
         .map_err(|_| anyhow!("invalid authenticated release manifest format"))?;
@@ -194,8 +205,16 @@ pub fn verify(
 }
 // This validates metadata only. It must never produce an authenticated proof.
 fn validate_policy(manifest: &Manifest, policy: &Policy) -> Result<Artifact> {
+    validate_metadata(manifest, policy, "dsh-ocean", artifact_url)
+}
+pub(crate) fn validate_metadata(
+    manifest: &Manifest,
+    policy: &Policy,
+    product: &str,
+    expected_url: impl Fn(&Version, Target, Kind) -> String,
+) -> Result<Artifact> {
     anyhow::ensure!(
-        manifest.version == 1 && manifest.product == "dsh-ocean",
+        manifest.version == 1 && manifest.product == product,
         "unsupported release manifest scope"
     );
     anyhow::ensure!(
@@ -250,7 +269,7 @@ fn validate_policy(manifest: &Manifest, policy: &Policy) -> Result<Artifact> {
             "release artifact size refused"
         );
         decode::<32>(&artifact.sha256)?;
-        let expected = artifact_url(&release, artifact.target, artifact.kind);
+        let expected = expected_url(&release, artifact.target, artifact.kind);
         anyhow::ensure!(
             artifact.url == expected,
             "release artifact location or filename refused"
@@ -308,7 +327,7 @@ pub fn verify_artifact(path: &Path, release: &Verified) -> Result<()> {
     );
     Ok(())
 }
-fn artifact_digest(path: &Path, expected_size: Option<u64>) -> Result<(u64, String)> {
+pub(crate) fn artifact_digest(path: &Path, expected_size: Option<u64>) -> Result<(u64, String)> {
     let mut file = open_regular(path, MAX_ASSET)?;
     let before = file.metadata()?;
     let size = expected_size.unwrap_or(before.len());
@@ -457,7 +476,11 @@ pub fn stage_artifact(source: &Path, destination: &Path, release: &Verified) -> 
     );
     stage_reader(&mut input, destination, release)
 }
-fn stage_reader(input: &mut impl Read, destination: &Path, release: &Verified) -> Result<Staged> {
+pub(crate) fn stage_reader(
+    input: &mut impl Read,
+    destination: &Path,
+    release: &Verified,
+) -> Result<Staged> {
     stage_reader_with_io(
         input,
         destination,
@@ -466,15 +489,111 @@ fn stage_reader(input: &mut impl Read, destination: &Path, release: &Verified) -
         File::sync_all,
     )
 }
-// Private operation seam for deterministic I/O-failure tests. Production always
-// uses File::write_all and File::sync_all, never an environment/remote override.
 fn stage_reader_with_io(
     input: &mut impl Read,
     destination: &Path,
     release: &Verified,
-    mut write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
+    write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
     sync: impl FnOnce(&File) -> std::io::Result<()>,
 ) -> Result<Staged> {
+    stage_reader_hooks(
+        input,
+        destination,
+        release,
+        write,
+        sync,
+        |_| Ok(()),
+        || Ok(()),
+    )
+}
+
+pub(crate) fn stage_reader_guarded(
+    input: &mut impl Read,
+    destination: &Path,
+    release: &Verified,
+    progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
+) -> Result<Staged> {
+    stage_artifact_guarded(
+        input,
+        destination,
+        release.artifact(),
+        progress,
+        before_publish,
+    )
+}
+/// Crate-private bytes primitive; public product APIs still require Verified.
+pub(crate) fn stage_artifact_guarded(
+    input: &mut impl Read,
+    destination: &Path,
+    artifact: &Artifact,
+    progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
+) -> Result<Staged> {
+    stage_artifact_hooks(
+        input,
+        destination,
+        artifact,
+        |file, bytes| file.write_all(bytes),
+        File::sync_all,
+        progress,
+        before_publish,
+    )
+}
+
+// Private operation seam for deterministic I/O-failure tests. Production always
+// uses File::write_all and File::sync_all, never an environment/remote override.
+fn stage_reader_hooks(
+    input: &mut impl Read,
+    destination: &Path,
+    release: &Verified,
+    write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
+    sync: impl FnOnce(&File) -> std::io::Result<()>,
+    progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
+) -> Result<Staged> {
+    stage_artifact_hooks(
+        input,
+        destination,
+        release.artifact(),
+        write,
+        sync,
+        progress,
+        before_publish,
+    )
+}
+/// Internal byte-copy primitive. Public callers must supply an authenticated
+/// product proof; metadata alone is never promoted to a Verified token here.
+pub(crate) fn stage_authenticated_artifact(
+    source: &Path,
+    destination: &Path,
+    artifact: &Artifact,
+) -> Result<Staged> {
+    let mut input = open_regular(source, MAX_ASSET)?;
+    anyhow::ensure!(
+        input.metadata()?.len() == artifact.size,
+        "release artifact size mismatch"
+    );
+    stage_artifact_hooks(
+        &mut input,
+        destination,
+        artifact,
+        |file, bytes| file.write_all(bytes),
+        File::sync_all,
+        |_| Ok(()),
+        || Ok(()),
+    )
+}
+fn stage_artifact_hooks(
+    input: &mut impl Read,
+    destination: &Path,
+    artifact: &Artifact,
+    mut write: impl FnMut(&mut File, &[u8]) -> std::io::Result<()>,
+    sync: impl FnOnce(&File) -> std::io::Result<()>,
+    mut progress: impl FnMut(u64) -> Result<()>,
+    before_publish: impl FnOnce() -> Result<()>,
+) -> Result<Staged> {
+    progress(0)?;
     let mut transfer = crate::downloads::Transfer::prepare(destination)
         .context("prepare new release staging destination")?;
     let mut output = OpenOptions::new()
@@ -488,22 +607,18 @@ fn stage_reader_with_io(
     let mut total = 0u64;
     let mut buffer = [0u8; 65536];
     loop {
-        let size = input
-            .read(&mut buffer)
-            .context("read local release source")?;
+        let size = input.read(&mut buffer).context("read release source")?;
         if size == 0 {
             break;
         }
         total += size as u64;
-        anyhow::ensure!(
-            total <= release.artifact.size,
-            "release source exceeds signed size"
-        );
+        anyhow::ensure!(total <= artifact.size, "release source exceeds signed size");
         write(&mut output, &buffer[..size]).context("write private release staging file")?;
+        progress(total)?;
         hash.update(&buffer[..size]);
     }
     anyhow::ensure!(
-        total == release.artifact.size && hex(&hash.finalize()) == release.artifact.sha256,
+        total == artifact.size && hex(&hash.finalize()) == artifact.sha256,
         "staged release size or SHA-256 mismatch"
     );
     sync(&output).context("sync verified release staging file")?;
@@ -514,6 +629,8 @@ fn stage_reader_with_io(
         a.dev() == b.dev() && a.ino() == b.ino() && b.len() == total,
         "private release staging file changed"
     );
+    progress(total)?;
+    before_publish()?;
     let path = transfer
         .publish()
         .context("publish verified release without overwriting")?;
@@ -581,6 +698,62 @@ mod staging_tests {
             digest: String::new(),
             key_id: "unit-test-only".into(),
         }
+    }
+    #[test]
+    fn cancellation_at_copy_or_final_sync_never_publishes_staged_bytes() {
+        for at_sync in [false, true] {
+            let f = Fixture::new();
+            let target = f.0.join("cancelled.AppImage");
+            let bytes = vec![b'x'; 131072];
+            let release = proof(&bytes);
+            let control = crate::update_control::Control::default();
+            let result = stage_reader_hooks(
+                &mut Cursor::new(&bytes),
+                &target,
+                &release,
+                |f, b| f.write_all(b),
+                |file| {
+                    if at_sync {
+                        assert!(control.cancel());
+                    }
+                    file.sync_all()
+                },
+                |total| {
+                    if !at_sync && total > 0 {
+                        assert!(control.cancel());
+                    }
+                    control.observe(total)
+                },
+                || control.begin_commit(),
+            );
+            assert!(result.is_err(), "cancelled operation must not publish");
+            assert!(!target.exists());
+            assert_eq!(std::fs::read_dir(&f.0).unwrap().count(), 0);
+        }
+    }
+    #[test]
+    fn final_publication_commit_cannot_be_cancelled_or_misreported() {
+        let f = Fixture::new();
+        let target = f.0.join("committed.AppImage");
+        let release = proof(b"expected");
+        let control = crate::update_control::Control::default();
+        let result = stage_reader_hooks(
+            &mut Cursor::new(b"expected"),
+            &target,
+            &release,
+            |f, b| f.write_all(b),
+            File::sync_all,
+            |total| control.observe(total),
+            || {
+                control.begin_commit()?;
+                assert!(!control.cancel());
+                Ok(())
+            },
+        );
+        assert!(result.is_ok());
+        assert!(!control.cancel());
+        assert!(control.complete());
+        assert_eq!(std::fs::read(target).unwrap(), b"expected");
     }
     struct Interrupt {
         first: bool,

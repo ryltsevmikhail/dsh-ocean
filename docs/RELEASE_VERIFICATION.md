@@ -1,10 +1,140 @@
-# Offline signed-release verification — not an updater
+# Signed shell release verification, download and local activation
+
+## Configured feeds, trust and channels
+
+`--update-settings` reports read-only status, channel selections and public-key
+fingerprints, never key bytes. Missing configuration means **unconfigured**, not
+an automatic trust/download fallback. Settings are separate from Harness and npm:
+`$XDG_CONFIG_HOME/dsh-ocean/updates.json` (owned atomic mode-0600 writes).
+
+An operator imports a reviewed settings document and confirms every configured
+product's public-key fingerprint from an independent authenticated channel. The
+fingerprint is SHA-256 of the raw 32-byte Ed25519 public key (64 lowercase hex
+characters), not a hash of PEM/DER formatting:
+
+```bash
+dsh-ocean --configure-updates reviewed-updates.json \
+  --confirm-shell-key INDEPENDENT_RAW_ED25519_PUBLIC_KEY_SHA256
+# Add --confirm-runtime-key FINGERPRINT when configuring a runtime source too.
+# Replacing an existing key additionally requires --confirm-replace-trust yes.
+dsh-ocean --set-update-channel shell stable
+dsh-ocean --set-update-channel runtime next
+dsh-ocean --check-shell-update --kind appimage
+```
+
+This example is schema documentation, **not published production configuration**;
+replace the public-key placeholder with independently authenticated public data.
+The illustrated feed locations have not been provisioned by these tests:
+
+```json
+{
+  "schema": 1,
+  "shellChannel": "stable",
+  "runtimeChannel": "stable",
+  "shell": {
+    "key": {"version": 1, "keyId": "operator-provisioned-id", "publicKeyHex": "INDEPENDENT_PUBLIC_KEY_LOWERCASE_HEX"},
+    "stable": {
+      "manifestUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-stable/manifest.json",
+      "signatureUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-stable/manifest.sig.json",
+      "minimumSequence": 1
+    },
+    "next": {
+      "manifestUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-next/manifest.json",
+      "signatureUrl": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/channel-next/manifest.sig.json",
+      "minimumSequence": 1
+    }
+  },
+  "runtime": null
+}
+```
+
+Runtime configuration has a separate source/confirmation; its verifier must use
+a separate signed product domain/floor. Runtime workflow wiring remains M2 work.
+Selecting its channel never changes npm `latest`/`next` settings. A null source
+disables that updater without resetting any accepted floor. Private keys do not
+belong in this document or application. Confirming a fingerprint copied from the
+same untrusted feed is **not** independent publisher authentication.
+
+Feed URLs must be canonical public HTTPS assets in this repository, with no
+credentials, query, fragment, port override, encoded path aliases or other hosts.
+Current settings/import files must be bounded, regular, single-link, owned and
+not writable by others; directory symlinks/untrusted writable ancestors fail
+closed. Existing unsafe/invalid settings are never silently treated as defaults.
+
+A configured check uses bounded curl transport (64 KiB manifest, 4 KiB signature),
+authenticates the exact bytes before parsing policy, checks native architecture,
+channel/expiry/version and remembered floor, then reports metadata only. It does
+not fetch a key/artifact, advance state, install or access the Harness profile.
+Candidates retain exact signed bytes and a settings digest: changes to trust or
+channels invalidate them, and expiry/floor must be rechecked at use. Configured
+activation must hold the settings operation guard across final revalidation and
+the state/prefix transaction so trust replacement cannot race that commit. Manual
+`--verify-release`/`--apply-release` with an explicitly supplied key remain advanced
+operator-selected trust, not an implicit use of configured publisher authority.
+
+## Signed artifact download (explicit, no install)
+
+```bash
+dsh-ocean --download-release manifest.json signature.json trusted-key.json \
+  --channel stable --target linux-x86_64 --kind appimage --min-sequence 42 \
+  --output downloaded.AppImage
+```
+
+The public key must be authenticated/provisioned independently. The manifest and
+signature are local bounded inputs; this command does not fetch a key or discover
+a feed. It verifies Ed25519, release/channel/target/time policy and the remembered
+sequence floor **before** starting any network request. The artifact URL comes
+only from the authenticated manifest's canonical GitHub release location; no URL
+argument is accepted. Download does not remember/advance the sequence floor.
+
+System `curl` is required and trusted, as in the Linux bootstrap toolchain. Its
+configuration file is disabled, TLS verification stays enabled, initial and
+redirect protocols are HTTPS-only, redirects are capped at five, connect timeout
+is 15 seconds and total transfer time is 180 seconds. Thirty seconds below
+1 KiB/s aborts a stalled transfer. `--max-filesize` uses the signed size; the Rust
+stream independently enforces the exact byte count and SHA-256. HTTPS redirects
+are delegated to curl, not restricted to a destination-host/IP allowlist. Normal
+proxy/CA environment configuration still applies; PATH wrappers are trusted tools,
+not an adversarial sandbox.
+
+Bytes flow directly into the existing private staging engine. A matching body is
+published only after curl exits successfully, its size/hash match, and staging
+is synced. HTTP/curl failure, truncation, excess bytes, hash mismatch or an
+existing destination refuses publication. Early failure kills/reaps curl; private
+staging cleanup is best effort. Curl stderr is discarded, never echoed with URLs,
+proxy credentials or paths. The published file is mode 0600, not executable.
+
+Native-operation backend APIs share cancellation/progress state for feed checks
+and artifact downloads. Cancellation is linearized against final result/publication:
+if it wins, named staging output is not published; once publication commits, a late
+Cancel is refused rather than reporting verified published bytes as cancelled.
+Cancellation signals only the exact owned curl process; its worker reaps it.
+Transport-exit polling never holds the child mutex across a blocking wait, and a
+native cancel request never waits behind worker cleanup. Hash/copy checkpoints
+clean private partial staging on cooperative cancellation. Abrupt process death
+can still skip cleanup; trusted wrappers/descendants are not a hostile sandbox.
+The native GTK controller uses these backend APIs; see [managed destination and lifecycle policy](SHELL_UPDATES.md).
+
+The JSON receipt says `downloaded:true`, `artifactChecked:true`, `applied:false`
+and gives `stagedPath`. Explicit AppImage/tar activation and rollback below are the
+next steps; download itself never executes bytes, changes the active selector,
+restarts a service or accesses a profile. Tests drive a synthetic-key download →
+apply → second release → rollback under private HOME/XDG/prefix, using a fake
+trusted curl (no live HTTP or release publication). A real published signed feed,
+production trust provisioning and signed core/bootstrap updates remain separate
+M2 work. Native shell orchestration now provides explicit configured check,
+download, managed apply/rollback/recovery and channel controls.
 
 ## Local activation and rollback (explicit, no download)
 
 `--apply-release MANIFEST SIGNATURE TRUSTED_KEY <policy> --artifact STAGED
 --prefix DIR --confirm-apply yes` activates an **already verified local** artifact
-into a private, user-owned prefix:
+into a private, user-owned prefix. Both `--kind appimage` and `--kind tar.gz`
+are supported; tar bytes are never mistaken for an executable. A tar package must
+have the builder's `dsh-ocean-<release>-linux-<arch>` root and an executable
+`dsh-ocean` entry. The updater retains the **whole package**, including notices;
+it does not invoke its installer scripts.
+
 
 ```
 DIR/versions/<release>-<sequence>-<digest8>/dsh-ocean
@@ -12,22 +142,61 @@ DIR/current  -> versions/<…>      (atomic symlink swap)
 DIR/.previous -> versions/<…>     (retained for rollback)
 ```
 
-Checks before anything is written: the manifest signature/policy, the staged
-file's size and SHA-256 against the authenticated manifest, the remembered
-sequence floor, and that the prefix is absolute, owned by the current user and not
-writable by others. The bytes are copied through a no-follow descriptor into a
-fresh private file, `fsync`ed, marked 0755 and then **re-verified after landing**;
-a mismatch or an existing non-matching version refuses the operation. The previous
-activation is written to `.previous` before `current` is swapped, so an explicit
-`--rollback-shell --prefix DIR --confirm-rollback yes` can switch back. The
-remembered release sequence is recorded only **after** a successful activation.
+Before executable/selector publication the signature/policy, exact staged bytes,
+remembered floor and owned non-writable-by-others directory chain are checked.
+A global release-state lock spans the final floor check, prefix activation and
+state recording; a per-prefix lock serializes apply, rollback and recovery.
+Bytes use the existing bounded/hash-checked no-overwrite staging engine, then
+0755 permissions and a retained receipt binding the manifest digest, version,
+sequence, byte size and SHA-256. Current/previous retained receipts and bytes
+must validate before changing selectors; symlink directory aliases are refused.
 
-Limits: no download, no service restart and no process replacement — a running
-client keeps the executable it already started. Rollback only switches the
-selector back to one retained version; it is not a filesystem transaction, does
-not remove newer versions, and does not verify that the retained version is still
-healthy. Nothing here signs, attests or publishes; a system-wide install, package
-manager integration and update-feed configuration remain unimplemented.
+Versions are prepared in an owned private temporary directory and published with
+`RENAME_NOREPLACE` only after complete validation. Invalid archives cannot leave a
+partially prepared active version or overwrite an existing version. Cleanup of the
+exact owned temporary inode is best effort; abrupt termination/filesystem failure
+can leave private inactive scratch material for investigation.
+
+Tar/gzip handling uses standard crates with a raw-header preflight before logical
+PAX/GNU path processing: extension bodies are capped at 64 KiB, paths at 4096 bytes
+and 128 components, entry count at 200,000, individual files at 512 MiB and file data
+at 2 GiB (with separately bounded stream overhead/padding). Links, sparse/special
+files, traversal/non-canonical paths, duplicate entries, unsafe permissions,
+corrupt/trailing payloads and missing entrypoints are refused. New content is
+private and never merged into an existing directory. A retained installed-file
+index is size/hash-bound by the local receipt (64 MiB maximum) and checks the exact
+file/directory set, normalized modes and every file hash on reuse/rollback;
+damaged notices or unexpected code files block selection just like a damaged
+executable. These are local integrity checks, not fresh publisher signatures.
+
+A synced `.activation-pending.json` records original and intended selectors before
+the switch. If normal activation/state recording fails, the original verified
+selectors are restored. If the process is killed or power is lost, later mutation
+fails closed until the operator confirms:
+
+```bash
+dsh-ocean --recover-shell --prefix DIR --confirm-recovery yes
+```
+
+Recovery restores only journaled original selectors after checking retained bytes;
+it does not reset the accepted sequence floor or guess whether to finish an
+interrupted update. Malformed journals, changed selectors or damaged recovery
+versions remain untouched and require investigation. A floor already committed
+before a later durability failure is never reduced; reapplying the identical
+verified release is allowed. A verified but inactive version can remain on disk.
+
+`--rollback-shell --prefix DIR --confirm-rollback yes` verifies both retained
+versions and swaps the selectors under the same journal/lock. It never lowers the
+floor. The local receipt is protected app-owned state created from an authenticated
+release, not a new signature or protection against a hostile same-UID process.
+Legacy prefixes without receipts are not silently treated as verified installs.
+
+Limits: no service restart or process replacement — the running client keeps its
+original executable. Integrity verification is not an executable health check;
+rollback does not restore profile data or remove newer versions. Journaling is
+recoverable coordination, not a kernel transaction across directories, immutable
+storage or a guarantee against hardware/filesystem corruption. Nothing signs or
+publishes a release here; package-manager integration remains separate.
 
 ## Persisted anti-rollback state (opt-in acceptance)
 
@@ -50,8 +219,9 @@ Rules enforced against the remembered entry for the same channel:
 * re-accepting the identical manifest is idempotent.
 
 The store is written atomically (private scratch + `rename` + directory `fsync`)
-under an exclusive `flock`, so a rejected or failed update leaves the previous
-state untouched. A corrupted or oversized store is reported and **blocks**
+under an exclusive `flock`. Rejection and pre-rename failures leave previous state
+untouched; a durability error after rename can leave the new floor recorded, so
+activation recovery never silently reduces it. A corrupted or oversized store is reported and **blocks**
 acceptance instead of silently resetting the floor. `--release-state` prints the
 remembered entries; `--reset-release-state --confirm-reset` forgets them and
 therefore re-allows older signed manifests.
@@ -60,17 +230,18 @@ Limits: this is local replay/downgrade protection, not a signature, not a truste
 clock, and not a production trust root. A same-user attacker can delete or edit the
 file, and nothing here verifies that a *newer* manifest was actually published
 (no freshness/consensus). Deleting the file with `--reset-release-state` is an
-explicit operator decision, not an automatic recovery path. AppImage/tar/shell
-apply and update-feed configuration remain unimplemented.
+explicit operator decision, not an automatic recovery path. AppImage/tar local
+activation, configured metadata checks and native shell GUI are explicit;
+signed runtime transactions and real production publishing remain separate work.
 
 
 ## Implemented boundary
 
 Ocean has a read-only `--verify-release` CLI and a strict Ed25519 verifier.
 It authenticates an exact shell-release manifest, checks caller-selected policy,
-and optionally hashes an already-present local artifact. No download, install,
-service operation, profile access, key discovery, automatic signing, remembered
-sequence or self-update occurs. It works headlessly without Node/runtime/GUI
+and optionally hashes an already-present local artifact. That verifier performs
+no download, install, service operation, profile access, key discovery, automatic
+signing, remembered sequence or self-update. It works headlessly without Node/runtime/GUI
 initialization. A separate explicit `--stage-release` command can create a
 verified local copy; it does not change the read-only verifier contract.
 **Existing core/bootstrap update paths are still unsigned.**
@@ -153,8 +324,9 @@ Example manifest shape (dummy digest; not a signed release):
 - Every artifact must use the exact canonical GitHub repository/tag/basename:
   `https://github.com/ryltsevmikhail/dsh-ocean/releases/download/vVERSION/dsh-ocean-VERSION-ARCH.EXT`.
   Arbitrary hosts, queries, fragments, credentials, traversal/encoded aliases
-  and filenames are not accepted. This is metadata validation; no HTTP redirect
-  handling or private-repository authentication is implemented.
+  and filenames are not accepted. Verification is metadata validation only;
+  the separate downloader delegates bounded HTTPS redirects to trusted curl.
+  No private-repository authentication is implemented.
 - Nonzero declared size is capped at 1 GiB, with a lowercase SHA-256 digest.
   Optional local artifact verification uses one no-follow/nonblocking descriptor,
   checks regular type/single link/exact size, hashes bytes, rechecks descriptor
@@ -370,12 +542,29 @@ cargo test --test release_feed
 cargo test --lib staging_tests
 ```
 
-Production key custody/provisioning/rotation/revocation, signed publishing CI,
-feed fetch/redirect policy, persisted rollback/freeze state, authenticated
-network downloader, safe shell apply/rollback, package-manager behavior and GUI acceptance
-are **not implemented by this slice**. M2 remains incomplete.
+Implemented CLI foundations now include persisted sequence/downgrade protection,
+operator-provisioned trust and channel settings, bounded authenticated shell-feed
+checks, artifact download and journaled AppImage/tar package activation/rollback.
+The native GUI adds explicit managed enrollment, check/download/confirmed local
+transactions, channel settings, cancellation and original-installer guidance.
+The [signed runtime workflow](RUNTIME_RELEASES.md) now also wires complete-generation
+download/import, isolated native health, proven-owned Systemd/Child activation,
+quiesced full supported-home snapshots and restore-before-old-start failure rollback.
+Native consent/apply/recovery replaces the installed npm-update path; fresh-session
+Systemd recovery uses the journal's old root/unit proof. Lost child ownership refuses
+safely; post-success core history rollback is not provided. M1 first bootstrap/manual
+maintenance remains a separate trust boundary, not an unsigned updater fallback.
+[Manual release CI](../.github/workflows/release.yml) implements pinned native builds,
+independent verification and protected signing of **drafts only**, with dry-run default.
+These implement the software M2 boundaries, not an unattended or production-accepted
+updater. Final readiness requires whole-branch review and exact-head CI evidence.
+Production key custody/provisioning/rotation/revocation, authenticated feed activation,
+genuine native packages/AppImages, compatibility/migration and laptop acceptance
+remain explicit owner gates; no keys, releases or live user data are provisioned here.
+The recovery/durability/health limits above still apply.
 
 The declared Rust floor is now 1.90: the already-locked Tauri 2.12 stack itself
 requires 1.90, whereas the previous 1.77 declaration was inaccurate. The selected
-Ed25519 library requires only 1.85. CI currently builds with current stable Rust;
-a separate full minimum-toolchain matrix has not been run.
+Ed25519 library requires only 1.85. CI builds/tests with current stable Rust and
+separately runs `cargo check --locked --all-targets` on exactly Rust 1.90. That
+minimum-toolchain check is not full native/runtime/ABI or release-license acceptance.

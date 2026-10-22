@@ -92,6 +92,9 @@ pub fn command(mode: Mode, prefix: &Path) -> Command {
 
 /// Runs one maintenance mode and returns the installer's exit status.
 pub fn run(mode: Mode) -> Result<i32> {
+    if mode != Mode::Check {
+        crate::runtime_switch::ensure_no_pending(&prefix())?;
+    }
     // A rollback may refresh the unit: reject ambiguous configuration before
     // moving the runtime selector or launching any maintenance helper.
     let rollback_base = if mode == Mode::Rollback {

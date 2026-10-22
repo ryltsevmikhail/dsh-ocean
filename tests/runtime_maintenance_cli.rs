@@ -96,6 +96,54 @@ fn check_mode_reports_the_private_runtime_without_creating_user_state() {
 }
 
 #[test]
+fn pending_signed_transaction_blocks_legacy_mutation_before_starting_a_helper() {
+    let sandbox = Sandbox::new();
+    fs::create_dir_all(&sandbox.prefix).unwrap();
+    let pending = sandbox.prefix.join(".runtime-pending.json");
+    fs::write(&pending, b"corrupt-sensitive-pending-marker").unwrap();
+    let scratch = sandbox.prefix.join(".download.keep-for-recovery");
+    fs::create_dir(&scratch).unwrap();
+    fs::write(scratch.join("retained"), b"retained-input").unwrap();
+    for args in [
+        &["--runtime-maintenance", "gc"][..],
+        &["--runtime-maintenance", "rollback", "--confirm-maintenance"][..],
+    ] {
+        let output = sandbox.run(args);
+        assert!(!output.status.success());
+        assert!(stdout(&output).is_empty());
+        assert!(stderr(&output).contains("pending"));
+        assert!(!stderr(&output).contains("sensitive"));
+        assert_eq!(
+            fs::read(scratch.join("retained")).unwrap(),
+            b"retained-input"
+        );
+    }
+    assert_eq!(
+        fs::read(&pending).unwrap(),
+        b"corrupt-sensitive-pending-marker"
+    );
+}
+
+#[test]
+fn standalone_maintenance_keeps_pending_transaction_scratch_untouched() {
+    let sandbox = Sandbox::new();
+    fs::create_dir_all(&sandbox.prefix).unwrap();
+    fs::write(sandbox.prefix.join(".runtime-pending.json"), b"pending").unwrap();
+    let scratch = sandbox.prefix.join(".download.keep-for-recovery");
+    fs::create_dir(&scratch).unwrap();
+    let output = Command::new("bash")
+        .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/bootstrap-runtime.sh"))
+        .arg("--gc")
+        .env("HOME", &sandbox.home)
+        .env("DSH_OCEAN_DATA_DIR", &sandbox.prefix)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(stderr(&output).contains("pending"));
+    assert!(scratch.exists());
+}
+
+#[test]
 fn collect_mode_is_a_no_op_without_generations() {
     let sandbox = Sandbox::new();
     let output = sandbox.run(&["--runtime-maintenance", "gc"]);

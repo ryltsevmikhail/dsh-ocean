@@ -67,10 +67,32 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building DSH Ocean");
 
-    app.run(|app_handle, event| {
-        if let RunEvent::Exit = event {
-            app_handle.state::<state::AppState>().shutdown();
+    app.run(|app_handle, event| match event {
+        RunEvent::ExitRequested { api, .. } => {
+            let state = app_handle.state::<state::AppState>();
+            match state.updates.request_exit() {
+                dsh_ocean::native_updates::Exit::Allow => (),
+                dsh_ocean::native_updates::Exit::Waiting => api.prevent_exit(),
+                dsh_ocean::native_updates::Exit::Wait(control) => {
+                    api.prevent_exit();
+                    state.quitting.store(true, Ordering::SeqCst);
+                    let handle = app_handle.clone();
+                    gtk::glib::timeout_add_local(
+                        std::time::Duration::from_millis(100),
+                        move || {
+                            if control.snapshot().finished {
+                                handle.exit(0);
+                                gtk::glib::ControlFlow::Break
+                            } else {
+                                gtk::glib::ControlFlow::Continue
+                            }
+                        },
+                    );
+                }
+            }
         }
+        RunEvent::Exit => app_handle.state::<state::AppState>().shutdown(),
+        _ => (),
     });
 }
 
@@ -129,13 +151,58 @@ fn handle_cli() -> bool {
             }
             true
         }
+        "--update-settings"
+        | "--configure-updates"
+        | "--set-update-channel"
+        | "--check-shell-update"
+        | "--managed-shell-status"
+        | "--enroll-shell"
+        | "--install-managed-shell"
+        | "--rollback-managed-shell"
+        | "--recover-managed-shell"
+        | "--verify-runtime-release"
+        | "--accept-runtime-release"
+        | "--check-runtime-update"
+        | "--import-runtime-release"
+        | "--check-runtime-bundle"
+        | "--download-runtime-release" => {
+            let result = if matches!(
+                args[0].as_str(),
+                "--verify-runtime-release"
+                    | "--accept-runtime-release"
+                    | "--check-runtime-update"
+                    | "--import-runtime-release"
+                    | "--check-runtime-bundle"
+                    | "--download-runtime-release"
+            ) {
+                dsh_ocean::runtime_cli::run(&args)
+            } else {
+                dsh_ocean::update_cli::run(&args)
+            };
+            match result {
+                Ok(value) => println!(
+                    "{}",
+                    serde_json::to_string_pretty(&value).expect("serialize updater result")
+                ),
+                Err(error) => {
+                    eprintln!(
+                        "dsh-ocean: {}",
+                        dsh_ocean::auth::redact(&format!("{error:#}"))
+                    );
+                    std::process::exit(1);
+                }
+            }
+            true
+        }
         "--verify-release"
         | "--stage-release"
+        | "--download-release"
         | "--accept-release"
         | "--release-state"
         | "--reset-release-state"
         | "--apply-release"
-        | "--rollback-shell" => {
+        | "--rollback-shell"
+        | "--recover-shell" => {
             match dsh_ocean::release_cli::run(&args) {
                 Ok(value) => println!(
                     "{}",
@@ -259,13 +326,30 @@ fn handle_cli() -> bool {
                    --restore-data SNAPSHOT --confirm-offline  replace sessions/stores; retained copies kept\n  \
                    --prune-data-backups --keep N --confirm-prune  delete older whole-data snapshots\n  \
                    --restore-profile NAME SNAPSHOT --confirm-offline  restore configuration\n  \
+                   --verify-runtime-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target TARGET --min-sequence N --current-runtime-version VERSION  verify complete runtime metadata (no execution)\n  \
+                   --accept-runtime-release ... --confirm-accept yes  remember a verified runtime floor separately from shell\n  \
+                   --download-runtime-release ... --output ARCHIVE --confirm-download yes  download only authenticated complete runtime bytes, no execution or floor change\n  \
+                   --import-runtime-release ... --artifact ARCHIVE --prefix DIR --confirm-import yes  import complete signed bytes without executing/selecting runtime\n  \
+                   --check-runtime-bundle ... --artifact ARCHIVE --prefix DIR --confirm-check yes  execute authenticated native candidate checks in disposable state (no activation)\n  \
+                   --check-runtime-update --current-runtime-version VERSION  check configured signed runtime source without installation\n  \
+                   --managed-shell-status  inspect explicitly enrolled destination (no network)\n  \
+                   --enroll-shell --confirm-managed yes  opt into a separate managed user destination\n  \
+                   --install-managed-shell [--kind appimage|tar.gz] --confirm-install yes  authenticate configured release, download and apply to enrolled destination\n  \
+                   --rollback-managed-shell --confirm-rollback yes  select verified retained managed version\n  \
+                   --recover-managed-shell --confirm-recovery yes  recover interrupted managed selector transaction\n  \
+                   --update-settings  show updater channels/trust fingerprints (no network or keys)\n  \
+                   --configure-updates CONFIG --confirm-shell-key SHA256 [--confirm-runtime-key SHA256] [--confirm-replace-trust yes]  provision independently authenticated public trust\n  \
+                   --set-update-channel shell|runtime stable|next  change only the selected updater channel\n  \
+                   --check-shell-update [--kind appimage|tar.gz]  authenticate configured feed metadata only\n  \
                    --verify-release MANIFEST SIGNATURE TRUSTED_KEY --channel stable|next --target TARGET --kind KIND --min-sequence N [--artifact FILE]  offline verification only\n  \
                    --accept-release ...  the same checks, then remember the accepted sequence locally\n  \
                    --release-state  print remembered per-channel release sequences\n  \
                    --reset-release-state --confirm-reset  forget them (allows older signed manifests again)\n  \
                    --apply-release ...  verify and activate a local artifact into a private prefix (no download)\n  \
                    --rollback-shell --prefix DIR --confirm-rollback yes  reactivate the retained previous version\n  \
+                   --recover-shell --prefix DIR --confirm-recovery yes  restore verified selectors after an interrupted shell activation\n  \
                    --stage-release MANIFEST SIGNATURE TRUSTED_KEY [policy options] --artifact SOURCE --output NEW_FILE  verified local copy only, no install\n  \
+                   --download-release MANIFEST SIGNATURE TRUSTED_KEY [policy options] --output NEW_FILE  signed HTTPS artifact to verified staging; no install\n  \
                    --draft-release --release VERSION --channel CHANNEL --sequence N --valid-hours N --asset TARGET KIND FILE [--asset ...]  unsigned JSON only; single-artifact flags also supported\n  \
                    -h, --help      show this help"
             );

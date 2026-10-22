@@ -95,6 +95,32 @@ impl Sandbox {
         (manifest_path, signature_path, artifact)
     }
 
+    fn tar_release(
+        &self,
+        name: &str,
+        sequence: u64,
+        version: &str,
+        bytes: &[u8],
+    ) -> (PathBuf, PathBuf, PathBuf) {
+        let (manifest, signature, artifact) = self.release(name, sequence, version, bytes);
+        let raw = fs::read_to_string(&manifest)
+            .unwrap()
+            .replace("\"kind\":\"appimage\"", "\"kind\":\"tar.gz\"")
+            .replace(".AppImage", ".tar.gz");
+        fs::write(&manifest, &raw).unwrap();
+        let mut message = DOMAIN.to_vec();
+        message.extend_from_slice(raw.as_bytes());
+        fs::write(
+            &signature,
+            format!(
+                "{{\"version\":1,\"keyId\":\"{KEY_ID}\",\"signatureHex\":\"{}\"}}",
+                hex(&self.key.sign(&message).to_bytes())
+            ),
+        )
+        .unwrap();
+        (manifest, signature, artifact)
+    }
+
     fn run(&self, arguments: &[String]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_dsh-ocean"))
             .args(arguments)
@@ -103,7 +129,10 @@ impl Sandbox {
             .env("XDG_STATE_HOME", self.root.join("state"))
             .env("XDG_CONFIG_HOME", self.root.join("config"))
             .env("XDG_RUNTIME_DIR", self.root.join("run"))
-            .env("PATH", "/usr/bin:/bin")
+            .env(
+                "PATH",
+                format!("{}/tools:/usr/bin:/bin", self.root.display()),
+            )
             .output()
             .expect("run the client CLI")
     }
@@ -139,6 +168,37 @@ impl Sandbox {
             arguments.push("yes".to_owned());
         }
         arguments
+    }
+
+    fn download_args(&self, manifest: &Path, signature: &Path, output: &Path) -> Vec<String> {
+        vec![
+            "--download-release".into(),
+            manifest.to_string_lossy().into_owned(),
+            signature.to_string_lossy().into_owned(),
+            self.key_file().to_string_lossy().into_owned(),
+            "--channel".into(),
+            "stable".into(),
+            "--target".into(),
+            "linux-x86_64".into(),
+            "--kind".into(),
+            "appimage".into(),
+            "--min-sequence".into(),
+            "1".into(),
+            "--output".into(),
+            output.to_string_lossy().into_owned(),
+        ]
+    }
+
+    // Trusted downloader stand-in: no real HTTP, credentials, profile or service.
+    fn fake_curl(&self, bytes: &[u8], exit: i32) {
+        let tools = self.root.join("tools");
+        fs::create_dir_all(&tools).unwrap();
+        let script = format!(
+            "#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\np=Path(__file__).parent\n(p/'curl-arguments').write_text('\\n'.join(sys.argv[1:]))\n(p/'curl-pid').write_text(str(os.getpid()))\nsys.stderr.write('private-downloader-marker')\nsys.stdout.buffer.write(bytes.fromhex('{}'))\nsys.stdout.buffer.flush()\nsys.exit({exit})\n",
+            hex(bytes)
+        );
+        fs::write(tools.join("curl"), script).unwrap();
+        fs::set_permissions(tools.join("curl"), fs::Permissions::from_mode(0o700)).unwrap();
     }
 
     fn state(&self) -> serde_json::Value {
@@ -304,6 +364,501 @@ fn refused_operations_leave_the_prefix_and_state_untouched() {
         "{}",
         describe(&private)
     );
+}
+
+#[test]
+fn downloads_signed_bytes_without_executing_then_applies_and_rolls_back() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let mut first_target = String::new();
+    for (name, sequence, version, bytes) in [
+        ("first", 5, "0.2.0", b"synthetic-appimage-first".as_slice()),
+        (
+            "second",
+            6,
+            "0.2.1",
+            b"synthetic-appimage-second".as_slice(),
+        ),
+    ] {
+        let (manifest, signature, _) = sandbox.release(name, sequence, version, bytes);
+        sandbox.fake_curl(bytes, 0);
+        let output = sandbox.root.join(format!("{name}-download.AppImage"));
+        let downloaded = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+        assert!(downloaded.status.success(), "{}", describe(&downloaded));
+        let receipt: serde_json::Value = serde_json::from_slice(&downloaded.stdout).unwrap();
+        assert_eq!(receipt["downloaded"], true);
+        assert_eq!(receipt["artifactChecked"], true);
+        assert_eq!(receipt["applied"], false);
+        assert_eq!(fs::read(&output).unwrap(), bytes);
+        assert_eq!(
+            fs::metadata(&output).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(!String::from_utf8_lossy(&downloaded.stderr).contains("private-downloader-marker"));
+        if sequence == 5 {
+            assert!(!prefix.exists());
+            assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
+        }
+        let curl = fs::read_to_string(sandbox.root.join("tools/curl-arguments")).unwrap();
+        let args: Vec<_> = curl.lines().collect();
+        assert_eq!(args[0], "--disable", "never load .curlrc");
+        for pair in [
+            ["--proto", "=https"],
+            ["--proto-redir", "=https"],
+            ["--max-redirs", "5"],
+            ["--connect-timeout", "15"],
+            ["--max-time", "180"],
+            ["--speed-limit", "1024"],
+            ["--speed-time", "30"],
+        ] {
+            assert!(
+                args.windows(2).any(|actual| actual == pair),
+                "missing curl bound: {pair:?}"
+            );
+        }
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--max-filesize", &bytes.len().to_string()]));
+        let applied =
+            sandbox.run(&sandbox.apply_args(&manifest, &signature, &output, &prefix, true));
+        assert!(applied.status.success(), "{}", describe(&applied));
+        if sequence == 5 {
+            first_target = current_target(&prefix);
+        }
+    }
+    let rolled = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(rolled.status.success(), "{}", describe(&rolled));
+    assert_eq!(current_target(&prefix), first_target);
+    assert_eq!(
+        fs::read(prefix.join("current/dsh-ocean")).unwrap(),
+        b"synthetic-appimage-first"
+    );
+    assert_eq!(
+        sandbox.state()["channels"]["stable"]["sequence"],
+        6,
+        "rollback must not forget the replay floor"
+    );
+}
+
+#[test]
+fn rejected_downloads_never_publish_or_leak_curl_stderr() {
+    for (label, bytes, exit) in [
+        ("changed", b"Authenticated-bytes".as_slice(), 0),
+        ("short", b"short".as_slice(), 0),
+        ("long", b"authenticated-bytes-plus-extra".as_slice(), 0),
+        ("http", b"authenticated-bytes".as_slice(), 22),
+        ("timeout", b"authenticated-bytes".as_slice(), 28),
+    ] {
+        let sandbox = Sandbox::new();
+        let (manifest, signature, _) = sandbox.release("input", 5, "0.2.0", b"authenticated-bytes");
+        sandbox.fake_curl(bytes, exit);
+        let output = sandbox.root.join(format!("{label}.AppImage"));
+        let refused = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+        assert!(!refused.status.success(), "{label}: {}", describe(&refused));
+        assert!(
+            sandbox.root.join("tools/curl-arguments").exists(),
+            "must reach the downloader: {label}"
+        );
+        assert!(
+            !output.exists(),
+            "failed transfers must not publish: {label}"
+        );
+        assert!(!describe(&refused).contains("private-downloader-marker"));
+        assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
+        assert!(!fs::read_dir(&sandbox.root).unwrap().any(|e| e
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".dsh-ocean-download-")));
+    }
+}
+
+#[test]
+fn signature_policy_and_remembered_floor_are_checked_before_download() {
+    let sandbox = Sandbox::new();
+    let (manifest, signature, _) = sandbox.release("input", 5, "0.2.0", b"authenticated-bytes");
+    sandbox.fake_curl(b"authenticated-bytes", 0);
+    let output = sandbox.root.join("download.AppImage");
+    let mut damaged = fs::read(&signature).unwrap();
+    damaged[0] = b'!';
+    let bad_signature = sandbox.root.join("bad-signature.json");
+    fs::write(&bad_signature, damaged).unwrap();
+    let refused = sandbox.run(&sandbox.download_args(&manifest, &bad_signature, &output));
+    assert!(!refused.status.success());
+    assert!(!sandbox.root.join("tools/curl-arguments").exists());
+    assert!(!output.exists());
+    let (newer, newer_sig, _) = sandbox.release("newer", 6, "0.2.1", b"newer-bytes");
+    let mut accept = sandbox.download_args(&newer, &newer_sig, &output);
+    accept[0] = "--accept-release".into();
+    accept.truncate(accept.len() - 2);
+    assert!(sandbox.run(&accept).status.success());
+    let replay = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+    assert!(!replay.status.success());
+    assert!(
+        describe(&replay).contains("rollback"),
+        "{}",
+        describe(&replay)
+    );
+    assert!(!sandbox.root.join("tools/curl-arguments").exists());
+    assert!(!output.exists());
+}
+
+#[test]
+fn download_refuses_overwrite_and_reaps_an_oversized_transfer() {
+    let sandbox = Sandbox::new();
+    let (manifest, signature, _) = sandbox.release("input", 5, "0.2.0", b"signed");
+    let output = sandbox.root.join("existing.AppImage");
+    fs::write(&output, b"keep-existing").unwrap();
+    sandbox.fake_curl(b"signed", 0);
+    let refused = sandbox.run(&sandbox.download_args(&manifest, &signature, &output));
+    assert!(!refused.status.success());
+    assert_eq!(fs::read(&output).unwrap(), b"keep-existing");
+    let oversized = sandbox.root.join("oversized.AppImage");
+    sandbox.fake_curl(b"too-many-bytes", 0);
+    let curl = sandbox.root.join("tools/curl");
+    let code = fs::read_to_string(&curl)
+        .unwrap()
+        .replace("sys.exit(0)", "import time\ntime.sleep(20)\nsys.exit(0)");
+    fs::write(&curl, code).unwrap();
+    let start = std::time::Instant::now();
+    let refused = sandbox.run(&sandbox.download_args(&manifest, &signature, &oversized));
+    assert!(!refused.status.success());
+    assert!(start.elapsed() < std::time::Duration::from_secs(5));
+    assert!(!oversized.exists());
+    let pid: i32 = fs::read_to_string(sandbox.root.join("tools/curl-pid"))
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(
+        unsafe { libc::kill(pid, 0) },
+        -1,
+        "oversized downloader must be reaped"
+    );
+    assert_eq!(
+        std::io::Error::last_os_error().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+}
+
+#[test]
+fn failed_state_commit_restores_activation_selectors() {
+    if unsafe { libc::geteuid() } == 0 {
+        return;
+    } // Permission injection needs an unprivileged test user.
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (m1, s1, a1) = sandbox.release("first", 5, "0.2.0", b"first-bytes");
+    let applied = sandbox.run(&sandbox.apply_args(&m1, &s1, &a1, &prefix, true));
+    assert!(applied.status.success(), "{}", describe(&applied));
+    let original = current_target(&prefix);
+    let state_dir = sandbox.root.join("state/dsh-ocean");
+    fs::set_permissions(&state_dir, fs::Permissions::from_mode(0o500)).unwrap();
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"second-bytes");
+    let failed = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    fs::set_permissions(&state_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(!failed.status.success(), "{}", describe(&failed));
+    assert_eq!(
+        current_target(&prefix),
+        original,
+        "failed acceptance must restore current"
+    );
+    assert!(!prefix.join(".previous").exists());
+    assert!(!prefix.join(".activation-pending.json").exists());
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 5);
+}
+
+#[test]
+fn apply_and_rollback_share_the_prefix_operation_lock() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (m1, s1, a1) = sandbox.release("first", 5, "0.2.0", b"first-bytes");
+    assert!(sandbox
+        .run(&sandbox.apply_args(&m1, &s1, &a1, &prefix, true))
+        .status
+        .success());
+    let original = current_target(&prefix);
+    let _lock =
+        dsh_ocean::profile_backup::operation_lock(&prefix.join(".shell-update.lock")).unwrap();
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"second-bytes");
+    let refused = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert!(describe(&refused).contains("operation"));
+    let rollback = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(!rollback.status.success());
+    assert_eq!(current_target(&prefix), original);
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 5);
+}
+
+#[test]
+fn tampered_retained_version_is_never_selected_by_rollback() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    for (name, seq, version, bytes) in [
+        ("first", 5, "0.2.0", b"first-bytes".as_slice()),
+        ("second", 6, "0.2.1", b"second-bytes".as_slice()),
+    ] {
+        let (m, s, a) = sandbox.release(name, seq, version, bytes);
+        let applied = sandbox.run(&sandbox.apply_args(&m, &s, &a, &prefix, true));
+        assert!(applied.status.success(), "{}", describe(&applied));
+    }
+    let original = current_target(&prefix);
+    let previous = fs::read_link(prefix.join(".previous")).unwrap();
+    fs::write(
+        prefix.join(&previous).join("dsh-ocean"),
+        b"corrupt-retained-file",
+    )
+    .unwrap();
+    let refused = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert_eq!(current_target(&prefix), original);
+    assert_eq!(fs::read_link(prefix.join(".previous")).unwrap(), previous);
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 6);
+    // Valid executable bytes still do not authorize a writable receipt.
+    fs::write(prefix.join(&previous).join("dsh-ocean"), b"first-bytes").unwrap();
+    let receipt = prefix.join(&previous).join("receipt.json");
+    fs::set_permissions(&receipt, fs::Permissions::from_mode(0o666)).unwrap();
+    let refused = sandbox.run(&[
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ]);
+    assert!(
+        !refused.status.success(),
+        "writable receipts are not trusted activation metadata"
+    );
+    assert_eq!(current_target(&prefix), original);
+}
+
+#[test]
+fn interrupted_activation_requires_explicit_verified_recovery() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (m1, s1, a1) = sandbox.release("first", 5, "0.2.0", b"first-bytes");
+    assert!(sandbox
+        .run(&sandbox.apply_args(&m1, &s1, &a1, &prefix, true))
+        .status
+        .success());
+    let first = current_target(&prefix);
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"second-bytes");
+    assert!(sandbox
+        .run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true))
+        .status
+        .success());
+    let second = current_target(&prefix);
+    let journal = prefix.join(".activation-pending.json");
+    fs::write(&journal, serde_json::to_vec(&serde_json::json!({"schema":1,"before":{"current":first,"previous":null},"after":{"current":second,"previous":first}})).unwrap()).unwrap();
+    let refused = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    assert!(
+        !refused.status.success(),
+        "pending transaction must not be silently ignored"
+    );
+    let recover = vec![
+        "--recover-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-recovery".into(),
+        "yes".into(),
+    ];
+    let recovered = sandbox.run(&recover);
+    assert!(recovered.status.success(), "{}", describe(&recovered));
+    assert_eq!(current_target(&prefix), first);
+    assert!(!prefix.join(".previous").exists());
+    assert!(!journal.exists());
+    assert_eq!(
+        sandbox.state()["channels"]["stable"]["sequence"],
+        6,
+        "recovery never lowers the floor"
+    );
+    fs::write(&journal, serde_json::to_vec(&serde_json::json!({"schema":1,"before":{"current":"../../outside","previous":null},"after":{"current":first,"previous":null}})).unwrap()).unwrap();
+    assert!(!sandbox.run(&recover).status.success());
+    assert_eq!(current_target(&prefix), first);
+    assert!(
+        journal.exists(),
+        "invalid recovery input is preserved for diagnosis"
+    );
+}
+
+fn shell_tar(version: &str, paths: &[(&str, &[u8], u32)]) -> Vec<u8> {
+    use std::io::Write;
+    let mut builder = tar::Builder::new(Vec::new());
+    for (name, bytes, mode) in paths {
+        let mut header = tar::Header::new_ustar();
+        header.set_mode(*mode);
+        header.set_size(bytes.len() as u64);
+        header.set_cksum();
+        builder
+            .append_data(
+                &mut header,
+                format!("dsh-ocean-{version}-linux-x86_64/{name}"),
+                *bytes,
+            )
+            .unwrap();
+    }
+    let mut output = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    output.write_all(&builder.into_inner().unwrap()).unwrap();
+    output.finish().unwrap()
+}
+
+#[test]
+fn signed_tar_package_retains_notices_and_rollback_verifies_the_entire_tree() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let bytes = shell_tar(
+        "0.2.0",
+        &[
+            ("dsh-ocean", b"tar-binary", 0o755),
+            ("docs/NOTICE", b"complete-public-notice", 0o644),
+        ],
+    );
+    let (m, s, a) = sandbox.tar_release("tar-first", 5, "0.2.0", &bytes);
+    let mut args = sandbox.apply_args(&m, &s, &a, &prefix, true);
+    let position = args.iter().position(|arg| arg == "--kind").unwrap();
+    args[position + 1] = "tar.gz".into();
+    let result = sandbox.run(&args);
+    assert!(result.status.success(), "{}", describe(&result));
+    let first = current_target(&prefix);
+    assert_eq!(
+        fs::read(prefix.join(&first).join("docs/NOTICE")).unwrap(),
+        b"complete-public-notice"
+    );
+    assert_eq!(
+        fs::read(prefix.join(&first).join("dsh-ocean")).unwrap(),
+        b"tar-binary"
+    );
+    assert_eq!(
+        fs::read(&a).unwrap(),
+        bytes,
+        "operator's original artifact is never removed"
+    );
+    let (m2, s2, a2) = sandbox.release("second", 6, "0.2.1", b"appimage-second");
+    let result = sandbox.run(&sandbox.apply_args(&m2, &s2, &a2, &prefix, true));
+    assert!(result.status.success(), "{}", describe(&result));
+    let second = current_target(&prefix);
+    let rollback = vec![
+        "--rollback-shell".into(),
+        "--prefix".into(),
+        prefix.to_string_lossy().into_owned(),
+        "--confirm-rollback".into(),
+        "yes".into(),
+    ];
+    let notice = prefix.join(&first).join("docs/NOTICE");
+    fs::write(&notice, b"damaged-notice").unwrap();
+    let refused = sandbox.run(&rollback);
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert_eq!(current_target(&prefix), second);
+    fs::write(&notice, b"complete-public-notice").unwrap();
+    let extra = prefix.join(&first).join("unexpected.js");
+    fs::write(&extra, b"unknown").unwrap();
+    assert!(!sandbox.run(&rollback).status.success());
+    assert_eq!(current_target(&prefix), second);
+    fs::remove_file(&extra).unwrap();
+    let restored = sandbox.run(&rollback);
+    assert!(restored.status.success(), "{}", describe(&restored));
+    assert_eq!(current_target(&prefix), first);
+    assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 6);
+}
+
+#[test]
+#[ignore = "requires a freshly generated package via DSH_OCEAN_TEST_PACKAGE_TAR"]
+fn packaged_tar_round_trip_uses_real_bytes_but_only_an_isolated_test_trust_root() {
+    let package =
+        std::env::var_os("DSH_OCEAN_TEST_PACKAGE_TAR").expect("set generated package path");
+    let bytes = fs::read(package).unwrap();
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (manifest, signature, artifact) =
+        sandbox.tar_release("packaged", 5, env!("CARGO_PKG_VERSION"), &bytes);
+    let arch = std::env::consts::ARCH;
+    let raw = fs::read_to_string(&manifest)
+        .unwrap()
+        .replace("x86_64", arch);
+    fs::write(&manifest, &raw).unwrap();
+    let mut message = DOMAIN.to_vec();
+    message.extend_from_slice(raw.as_bytes());
+    fs::write(
+        &signature,
+        format!(
+            "{{\"version\":1,\"keyId\":\"{KEY_ID}\",\"signatureHex\":\"{}\"}}",
+            hex(&sandbox.key.sign(&message).to_bytes())
+        ),
+    )
+    .unwrap();
+    let mut arguments = sandbox.apply_args(&manifest, &signature, &artifact, &prefix, true);
+    let kind = arguments.iter().position(|arg| arg == "--kind").unwrap();
+    arguments[kind + 1] = "tar.gz".into();
+    let target = arguments.iter().position(|arg| arg == "--target").unwrap();
+    arguments[target + 1] = format!("linux-{arch}");
+    let applied = sandbox.run(&arguments);
+    assert!(applied.status.success(), "{}", describe(&applied));
+    let selected = prefix.join(current_target(&prefix));
+    assert!(selected.join("THIRD_PARTY_NOTICES.txt").is_file());
+    assert!(selected.join("docs/third-party/inventory.json").is_file());
+    let probe = Command::new(selected.join("dsh-ocean"))
+        .arg("--version")
+        .env_clear()
+        .env("HOME", sandbox.root.join("home"))
+        .env("XDG_STATE_HOME", sandbox.root.join("state"))
+        .env("XDG_CONFIG_HOME", sandbox.root.join("config"))
+        .output()
+        .unwrap();
+    assert!(probe.status.success(), "{}", describe(&probe));
+    assert!(String::from_utf8_lossy(&probe.stdout).contains(env!("CARGO_PKG_VERSION")));
+    assert!(!sandbox.root.join("home/.dsh").exists());
+}
+
+#[test]
+fn invalid_tar_archive_is_not_activated_as_an_executable() {
+    let sandbox = Sandbox::new();
+    let prefix = sandbox.root.join("prefix");
+    let (manifest, signature, artifact) =
+        sandbox.release("archive", 5, "0.2.0", b"synthetic-tar-bytes");
+    let raw = fs::read_to_string(&manifest)
+        .unwrap()
+        .replace("\"kind\":\"appimage\"", "\"kind\":\"tar.gz\"")
+        .replace(".AppImage", ".tar.gz");
+    fs::write(&manifest, raw.as_bytes()).unwrap();
+    let mut message = DOMAIN.to_vec();
+    message.extend_from_slice(raw.as_bytes());
+    fs::write(
+        &signature,
+        format!(
+            "{{\"version\":1,\"keyId\":\"{KEY_ID}\",\"signatureHex\":\"{}\"}}",
+            hex(&sandbox.key.sign(&message).to_bytes())
+        ),
+    )
+    .unwrap();
+    let mut args = sandbox.apply_args(&manifest, &signature, &artifact, &prefix, true);
+    let kind = args.iter().position(|arg| arg == "--kind").unwrap();
+    args[kind + 1] = "tar.gz".into();
+    let refused = sandbox.run(&args);
+    assert!(!refused.status.success(), "{}", describe(&refused));
+    assert!(
+        describe(&refused).contains("archive"),
+        "{}",
+        describe(&refused)
+    );
+    assert!(!prefix.join("current").exists());
+    assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
 }
 
 #[test]

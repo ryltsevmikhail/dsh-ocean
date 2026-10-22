@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-const DOMAIN = Buffer.from('DSH Ocean release manifest v1\n');
+const DOMAINS = {shell:Buffer.from('DSH Ocean release manifest v1\n'),runtime:Buffer.from('DSH Ocean runtime manifest v1\n')};
 function fail(message) { throw new Error(message); }
 function readRegular(path, limit, secret = false) {
   let fd;
@@ -38,12 +38,15 @@ function readRegular(path, limit, secret = false) {
   } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
 export function signRelease(args) {
-  if (args.length !== 6) fail('usage: --manifest FILE --private-key PEM --key-id ID');
+  if (args.length < 6 || args.length % 2) fail('usage: --manifest FILE --private-key PEM --key-id ID [--product shell|runtime]');
   const flags = new Map();
   for (let i = 0; i < args.length; i += 2) {
-    if (!['--manifest', '--private-key', '--key-id'].includes(args[i]) || flags.has(args[i])) fail('unknown or duplicate signing option');
+    if (!['--manifest', '--private-key', '--key-id','--product'].includes(args[i]) || flags.has(args[i])) fail('unknown or duplicate signing option');
     flags.set(args[i], args[i + 1]);
   }
+  const product=flags.get('--product')??'shell';
+  if(!['shell','runtime'].includes(product))fail('unsupported signing product');
+  const domain=DOMAINS[product];
   const id = flags.get('--key-id');
   if (typeof id !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(id)) fail('invalid signing key identity');
   const manifest = readRegular(flags.get('--manifest'), 65536);
@@ -58,7 +61,7 @@ export function signRelease(args) {
     const publicDer = crypto.createPublicKey(key).export({ format: 'der', type: 'spki' });
     const prefix = Buffer.from('302a300506032b6570032100', 'hex');
     if (publicDer.length !== 44 || !publicDer.subarray(0, 12).equals(prefix)) fail('unexpected Ed25519 public key encoding');
-    const signature = crypto.sign(null, Buffer.concat([DOMAIN, manifest]), key);
+    const signature = crypto.sign(null, Buffer.concat([domain, manifest]), key);
     return {
       version: 1,
       signature: { version: 1, keyId: id, signatureHex: signature.toString('hex') },
@@ -77,7 +80,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   catch (error) {
     // All expected parser/crypto errors above are coarse. Unknown failures are
     // intentionally not logged with a stack or native detail.
-    const safe = new Set(['usage: --manifest FILE --private-key PEM --key-id ID', 'unknown or duplicate signing option', 'invalid signing key identity', 'empty manifest refused', 'input type, links or size refused', 'private key owner refused', 'private key requires mode 0600 or 0400', 'input grew beyond limit', 'input changed while reading', 'cannot read signing input', 'invalid or encrypted private key PEM', 'only Ed25519 private keys are accepted', 'unexpected Ed25519 public key encoding']);
+    const safe = new Set(['usage: --manifest FILE --private-key PEM --key-id ID [--product shell|runtime]', 'unsupported signing product', 'unknown or duplicate signing option', 'invalid signing key identity', 'empty manifest refused', 'input type, links or size refused', 'private key owner refused', 'private key requires mode 0600 or 0400', 'input grew beyond limit', 'input changed while reading', 'cannot read signing input', 'invalid or encrypted private key PEM', 'only Ed25519 private keys are accepted', 'unexpected Ed25519 public key encoding']);
     process.stderr.write(`dsh-ocean: ${safe.has(error.message) ? error.message : 'release signing failed'}\n`);
     process.exitCode = 1;
   }

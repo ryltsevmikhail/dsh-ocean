@@ -1,7 +1,8 @@
 # Releasing
 
-This describes the **local** release checklist for DSH Ocean. It is not a
-published trust root: nothing here signs, attests or auto-publishes anything.
+This describes the **local** release checklist and the owner-operated manual
+signed-candidate workflow. It embeds no production trust root and does not grant
+release clearance. The workflow never publishes a public release automatically.
 
 1. The declared `rust-version` in `Cargo.toml` is checked by a separate CI job
    (`cargo check --locked --all-targets` on exactly that toolchain), so a
@@ -44,14 +45,88 @@ published trust root: nothing here signs, attests or auto-publishes anything.
    WebKitGTK 4.1/GTK3, and a clean `dist/` (`SOURCE_DATE_EPOCH` may be set for
    reproducible tar/deb archives).
 10. Release notes list user-visible changes and explicitly state the limits that
-   still apply: system WebKit dependency, no production signed feed (the opt-in
-   local anti-rollback store is not publisher authentication), no data/schema
-   rollback, no portable-ABI guarantee, and that AppImage tool
-   trust is an operator-provided digest.
+   still apply: system WebKit dependency; production feed/root provisioning is an
+   owner action (an anti-rollback store is not publisher authentication); data
+   rollback is limited to the supported quiesced managed home and proven-owned
+   controller workflow, not arbitrary schemas/writers or post-success core
+   history; no portable-ABI guarantee; AppImage tool trust uses an operator digest.
 
-Tagging, signing, publishing and update-feed configuration are **not** covered by
-this document. Do not describe a build as verified, signed or reproducible unless
-independent evidence exists.
+Do not describe a build as verified, signed or reproducible unless independent
+evidence exists. Public trust provisioning/rotation, compatibility acceptance and
+final public release/feed activation remain explicit owner actions.
+
+## Manual signed release candidates
+
+[The release workflow](../.github/workflows/release.yml) runs **only** through
+`workflow_dispatch`. Choose `shell` or `runtime`, independent `stable`/`next`
+channel, exact repository version and an owner-assigned positive monotonic
+product/channel sequence. Prereleases are refused on `stable` at preflight; the
+current pinned prerelease runtime must use `next`. No production sequence/key/
+fingerprint is invented.
+
+**Dry-run defaults to true.** Each native x86_64/ARM64 runner builds its own
+artifact and the independent Rust verifier. Hosted ARM runner availability/billing
+is an owner prerequisite; an unavailable native runner is not permission to skip
+native health or label a cross-build as tested. Runtime builds use the repository's
+Node archive checksum, DSH/pnpm pins and lifecycle/native compilation **on the
+publisher**, never on an installed client. Complete archives retain dependency
+bytes/notices. Disposable validation keys authorize only isolated CI checks,
+including runtime native bindings/version/authenticated health and shell apply
+into a new private prefix. Dry-run reads no production signing secrets, uploads
+no binaries and creates no release/tag. It is not publisher authentication or
+production artifact/laptop acceptance.
+
+Non-dry-run is additionally restricted to manual execution on `main`. It uploads
+short-lived candidate artifacts, then enters the product-specific protected
+`release-shell` or `release-runtime` environment. **The owner must configure both
+environments with required reviewers and main-only deployment rules** before use;
+creating this workflow does not configure GitHub protection. Checkout credentials
+are not persisted into supplier builds. Producer/native checks occur in separate
+build jobs before production keys are made available.
+
+Configure only the matching protected environment's inputs:
+
+| Product | Secret PEM | Public variables |
+| --- | --- | --- |
+| shell | `OCEAN_SHELL_SIGNING_KEY_PEM` | `OCEAN_SHELL_KEY_ID`, `OCEAN_SHELL_PUBLIC_KEY_SHA256` |
+| runtime | `OCEAN_RUNTIME_SIGNING_KEY_PEM` | `OCEAN_RUNTIME_KEY_ID`, `OCEAN_RUNTIME_PUBLIC_KEY_SHA256` |
+
+The fingerprint is SHA-256 of the raw 32-byte Ed25519 public key, **confirmed
+independently**, not copied from the untrusted release being checked. Never put
+private PEMs in repository files, artifacts, logs, release notes or an assistant
+request. The signing helper uses private temporary files, verifies the independent
+public fingerprint, exports only public signature/key files and removes its key
+scratch. Missing approval/key/fingerprint or a mismatch fails closed. Separate
+product steps avoid a missing runtime secret falling back to a shell key.
+
+Before keys are accessed, the environment variable `OCEAN_RELEASE_CLEARANCE`
+(GitHub environment **variable**, not a secret) must equal
+`owner-reviewed-native-and-license-clearance`, and the canonical tag must already
+exist (`vVERSION` for shell; `runtime-CHANNEL-vVERSION-rSEQUENCE` for runtime)
+and resolve to the **exact commit built by this run**. A mismatched/missing source
+binding refuses key access. Protect release tags against later movement.
+This is a deliberate **owner attestation**, not an automated legal/native ABI
+proof. Inventory/source checks do not close compiled compiler/std, native/dlopen,
+genuine package/assets or migration acceptance gates. Do not set clearance merely
+because tests passed; review the [native/toolchain audit](TOOLCHAIN_NATIVE_AUDIT.md).
+
+[Metadata assembly](../scripts/release-artifacts.py) requires both native targets,
+canonical URLs and actual archive size/SHA-256; it rehashes the adjacent files
+before preparing the manifest. Single-target manifests require the explicit
+validation-only flag and are not used by the draft job. Runtime components and
+original Node archive hashes must match the repository pin. Manifests have a
+seven-day default lifetime (bounded by the client's thirty-day maximum).
+[Protected signing](../scripts/sign-publisher-release.mjs) selects the explicit
+product domain; [the low-level signer](../scripts/sign-release.mjs) still requires
+independent Rust policy validation. Final production signatures and both exact
+artifacts are rechecked by the Rust client before a draft can be created.
+
+The last step uses `gh release create --verify-tag --draft`: **draft only**, no
+automatic tag creation or public publication. The owner must inspect genuine
+artifacts, signatures/notices, native compatibility and acceptance, then separately
+publish/configure authenticated feed endpoints. A public key attached to a release
+is not itself an authenticated trust root. This development work does not invoke
+the workflow or access production keys.
 
 ## Past internal 0.1.1 local preparation — 2026-10-20
 
