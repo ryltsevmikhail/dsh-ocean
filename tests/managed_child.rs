@@ -68,6 +68,95 @@ fn alive(pid: i32) -> bool {
     unsafe { libc::kill(pid, 0) == 0 }
 }
 
+#[test]
+fn owned_child_creates_private_data_without_changing_parent_or_existing_modes() {
+    use std::os::unix::process::CommandExt;
+    let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+    command
+        .args(["--exact", "private_creation_case", "--nocapture"])
+        .env("OCEAN_PRIVATE_CREATION_CASE", "1");
+    // Only the isolated test subprocess inherits the permissive mask.
+    unsafe {
+        command.pre_exec(|| {
+            libc::umask(0o002);
+            Ok(())
+        });
+    }
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[tokio::test]
+async fn private_creation_case() {
+    if std::env::var_os("OCEAN_PRIVATE_CREATION_CASE").is_none() {
+        return;
+    }
+    let fixture = Fixture::new("root=$(dirname \"$0\")\nmkdir \"$root/new-dir\"\nprintf new > \"$root/new-dir/session.lock\"\nprintf appended >> \"$root/existing\"\nprintf 'dsh web: http://127.0.0.1:4567/?token=fixture-only\\n'\nexec sleep 30\n");
+    fs::write(fixture.root.join("existing"), b"original-").unwrap();
+    fs::set_permissions(
+        fixture.root.join("existing"),
+        fs::Permissions::from_mode(0o664),
+    )
+    .unwrap();
+    let (log, _) = logs();
+    let mut started = managed_child::start(
+        &fixture.node,
+        &fixture.dsh,
+        &[],
+        "/usr/bin:/bin",
+        Duration::from_secs(5),
+        log,
+    )
+    .await
+    .unwrap();
+    managed_child::stop_child(&mut started.child).await.unwrap();
+    fs::write(fixture.root.join("parent-created"), b"parent").unwrap();
+    assert_eq!(
+        fs::metadata(fixture.root.join("parent-created"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o664,
+        "parent umask must not change"
+    );
+    assert_eq!(
+        fs::read(fixture.root.join("existing")).unwrap(),
+        b"original-appended"
+    );
+    assert_eq!(
+        fs::metadata(fixture.root.join("existing"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o664,
+        "no chmod of existing data"
+    );
+    assert_eq!(
+        fs::metadata(fixture.root.join("new-dir/session.lock"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600,
+        "new owned-child data must be private despite inherited0002"
+    );
+    assert_eq!(
+        fs::metadata(fixture.root.join("new-dir"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+}
+
 #[tokio::test]
 async fn discovers_the_authenticated_url_and_keeps_a_live_child() {
     let fixture = Fixture::new(

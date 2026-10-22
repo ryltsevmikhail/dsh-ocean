@@ -94,7 +94,17 @@ struct TokenGate {
     stop: std::sync::Arc<AtomicBool>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
-fn serve_once(stream: &mut std::net::TcpStream, accepted: &str) {
+#[derive(Clone, Copy)]
+enum AnonymousGate {
+    Fixed(&'static str),
+    OpensAfterToken,
+}
+fn serve_once(
+    stream: &mut std::net::TcpStream,
+    accepted: &str,
+    anonymous: AnonymousGate,
+    exchanged: &mut bool,
+) {
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
         .unwrap();
@@ -114,7 +124,14 @@ fn serve_once(stream: &mut std::net::TcpStream, accepted: &str) {
     }
     let request = String::from_utf8_lossy(&raw);
     let status = if request.starts_with(&format!("GET /?token={accepted} HTTP/1.1")) {
+        *exchanged = true;
         "303 See Other"
+    } else if request.starts_with("GET / HTTP/1.1") {
+        match anonymous {
+            AnonymousGate::Fixed(status) => status,
+            AnonymousGate::OpensAfterToken if *exchanged => "200 OK",
+            AnonymousGate::OpensAfterToken => "401 Unauthorized",
+        }
     } else {
         "401 Unauthorized"
     };
@@ -124,15 +141,24 @@ fn serve_once(stream: &mut std::net::TcpStream, accepted: &str) {
 }
 impl TokenGate {
     fn spawn(accepted: &'static str) -> Self {
+        Self::spawn_with_anonymous(accepted, "401 Unauthorized")
+    }
+    fn spawn_with_anonymous(accepted: &'static str, anonymous: &'static str) -> Self {
+        Self::spawn_policy(accepted, AnonymousGate::Fixed(anonymous))
+    }
+    fn spawn_policy(accepted: &'static str, anonymous: AnonymousGate) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         listener.set_nonblocking(true).unwrap();
         let stop = std::sync::Arc::new(AtomicBool::new(false));
         let stop_flag = stop.clone();
         let thread = std::thread::spawn(move || {
+            let mut exchanged = false;
             while !stop_flag.load(Ordering::SeqCst) {
                 match listener.accept() {
-                    Ok((mut stream, _)) => serve_once(&mut stream, accepted),
+                    Ok((mut stream, _)) => {
+                        serve_once(&mut stream, accepted, anonymous, &mut exchanged)
+                    }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         std::thread::sleep(Duration::from_millis(2));
                     }
@@ -244,6 +270,11 @@ esac
         executable(
             &root.join("bin/journalctl"),
             r#"#!/bin/bash
+if [ "${MOCK_DELAY_JOURNAL:-0}" = 1 ]; then
+  n=0; [ ! -f "$FIXTURE/journal-count" ] || read -r n < "$FIXTURE/journal-count"
+  n=$((n+1)); printf '%s\n' "$n" > "$FIXTURE/journal-count"
+  [ "$n" -ge 4 ] || exit 0
+fi
 if [ -n "${DSH_JOURNAL_TOKEN:-}" ]; then
   printf 'dsh web: http://127.0.0.1:%s/?token=%s\n' "${DSH_AUTH_PORT:-0}" "${DSH_JOURNAL_TOKEN}"
 fi
@@ -310,6 +341,88 @@ fn systemd_case() {
     fs::write(root.join("active"), b"").unwrap();
 
     match case.as_str() {
+        "legacy-unit" | "unsafe-umask-unit" => {
+            let legacy = old_unit.replace("UMask=0077\n", "");
+            let captured = if case == "legacy-unit" {
+                legacy
+            } else {
+                legacy.replace("Type=simple\n", "Type=simple\nUMask=0000\n")
+            };
+            fs::write(&unit_path, &captured).unwrap();
+            let state = AppState::default();
+            let permit = state.begin_update().unwrap();
+            permit
+                .publish_server(server(base.clone(), ServerMode::Systemd))
+                .unwrap();
+            let mut c =
+                OwnedController::headless(permit, old.clone(), candidate.clone(), expected_home())
+                    .unwrap();
+            if case == "unsafe-umask-unit" {
+                assert!(c.ownership(&old_root).is_err());
+                assert_eq!(fs::read(&unit_path).unwrap(), captured.as_bytes());
+            } else {
+                c.ownership(&old_root).unwrap();
+                let image = c.unit().unwrap().unwrap();
+                assert_eq!(
+                    image.before,
+                    captured.as_bytes(),
+                    "capture exact historical bytes"
+                );
+                assert!(
+                    String::from_utf8_lossy(&image.after)
+                        .lines()
+                        .any(|l| l == "UMask=0077"),
+                    "new generation must create private files"
+                );
+                c.switch_unit(&Some(image.clone()), true).unwrap();
+                c.start(&candidate).unwrap();
+                c.switch_unit(&Some(image.clone()), false).unwrap();
+                c.start(&old_root).unwrap();
+                assert_eq!(
+                    fs::read(&unit_path).unwrap(),
+                    captured.as_bytes(),
+                    "rollback must preserve exact legacy before-image"
+                );
+            }
+        }
+        "health-delayed-journal" | "recover-health-delayed-journal" => {
+            fs::write(&unit_path, &old_unit).unwrap();
+            let state = AppState::default();
+            let permit = state.begin_update().unwrap();
+            let mut c = if case == "recover-health-delayed-journal" {
+                assert!(permit.server().unwrap().is_none());
+                OwnedController::headless_recover(
+                    permit,
+                    old_root.clone(),
+                    candidate.clone(),
+                    expected_home(),
+                    Some(dsh_ocean::runtime_switch::UnitImage {
+                        before: old_unit.as_bytes().to_vec(),
+                        after: dsh_ocean::systemd::render_unit(
+                            &generation_runtime(&candidate),
+                            &base,
+                        )
+                        .into_bytes(),
+                    }),
+                )
+                .unwrap()
+            } else {
+                permit
+                    .publish_server(server(base.clone(), ServerMode::Systemd))
+                    .unwrap();
+                OwnedController::headless(permit, old.clone(), candidate.clone(), expected_home())
+                    .unwrap()
+            };
+            c.ownership(&old_root).unwrap();
+            c.stop().unwrap();
+            c.stopped().unwrap();
+            c.start(&old_root).unwrap();
+            c.health()
+                .expect("must await a fresh authenticated journal token, not just systemctl start");
+            assert_eq!(c.permit().server().unwrap().unwrap().token, "good-token");
+            c.stop().unwrap();
+            c.stopped().unwrap();
+        }
         "attached-refused" => {
             let state = AppState::default();
             let permit = state.begin_update().unwrap();
@@ -416,7 +529,7 @@ fn systemd_case() {
                 "stop must precede the inactive proof: {actions}"
             );
         }
-        "health-requires-token" => {
+        "health-requires-token" | "health-requires-anonymous-gate" => {
             fs::write(&unit_path, &old_unit).unwrap();
             let state = AppState::default();
             let permit = state.begin_update().unwrap();
@@ -430,10 +543,26 @@ fn systemd_case() {
             c.stop().unwrap();
             c.stopped().unwrap();
             c.start(&old_root).unwrap();
+            dsh_ocean::auth::cache_token("pre-switch-token");
+            let began = std::time::Instant::now();
             let error = c
                 .health()
                 .expect_err("an unauthenticated service must not be healthy");
-            assert!(error.to_string().contains("token"), "{error:#}");
+            assert!(
+                began.elapsed() < Duration::from_secs(40),
+                "readiness must remain bounded"
+            );
+            assert!(!format!("{error:#}").contains("good-token"));
+            assert_eq!(
+                c.permit().server().unwrap().unwrap().token,
+                "pre-switch-token",
+                "failed readiness must not publish a new token"
+            );
+            assert_eq!(
+                dsh_ocean::auth::cached_token().as_deref(),
+                Some("pre-switch-token"),
+                "failed readiness must not overwrite the previous cache"
+            );
         }
         "dropin-refused" => {
             fs::write(&unit_path, &old_unit).unwrap();
@@ -692,9 +821,67 @@ fn systemd_stop_precedes_the_inactive_proof() {
 }
 
 #[test]
+fn systemd_waits_for_delayed_token_in_apply_and_fresh_recovery() {
+    for case in ["health-delayed-journal", "recover-health-delayed-journal"] {
+        let gate = TokenGate::spawn("good-token");
+        let f = SysFixture::new();
+        let output = f
+            .command(case)
+            .env("DSH_OCEAN_BASE", gate.base().as_str())
+            .env("DSH_OCEAN_URL", gate.base().as_str())
+            .env("DSH_AUTH_PORT", gate.port.to_string())
+            .env("DSH_JOURNAL_TOKEN", "good-token")
+            .env("MOCK_DELAY_JOURNAL", "1")
+            .output()
+            .unwrap();
+        gate.join();
+        assert!(output.status.success(), "{case}: {}", describe(&output));
+    }
+}
+
+#[test]
+fn legacy_generated_unit_upgrades_privacy_but_preserves_exact_rollback_image() {
+    for case in ["legacy-unit", "unsafe-umask-unit"] {
+        let f = SysFixture::new();
+        let output = f.command(case).output().unwrap();
+        assert!(output.status.success(), "{case}: {}", describe(&output));
+    }
+}
+
+#[test]
 fn systemd_health_requires_an_authenticated_token() {
     let f = SysFixture::new();
     let output = f.command("health-requires-token").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn token_redirect_without_anonymous_gate_cannot_publish_or_cache_success() {
+    let gate = TokenGate::spawn_with_anonymous("good-token", "200 OK");
+    let f = SysFixture::new();
+    let output = f
+        .command("health-requires-anonymous-gate")
+        .env("DSH_OCEAN_BASE", gate.base().as_str())
+        .env("DSH_AUTH_PORT", gate.port.to_string())
+        .env("DSH_JOURNAL_TOKEN", "good-token")
+        .output()
+        .unwrap();
+    gate.join();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn anonymous_gate_opening_after_token_exchange_cannot_publish_or_cache_success() {
+    let gate = TokenGate::spawn_policy("good-token", AnonymousGate::OpensAfterToken);
+    let f = SysFixture::new();
+    let output = f
+        .command("health-requires-anonymous-gate")
+        .env("DSH_OCEAN_BASE", gate.base().as_str())
+        .env("DSH_AUTH_PORT", gate.port.to_string())
+        .env("DSH_JOURNAL_TOKEN", "good-token")
+        .output()
+        .unwrap();
+    gate.join();
     assert!(output.status.success(), "{}", describe(&output));
 }
 

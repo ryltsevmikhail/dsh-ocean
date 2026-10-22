@@ -61,6 +61,18 @@ pub fn render_unit(runtime: &Runtime, base: &Url) -> String {
     render(runtime, base, None)
 }
 
+/// Recognize only our exact current template or its historical pre-UMask form.
+/// Compatibility is for capturing the before-image, not rewriting arbitrary
+/// units or altering existing data. New units always get the private mask.
+pub(crate) fn is_generated_unit(runtime: &Runtime, base: &Url, bytes: &[u8]) -> bool {
+    let current = render_unit(runtime, base);
+    bytes == current.as_bytes()
+        || bytes
+            == current
+                .replacen("Type=simple\nUMask=0077\n", "Type=simple\n", 1)
+                .as_bytes()
+}
+
 /// Renders the same unit with a non-loopback bind and explicit trusted hosts.
 ///
 /// Used only to stage a candidate file for a human to inspect; this function never
@@ -174,6 +186,7 @@ fn render(runtime: &Runtime, base: &Url, isolated: Option<&Path>) -> String {
          \n\
          [Service]\n\
          Type=simple\n\
+         UMask=0077\n\
          ExecStart={prefix}\"{node}\" \"{dsh}\" --profile web --host 127.0.0.1 --port {port} --no-open\n\
          WorkingDirectory={working}\n\
          Environment=\"PATH={path}\"\n\

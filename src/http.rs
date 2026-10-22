@@ -7,6 +7,17 @@ use url::Url;
 /// Bounded plain-HTTP probe for a local DSH origin. No redirects or TLS.
 /// TCP is a byte stream: neither a request nor a status line is one packet.
 pub fn status(url: &Url) -> Option<u16> {
+    status_until(url, Instant::now() + Duration::from_secs(6))
+}
+
+/// Share an absolute budget with owned-service readiness. Its caller uses a
+/// numeric loopback origin, so no unbounded DNS resolution enters that budget.
+pub(crate) fn status_until(url: &Url, deadline: Instant) -> Option<u16> {
+    fn remaining(deadline: Instant) -> Option<Duration> {
+        let time = deadline.checked_duration_since(Instant::now())?;
+        (!time.is_zero()).then_some(time.min(Duration::from_secs(2)))
+    }
+    remaining(deadline)?;
     if url.scheme() != "http" {
         return None;
     }
@@ -14,15 +25,12 @@ pub fn status(url: &Url) -> Option<u16> {
     let addrs = url.socket_addrs(|| None).ok()?;
     let mut stream = None;
     for addr in addrs {
-        if let Ok(candidate) = TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+        if let Ok(candidate) = TcpStream::connect_timeout(&addr, remaining(deadline)?) {
             stream = Some(candidate);
             break;
         }
     }
     let mut stream = stream?;
-    stream
-        .set_write_timeout(Some(Duration::from_secs(2)))
-        .ok()?;
     let path = match url.query() {
         Some(query) => format!("{}?{query}", url.path()),
         None => url.path().to_string(),
@@ -33,9 +41,17 @@ pub fn status(url: &Url) -> Option<u16> {
         None => host.to_string(),
     };
     let request = format!("GET {path} HTTP/1.1\r\nHost: {host_header}\r\nConnection: close\r\nUser-Agent: dsh-ocean\r\n\r\n");
-    stream.write_all(request.as_bytes()).ok()?;
+    let mut bytes = request.as_bytes();
+    while !bytes.is_empty() {
+        stream.set_write_timeout(Some(remaining(deadline)?)).ok()?;
+        let written = stream.write(bytes).ok()?;
+        if written == 0 {
+            return None;
+        }
+        bytes = &bytes[written..];
+    }
 
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = deadline.min(Instant::now() + Duration::from_secs(2));
     let mut line = Vec::new();
     let mut chunk = [0u8; 256];
     loop {
@@ -68,5 +84,37 @@ pub fn status(url: &Url) -> Option<u16> {
         return None;
     }
     let code: u16 = code.parse().ok()?;
+    remaining(deadline)?;
     (100..=599).contains(&code).then_some(code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn owned_readiness_budget_bounds_a_slow_http_response() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let (done, stopped) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            if stopped.recv_timeout(Duration::from_millis(800)).is_err() {
+                let _ = socket.write_all(b"HTTP/1.1 303 See Other\r\nContent-Length: 0\r\n\r\n");
+            }
+        });
+        let start = Instant::now();
+        let status = status_until(&url, start + Duration::from_millis(100));
+        let elapsed = start.elapsed();
+        let _ = done.send(());
+        thread.join().unwrap();
+        assert_eq!(
+            status, None,
+            "a response after the shared deadline must not count as ready"
+        );
+        assert!(
+            elapsed < Duration::from_millis(700),
+            "probe ignored its readiness budget: {elapsed:?}"
+        );
+    }
 }

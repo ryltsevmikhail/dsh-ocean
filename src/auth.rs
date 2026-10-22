@@ -159,9 +159,190 @@ pub fn resolve_token(base: &Url, unit: Option<&str>) -> Result<String> {
     )
 }
 
+/// Await a newly started owned systemd service, not merely a listening port.
+/// This intentionally does not use the attachment resolver's all-unit journal
+/// search: only the fixed owned unit and the bounded token cache are candidates.
+/// All retries and HTTP attempts share a deadline. Stock `journalctl --no-pager`
+/// is a single-process helper: it is reaped on exit; timeout/oversize paths kill
+/// its owned group before reaping. This is not supervision of substituted
+/// wrappers that exit after detaching their own workers.
+pub(crate) async fn wait_for_systemd(
+    base: &Url,
+    unit: &str,
+    timeout: std::time::Duration,
+) -> Result<String> {
+    use std::time::{Duration, Instant};
+    anyhow::ensure!(
+        base.scheme() == "http"
+            && base.host_str() == Some("127.0.0.1")
+            && unit == config::UNIT_NAME,
+        "authenticated readiness requires the owned loopback systemd unit"
+    );
+    let deadline = Instant::now() + timeout;
+    loop {
+        if Instant::now() >= deadline {
+            anyhow::bail!("authenticated readiness timed out: no valid DSH launch token and anonymous gate became ready");
+        }
+        if http::status_until(base, deadline) == Some(401) {
+            let mut command = tokio::process::Command::new("journalctl");
+            command.args([
+                "--user",
+                "-u",
+                unit,
+                "-n",
+                "5000",
+                "--no-pager",
+                "-o",
+                "cat",
+            ]);
+            let bytes = journal_output_until(
+                &mut command,
+                deadline.min(Instant::now() + Duration::from_secs(2)),
+            )
+            .await?;
+            let text = String::from_utf8_lossy(&bytes);
+            let mut seen = std::collections::HashSet::new();
+            let candidates = text
+                .lines()
+                .rev()
+                .filter_map(parse_token_line)
+                .filter(|token| !token.is_empty() && token.len() <= MAX_TOKEN_BYTES as usize)
+                .filter(|token| seen.insert(token.clone()))
+                .take(64)
+                .chain(cached_token());
+            for token in candidates {
+                if Instant::now() >= deadline {
+                    break;
+                }
+                if http::status_until(&token_url(base, &token), deadline) == Some(303)
+                    && http::status_until(base, deadline) == Some(401)
+                {
+                    cache_token(&token);
+                    return Ok(token);
+                }
+            }
+        }
+        tokio::time::sleep(
+            Duration::from_millis(100).min(deadline.saturating_duration_since(Instant::now())),
+        )
+        .await;
+    }
+}
+
+async fn journal_output_until(
+    command: &mut tokio::process::Command,
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>> {
+    use anyhow::Context;
+    use std::process::Stdio;
+    use tokio::io::AsyncReadExt;
+    const MAX_JOURNAL_BYTES: u64 = 1024 * 1024;
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .kill_on_drop(true)
+        .spawn()
+        .context("run owned-unit journal query")?;
+    let stdout = child.stdout.take().context("capture owned-unit journal")?;
+    let result = tokio::time::timeout_at(deadline.into(), async {
+        let mut bytes = Vec::new();
+        stdout
+            .take(MAX_JOURNAL_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .await
+            .context("read owned-unit journal")?;
+        anyhow::ensure!(
+            bytes.len() <= MAX_JOURNAL_BYTES as usize,
+            "owned-unit journal exceeds readiness limit"
+        );
+        let status = child
+            .wait()
+            .await
+            .context("reap owned-unit journal query")?;
+        anyhow::ensure!(status.success(), "owned-unit journal query failed");
+        Ok(bytes)
+    })
+    .await
+    .unwrap_or_else(|_| {
+        Err(anyhow::anyhow!(
+            "owned-unit journal query exceeded readiness deadline"
+        ))
+    });
+    if result.is_err() {
+        crate::managed_child::stop_child(&mut child)
+            .await
+            .context("could not clean up owned-unit journal query")?;
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn journal_deadline_kills_and_reaps_the_owned_query_without_echoing_output() {
+        use std::os::unix::fs::DirBuilderExt;
+        use std::time::{Duration, Instant};
+        let root = std::env::temp_dir().join(format!(
+            "ocean-journal-bound-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let pid_path = root.join("pid");
+        let mut command = tokio::process::Command::new("/bin/bash");
+        command
+            .args([
+                "-c",
+                "printf '%s' \"$$\" > \"$1\"; printf 'token=fixture-secret\\n'; exec sleep 30",
+                "fixture",
+            ])
+            .arg(&pid_path);
+        let start = Instant::now();
+        let error = journal_output_until(&mut command, start + Duration::from_millis(200))
+            .await
+            .unwrap_err();
+        let message = format!("{error:#}");
+        assert!(message.contains("deadline"), "{message}");
+        assert!(!message.contains("fixture-secret"));
+        assert!(
+            start.elapsed() < Duration::from_secs(4),
+            "helper must not inherit its30s sleep"
+        );
+        let pid: i32 = fs::read_to_string(&pid_path).unwrap().parse().unwrap();
+        assert_eq!(
+            unsafe { libc::kill(pid, 0) },
+            -1,
+            "owned journal leader was killed and reaped"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn oversized_or_failed_journal_is_bounded_and_never_used_as_a_diagnostic() {
+        use std::time::{Duration, Instant};
+        for (script, expected) in [
+            ("head -c 1100000 /dev/zero; exec sleep 30", "limit"),
+            (
+                "printf 'token=fixture-secret'; printf 'token=fixture-secret' >&2; exit 1",
+                "query failed",
+            ),
+        ] {
+            let mut command = tokio::process::Command::new("/bin/bash");
+            command.args(["-c", script]);
+            let start = Instant::now();
+            let error = journal_output_until(&mut command, start + Duration::from_secs(2))
+                .await
+                .unwrap_err();
+            let message = format!("{error:#}");
+            assert!(message.contains(expected), "{message}");
+            assert!(!message.contains("fixture-secret"));
+            assert!(start.elapsed() < Duration::from_secs(4));
+        }
+    }
 
     #[test]
     fn parses_launch_token_from_journal_line() {
