@@ -336,7 +336,16 @@ fn systemd_case() {
     )
     .unwrap();
     let old = generation_runtime(&old_root);
-    let old_unit = dsh_ocean::systemd::render_unit(&old, &base);
+    let old_unit = if case == "recover-locale-health" {
+        dsh_ocean::systemd::render_unit_with_patch(
+            &old,
+            &base,
+            &root.join("saved-resource/overlay.yml"),
+        )
+        .unwrap()
+    } else {
+        dsh_ocean::systemd::render_unit(&old, &base)
+    };
 
     // The service starts active.
     fs::write(root.join("active"), b"").unwrap();
@@ -414,11 +423,11 @@ fn systemd_case() {
                 );
             }
         }
-        "health-delayed-journal" | "recover-health-delayed-journal" => {
+        "health-delayed-journal" | "recover-health-delayed-journal" | "recover-locale-health" => {
             fs::write(&unit_path, &old_unit).unwrap();
             let state = AppState::default();
             let permit = state.begin_update().unwrap();
-            let mut c = if case == "recover-health-delayed-journal" {
+            let mut c = if case.starts_with("recover-") {
                 assert!(permit.server().unwrap().is_none());
                 OwnedController::headless_recover(
                     permit,
@@ -442,6 +451,10 @@ fn systemd_case() {
                 OwnedController::headless(permit, old.clone(), candidate.clone(), expected_home())
                     .unwrap()
             };
+            if case == "recover-locale-health" {
+                c.restore_locale_patches(Some(root.join("saved-resource/overlay.yml")), None)
+                    .unwrap();
+            }
             c.ownership(&old_root).unwrap();
             c.stop().unwrap();
             c.stopped().unwrap();
@@ -449,6 +462,12 @@ fn systemd_case() {
             c.health()
                 .expect("must await a fresh authenticated journal token, not just systemctl start");
             assert_eq!(c.permit().server().unwrap().unwrap().token, "good-token");
+            if case == "recover-locale-health" {
+                assert_eq!(
+                    c.permit().server().unwrap().unwrap().locale_patch,
+                    Some(root.join("saved-resource/overlay.yml"))
+                );
+            }
             c.stop().unwrap();
             c.stopped().unwrap();
         }
@@ -865,7 +884,11 @@ fn systemd_stop_precedes_the_inactive_proof() {
 
 #[test]
 fn systemd_waits_for_delayed_token_in_apply_and_fresh_recovery() {
-    for case in ["health-delayed-journal", "recover-health-delayed-journal"] {
+    for case in [
+        "health-delayed-journal",
+        "recover-health-delayed-journal",
+        "recover-locale-health",
+    ] {
         let gate = TokenGate::spawn("good-token");
         let f = SysFixture::new();
         let output = f
@@ -1157,7 +1180,7 @@ fn child_case() {
     permit.publish_child(launched, started.child).unwrap();
 
     match case.as_str() {
-        "recipe-roundtrip" | "recipe-change" => {
+        "recipe-roundtrip" | "recipe-change" | "recipe-recovery" => {
             let mut c = OwnedController::headless(
                 permit,
                 old.clone(),
@@ -1165,7 +1188,7 @@ fn child_case() {
                 root.join("home/.dsh"),
             )
             .unwrap();
-            if case == "recipe-change" {
+            if case != "recipe-roundtrip" {
                 c = c.with_candidate_locale_patch(None).unwrap();
             }
             c.ownership(&old_root).unwrap();
@@ -1173,7 +1196,7 @@ fn child_case() {
             c.stopped().unwrap();
             fs::write(&marker, "").unwrap();
             c.start(&candidate).unwrap();
-            let expected = if case == "recipe-change" {
+            let expected = if case != "recipe-roundtrip" {
                 None
             } else {
                 recipe.clone()
@@ -1185,6 +1208,20 @@ fn child_case() {
                     .contains(recipe.as_ref().unwrap().to_str().unwrap()),
                 expected.is_some()
             );
+            if case == "recipe-recovery" {
+                drop(c);
+                let permit = state.begin_update().unwrap();
+                c = OwnedController::headless_recover(
+                    permit,
+                    old_root.clone(),
+                    candidate.clone(),
+                    root.join("home/.dsh"),
+                    None,
+                )
+                .unwrap();
+                c.restore_locale_patches(recipe.clone(), None).unwrap();
+                c.ownership(&old_root).unwrap();
+            }
             c.stop().unwrap();
             c.stopped().unwrap();
             fs::write(&marker, "").unwrap();
@@ -1369,6 +1406,13 @@ fn child_candidate_and_rollback_retain_captured_launch_patch() {
 fn plain_candidate_does_not_replace_captured_patched_rollback_recipe() {
     let f = ChildFixture::new();
     let output = f.command("recipe-change", None).output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn same_session_child_recovery_uses_saved_old_recipe_not_current_plain_candidate() {
+    let f = ChildFixture::new();
+    let output = f.command("recipe-recovery", None).output().unwrap();
     assert!(output.status.success(), "{}", describe(&output));
 }
 

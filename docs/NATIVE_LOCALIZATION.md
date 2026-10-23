@@ -96,9 +96,15 @@ recipes; candidate planning is restricted to before ownership/stop. Its systemd
 ownership comparison accepts only the explicitly captured patched template (or
 its exact historical pre-UMask image), with unchanged manager/provenance guards.
 Tests cover child and systemd candidate/rollback roundtrips, including a plain
-candidate restoring an old patched recipe. Durable journal recipe restoration
-and automatic cold-start planning are not wired yet; these are required before
-enabling the feature.
+candidate restoring an old patched recipe. Private pending journals now retain
+old/candidate recipes and restore them before recovery ownership checks. Legacy
+journals default to plain recipes; plain transactions omit the new fields so
+legacy strict readers retain their original schema. Malformed relative,
+parent-escaping or non-overlay paths are refused before transaction mutation.
+Same-session child recovery and fresh-session systemd recovery retain the saved
+old recipe rather than consulting current preferences or candidate metadata.
+Automatic cold-start planning and its scoped consent callers are still pending;
+these are required before enabling the feature.
 
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls

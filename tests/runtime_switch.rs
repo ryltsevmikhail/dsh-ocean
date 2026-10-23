@@ -19,7 +19,7 @@ macro_rules! runtime_switch_tests {
         #[test]
         fn recovery_refuses_a_changed_managed_home_even_before_snapshot_creation() {
             let (mut p,mut c)=fixture();
-            let j=Journal{schema:1,home:p.home.clone(),backups:p.backups.clone(),old:PathBuf::from("generations/gen.old"),new:PathBuf::from("generations/gen.new"),snapshot:None,unit:None};
+            let j=Journal{schema:1,home:p.home.clone(),backups:p.backups.clone(),old:PathBuf::from("generations/gen.old"),new:PathBuf::from("generations/gen.new"),snapshot:None,unit:None,old_locale_patch:None,candidate_locale_patch:None};
             save(&p,&j).unwrap();c.running=false;p.home=p.home.with_file_name("different-home");
             assert!(recover(&p,&mut c).is_err(),"pending recovery must bind the same managed data home, not restart against a changed scope");assert_eq!(c.old_starts,0);assert!(p.pending().exists());
         }
@@ -103,6 +103,7 @@ macro_rules! runtime_switch_tests {
                         .into(),
                 ),
                 unit: None,
+                old_locale_patch:None,candidate_locale_patch:None,
             };
             save(&p, &j).unwrap();
             select(&p, &j.old, &j.new).unwrap();
@@ -164,6 +165,7 @@ macro_rules! runtime_switch_tests {
                 new: PathBuf::from("generations/gen.new"),
                 snapshot: None,
                 unit: None,
+                old_locale_patch:None,candidate_locale_patch:None,
             };
             save(&p, &j).unwrap();
             select(&p, &j.old, &j.new).unwrap();

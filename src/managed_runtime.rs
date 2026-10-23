@@ -438,6 +438,16 @@ struct RevalidateStart<'a, C: Controller> {
 }
 
 impl<C: Controller> Controller for RevalidateStart<'_, C> {
+    fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+        self.inner.locale_patches()
+    }
+    fn restore_locale_patches(
+        &mut self,
+        old: Option<PathBuf>,
+        candidate: Option<PathBuf>,
+    ) -> Result<()> {
+        self.inner.restore_locale_patches(old, candidate)
+    }
     fn ownership(&mut self, old: &Path) -> Result<()> {
         self.inner.ownership(old)
     }
@@ -482,9 +492,21 @@ mod tests {
     use super::*;
 
     struct Fake {
+        recipes: (Option<PathBuf>, Option<PathBuf>),
         starts: Vec<PathBuf>,
     }
     impl Controller for Fake {
+        fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+            self.recipes.clone()
+        }
+        fn restore_locale_patches(
+            &mut self,
+            old: Option<PathBuf>,
+            candidate: Option<PathBuf>,
+        ) -> Result<()> {
+            self.recipes = (old, candidate);
+            Ok(())
+        }
         fn ownership(&mut self, _old: &Path) -> Result<()> {
             Ok(())
         }
@@ -507,6 +529,23 @@ mod tests {
     }
 
     #[test]
+    fn revalidate_decorator_forwards_durable_recipe_capture_and_restore() {
+        let old = Some(PathBuf::from("/private/old/overlay.yml"));
+        let mut inner = Fake {
+            starts: Vec::new(),
+            recipes: (old.clone(), None),
+        };
+        let revalidate = || Ok(());
+        let mut decorated = RevalidateStart {
+            inner: &mut inner,
+            revalidate: &revalidate,
+            new_root: PathBuf::from("/private/new"),
+        };
+        assert_eq!(decorated.locale_patches(), (old.clone(), None));
+        decorated.restore_locale_patches(None, old.clone()).unwrap();
+        assert_eq!(decorated.locale_patches(), (None, old));
+    }
+    #[test]
     fn revalidate_decorator_rechecks_only_the_new_root_and_allows_rollback() {
         let tmp = std::env::temp_dir().join(format!(
             "dsh-managed-runtime-revalidate-{}",
@@ -523,7 +562,10 @@ mod tests {
             calls.set(calls.get() + 1);
             anyhow::bail!("candidate expired");
         };
-        let mut inner = Fake { starts: Vec::new() };
+        let mut inner = Fake {
+            starts: Vec::new(),
+            recipes: (None, None),
+        };
         {
             let mut decorated = RevalidateStart {
                 inner: &mut inner,

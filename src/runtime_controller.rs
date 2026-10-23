@@ -499,6 +499,28 @@ impl OwnedController {
 }
 
 impl Controller for OwnedController {
+    fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+        (
+            self.old_locale_patch.clone(),
+            self.candidate_locale_patch.clone(),
+        )
+    }
+    fn restore_locale_patches(
+        &mut self,
+        old: Option<PathBuf>,
+        candidate: Option<PathBuf>,
+    ) -> Result<()> {
+        self.permit.ensure_open()?;
+        anyhow::ensure!(
+            self.recovery && self.old_root.is_none(),
+            "locale journal recipes must precede recovery ownership"
+        );
+        service::managed_arguments(old.as_deref())?;
+        service::managed_arguments(candidate.as_deref())?;
+        self.old_locale_patch = old;
+        self.candidate_locale_patch = candidate;
+        Ok(())
+    }
     fn ownership(&mut self, old: &Path) -> Result<()> {
         let root = canonical(&generation_root(&self.old)?)?;
         let old = canonical(old)?;
