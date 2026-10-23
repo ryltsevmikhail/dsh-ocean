@@ -55,8 +55,12 @@ acceptance also checks that export confirmation has no default acceptance.
 The signed shell updater now localizes its action/channel/format controls and
 explicit enrollment/transaction confirmations, including native Yes/No captions.
 Action indices, technical channel IDs and response-based approval gates are retained.
-The updater's detailed trust/destination/progress reports and operation-result
-messages are still being localized, alongside the remaining core native dialogs.
+Its six progress phases, cancellation/commit qualifications and operation-result
+messages are localized too. Counters are explicitly not signature/installation
+success, disk-only changes do not claim to replace the running client/core/profile,
+and the remembered floor is described as a release-sequence bound. Literal launcher
+diagnostics remain plain single-pass arguments. Detailed trust/destination reports
+and the remaining core native dialogs are still being localized.
 
 ## Harness resource tree
 

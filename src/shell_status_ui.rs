@@ -68,6 +68,119 @@ fn selected_locale_names_all_signed_actions_and_keeps_enrollment_authority_expli
     }
 }
 
+#[cfg(test)]
+#[test]
+fn selected_locale_progress_preserves_commit_cancel_and_non_success_qualifications() {
+    for (language, _) in crate::i18n::LANGUAGES {
+        for (phase, key) in [
+            (Phase::Checking, "checking"),
+            (Phase::Downloading, "downloading"),
+            (Phase::Preparing, "preparing"),
+            (Phase::Verifying, "verifying"),
+            (Phase::Committing, "committing"),
+            (Phase::Finished, "finished"),
+        ] {
+            let progress = crate::update_control::Progress {
+                phase,
+                bytes: 2048,
+                total: Some(4096),
+                cancel_requested: false,
+                finished: false,
+            };
+            let text = progress_text_in(&progress, language);
+            assert!(
+                text.contains("2048")
+                    && text.contains("4096")
+                    && text.contains(
+                        crate::i18n::message(language, &format!("shell_status.phase.{key}"))
+                            .unwrap()
+                    )
+            );
+            let notice = if phase == Phase::Committing {
+                "notice_commit"
+            } else {
+                "notice_counts"
+            };
+            assert!(text.contains(
+                crate::i18n::message(language, &format!("shell_status.{notice}")).unwrap()
+            ));
+        }
+        let cancelled = crate::update_control::Progress {
+            cancel_requested: true,
+            ..Default::default()
+        };
+        assert!(progress_text_in(&cancelled, language)
+            .contains(crate::i18n::message(language, "shell_status.notice_cancel").unwrap()));
+        let receipt = serde_json::json!({"launcherError":"<b>{bytes}</b>"});
+        assert!(changed_text_in(&receipt, language).contains("<b>{bytes}</b>"));
+    }
+}
+
+fn progress_text_in(
+    progress: &crate::update_control::Progress,
+    language: crate::i18n::Language,
+) -> String {
+    let phase = match progress.phase {
+        Phase::Checking => "checking",
+        Phase::Downloading => "downloading",
+        Phase::Preparing => "preparing",
+        Phase::Verifying => "verifying",
+        Phase::Committing => "committing",
+        Phase::Finished => "finished",
+    };
+    let phase = crate::i18n::message(language, &format!("shell_status.phase.{phase}"))
+        .expect("embedded update phase");
+    let total = progress
+        .total
+        .map(|total| {
+            crate::i18n::render(
+                language,
+                "shell_status.total",
+                &[("total", &total.to_string())],
+            )
+            .expect("validated progress total")
+        })
+        .unwrap_or_default();
+    let notice = if progress.cancel_requested {
+        "shell_status.notice_cancel"
+    } else if progress.phase == Phase::Committing {
+        "shell_status.notice_commit"
+    } else {
+        "shell_status.notice_counts"
+    };
+    crate::i18n::render(
+        language,
+        "shell_status.progress",
+        &[
+            ("phase", phase),
+            ("bytes", &progress.bytes.to_string()),
+            ("total", &total),
+            (
+                "notice",
+                crate::i18n::message(language, notice)
+                    .expect("embedded update progress qualification"),
+            ),
+        ],
+    )
+    .expect("validated update progress fields")
+}
+fn changed_text_in(receipt: &serde_json::Value, language: crate::i18n::Language) -> String {
+    let launcher = receipt
+        .get("launcherError")
+        .and_then(|value| value.as_str())
+        .map(|error| {
+            crate::i18n::render(language, "shell_status.launcher_error", &[("error", error)])
+                .expect("validated launcher diagnostic")
+        })
+        .unwrap_or_default();
+    crate::i18n::render(
+        language,
+        "shell_status.result_changed",
+        &[("launcher", &launcher)],
+    )
+    .expect("validated disk-only transaction receipt")
+}
+
 fn discard_cache(cached: Option<Arc<managed_shell::CachedArtifact>>) {
     if let Some(cached) = cached {
         std::thread::spawn(move || drop(cached));
@@ -266,23 +379,7 @@ fn render(widgets: &Widgets, model: &Model, registry: &native_updates::Registry)
                 .active
                 .as_ref()
                 .map(|control| {
-                    let progress = control.snapshot();
-                    format!(
-                        "{:?}: {}{}{}",
-                        progress.phase,
-                        progress.bytes,
-                        progress
-                            .total
-                            .map(|total| format!(" / {total} bytes"))
-                            .unwrap_or_default(),
-                        if progress.cancel_requested {
-                            " — cancellation requested; waiting for owned cleanup"
-                        } else if progress.phase == Phase::Committing {
-                            " — finishing local publication/transaction; cannot cancel"
-                        } else {
-                            " (counts are not signature/installation success)"
-                        }
-                    )
+                    progress_text_in(&control.snapshot(), crate::i18n::active_language())
                 })
                 .unwrap_or_default(),
         );
@@ -322,9 +419,9 @@ fn start(
                 return glib::ControlFlow::Continue;
             }
             Err(mpsc::TryRecvError::Disconnected) => Completion {
-                result: Err(anyhow::anyhow!(
-                    "native worker terminated; refresh local status and inspect pending recovery"
-                )),
+                result: Err(anyhow::anyhow!(crate::i18n::text(
+                    "shell_status.worker_failed"
+                ))),
                 cancelled: false,
             },
         };
@@ -332,15 +429,20 @@ fn start(
             let mut model = model.borrow_mut();
             model.active = None;
             if completion.cancelled {
-                model.message =
-                    "Cancelled; no new operation will be started from this result.".into();
+                model.message = crate::i18n::text("shell_status.result_cancelled").into();
                 model.candidate = None;
                 discard_cache(model.cached.take());
             } else {
                 match completion.result {
                     Err(error) => {
-                        model.message =
-                            crate::auth::redact(&format!("Update action failed: {error:#}"));
+                        model.message = crate::auth::redact(
+                            &crate::i18n::render(
+                                crate::i18n::active_language(),
+                                "shell_status.result_failed",
+                                &[("error", &format!("{error:#}"))],
+                            )
+                            .expect("validated update error context"),
+                        );
                         model.candidate = None;
                         discard_cache(model.cached.take());
                     }
@@ -355,33 +457,32 @@ fn start(
                         }
                         model.settings = Some(settings);
                         model.destination = Some(destination);
-                        model.message =
-                            "Local state refreshed. No network request was made.".into();
+                        model.message = crate::i18n::text("shell_status.result_refreshed").into();
                     }
                     Ok(Outcome::Channel(settings)) => {
                         model.settings = Some(settings);
                         model.candidate = None;
                         discard_cache(model.cached.take());
-                        model.message="Channel saved. Check again; previous candidates were invalidated. Core channel here is for signed runtime updates, not the old npm selector.".into();
+                        model.message = crate::i18n::text("shell_status.result_channel").into();
                     }
                     Ok(Outcome::Enrolled(destination)) => {
                         model.destination = Some(destination);
-                        model.message="Explicit managed destination enabled. This does not replace or convert the original package installation.".into();
+                        model.message = crate::i18n::text("shell_status.result_enrolled").into();
                     }
                     Ok(Outcome::Checked(candidate)) => {
                         model.candidate = Some(candidate);
                         discard_cache(model.cached.take());
-                        model.message="Signature, policy and remembered floor checked. Artifact has NOT been downloaded or applied.".into();
+                        model.message = crate::i18n::text("shell_status.result_checked").into();
                     }
                     Ok(Outcome::Downloaded(cached)) => {
                         model.cached = Some(cached);
-                        model.message="Exact signed artifact downloaded/hashed into private non-executable staging. Nothing is active yet.".into();
+                        model.message = crate::i18n::text("shell_status.result_downloaded").into();
                     }
                     Ok(Outcome::Changed(receipt, destination)) => {
                         model.destination = Some(destination);
                         model.candidate = None;
                         discard_cache(model.cached.take());
-                        model.message=format!("Local transaction completed; selection changed on disk only. Running client/core/profile are unchanged. {}\nQuit this client using its Quit action, then open DSH Ocean (managed) from the application menu. Closing to tray is not quitting.",receipt.get("launcherError").and_then(|value|value.as_str()).map(|error|format!("Launcher needs operator attention: {error}")).unwrap_or_default());
+                        model.message = changed_text_in(&receipt, crate::i18n::active_language());
                     }
                 }
             }
