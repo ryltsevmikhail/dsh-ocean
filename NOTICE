@@ -13,6 +13,16 @@ rendered derivatives. See docs/BRANDING.md for palette and reproduction details.
 This source snapshot includes no DeepSeek-derived favicon/whale artwork and no
 historical runtime patches. It does not import private Git development history.
 
+Built-in DSH dictionaries
+------------------------
+
+The built-in UI dictionaries contain DeepSeek English catalog text and derived
+translations, under the MIT license. Copyright (c) 2026 DeepSeek and DSH Ocean
+contributors. The complete terms are retained at locales/dsh/LICENSE in the
+native package. Source provenance and dictionary coverage are recorded in
+language-pack/data/inventory.json. This dictionary resource does not bundle or
+relicense the separate Harness runtime.
+
 Separate third-party software
 -----------------------------
 

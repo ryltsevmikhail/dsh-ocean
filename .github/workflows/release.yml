@@ -76,13 +76,14 @@ jobs:
       - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev pkg-config patchelf build-essential python3 jq xvfb x11-utils xauth dbus-x11
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev pkg-config patchelf build-essential python3 nodejs jq xvfb x11-utils xauth dbus-x11
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # pinned action, exact compiler below
         with:
           toolchain: 1.90.0
       - name: Check source inventories and build independent verifier
         run: |
           python3 -B tests/test_native_locale_catalogs.py
+          node scripts/build-builtin-locales.mjs --check
           python3 -B scripts/license-inventory.py --check
           python3 -B scripts/check-glib-backport.py
           python3 -B scripts/check-toolchain-source-evidence.py

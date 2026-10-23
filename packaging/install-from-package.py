@@ -347,7 +347,7 @@ def license_payload(root_fd):
         raw = source.read(65537)
         if len(raw) > 65536 or stamp(os.fstat(source.fileno())) != stamp(before):
             raise ValueError("license payload manifest changed")
-        base = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "docs/third-party/inventory.json", "docs/BINARY_LICENSE_AUDIT.md",
+        base = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "locales/dsh/LICENSE", "docs/third-party/inventory.json", "docs/BINARY_LICENSE_AUDIT.md",
                 "docs/third-party/sources/cssparser-0.37.0.crate", "docs/third-party/sources/cssparser-macros-0.7.1.crate",
                 "docs/third-party/sources/dtoa-short-0.3.5.crate", "docs/third-party/sources/option-ext-0.2.0.crate",
                 "docs/third-party/sources/selectors-0.38.0.crate"}

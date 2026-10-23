@@ -39,7 +39,7 @@ def destinations(opened):
             path = "usr/bin/dsh-ocean"
         elif key == "packaging/dsh-ocean.desktop":
             path = "usr/share/applications/dev.dsh.ocean.desktop"
-        elif key in ("assets/ocean-ice.svg", "packaging/license-inputs.txt") or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"):
+        elif key in ("assets/ocean-ice.svg", "packaging/license-inputs.txt", "locales/dsh/LICENSE") or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"):
             path = "usr/share/doc/dsh-ocean/" + key
         elif key.startswith("icons/"):
             size = key.split("/")[1].removesuffix(".png")

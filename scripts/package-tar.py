@@ -85,7 +85,7 @@ def open_source(path, binary=False, machine=None, repository=None):
 
 
 # Exact current covered-source set; dependency/source revisions require review.
-LICENSE_BASE = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "docs/third-party/inventory.json", "docs/BINARY_LICENSE_AUDIT.md",
+LICENSE_BASE = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "locales/dsh/LICENSE", "docs/third-party/inventory.json", "docs/BINARY_LICENSE_AUDIT.md",
                 "docs/third-party/sources/cssparser-0.37.0.crate", "docs/third-party/sources/cssparser-macros-0.7.1.crate",
                 "docs/third-party/sources/dtoa-short-0.3.5.crate", "docs/third-party/sources/option-ext-0.2.0.crate",
                 "docs/third-party/sources/selectors-0.38.0.crate"}

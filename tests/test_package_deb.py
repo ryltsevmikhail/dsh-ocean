@@ -43,7 +43,7 @@ def read_ar(raw):
 
 def expected_payload():
     files = {"usr/bin/dsh-ocean", "usr/share/applications/dev.dsh.ocean.desktop", "usr/share/doc/dsh-ocean/copyright"}
-    files.update("usr/share/doc/dsh-ocean/" + key for key in INPUTS if key in ("assets/ocean-ice.svg", "packaging/license-inputs.txt") or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"))
+    files.update("usr/share/doc/dsh-ocean/" + key for key in INPUTS if key in ("assets/ocean-ice.svg", "packaging/license-inputs.txt", "locales/dsh/LICENSE") or key in ("README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.txt", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "GOVERNANCE.md") or key.startswith("docs/"))
     files.update(f"usr/share/icons/hicolor/{size}x{size}/apps/dsh-ocean.png" for size in (32, 64, 128, 256, 512))
     return files
 

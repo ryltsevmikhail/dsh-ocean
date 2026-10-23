@@ -7,8 +7,9 @@ import { auditCatalog } from './audit-catalogs.mjs';
 const root = new URL('../', import.meta.url);
 
 /** Emit the official no-import, lazy browser factory (see installed UI template). */
-export function renderClient(catalogs) {
-  return `// Generated from src/register.mjs and data/*.json; do not edit.\nwindow.__ModuleLoader__.load({\n  id: '@dsh-ocean/desktop-language-pack',\n  factory() {\n    const languages = ${JSON.stringify(languages)};\n    const catalogs = ${JSON.stringify(catalogs)};\n    ${registerLanguagePack.toString()}\n    return { inject: ['locale'], apply(ctx) { registerLanguagePack(ctx, catalogs); } };\n  },\n});\n`;
+export function renderClient(catalogs, moduleId = '@dsh-ocean/desktop-language-pack') {
+  if (!/^@[a-z0-9-]+\/[a-z0-9-]+$/.test(moduleId)) throw new Error('invalid built-in module id');
+  return `// Generated from src/register.mjs and data/*.json; do not edit.\nwindow.__ModuleLoader__.load({\n  id: '${moduleId}',\n  factory() {\n    const languages = ${JSON.stringify(languages)};\n    const catalogs = ${JSON.stringify(catalogs)};\n    ${registerLanguagePack.toString()}\n    return { inject: ['locale'], apply(ctx) { registerLanguagePack(ctx, catalogs); } };\n  },\n});\n`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
