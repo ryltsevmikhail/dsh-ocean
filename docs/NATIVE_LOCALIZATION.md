@@ -30,6 +30,13 @@ IDs, transfer limits, publication gates and file-retention behavior are unchange
 Backend diagnostic details and ISO timestamps remain literal technical data.
 Component tests cover all eight catalogs; private Xvfb/non-activating D-Bus tests
 exercise the native download/storage/plugin controls in the default English locale.
+Read-only snapshot verification now also localizes its picker, bounded progress
+stages, cooperative-cancellation notices and integrity summary. Invalid timestamp
+metadata is represented as unavailable data before localized display; it is never
+repeated as raw text. Checksums remain explicitly distinguished from signatures,
+publisher authentication, immutable snapshots and data-schema rollback. No restore,
+service or package operation is added. Eight-catalog component tests and a private
+native GTK acceptance test cover these presentation changes.
 Other native panels and status summaries are still being localized.
 
 ## Harness resource tree

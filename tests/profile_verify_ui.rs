@@ -113,7 +113,15 @@ fn malformed_time_is_not_echoed_and_corrupted_snapshot_never_produces_success_su
         serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     metadata["createdAt"] = "synthetic-private-invalid-timestamp-token".into();
     fs::write(&path, serde_json::to_vec(&metadata).unwrap()).unwrap();
-    let text = ui::verify_snapshot(&f.snapshot).unwrap().text();
+    let verified = ui::verify_snapshot(&f.snapshot).unwrap();
+    for (language, _) in dsh_ocean::i18n::LANGUAGES {
+        let localized = verified.text_in(language);
+        assert!(localized.contains(
+            dsh_ocean::i18n::message(language, "verification.timestamp_unavailable").unwrap()
+        ));
+        assert!(!localized.contains("synthetic-private"));
+    }
+    let text = verified.text();
     assert!(text.contains("unavailable (invalid metadata timestamp)"));
     assert!(!text.contains("synthetic-private"));
     let data = f
