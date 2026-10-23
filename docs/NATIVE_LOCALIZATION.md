@@ -91,8 +91,12 @@ download/history controls, private-folder snapshot/export choosers, and data-sna
 and export confirmations/progress. Destructive confirmations have no default
 acceptance, download origins are sanitized and empty-history cancellation is disabled.
 No real action callbacks or file selections are invoked. Labels remain plain text and
-response IDs remain unchanged. This is x86_64 coverage of 15 widget variants, not yet
-proof of every native panel, ARM64 execution or release packaging.
+response IDs remain unchanged. Verification summary/progress use a private synthetic
+snapshot and prove cancellation does not become success or modify its source files.
+Shell updater controls run only a private read-only initial inspection: no configured
+feed, candidate or cached artifact means update actions remain disabled and no
+settings or managed destination are created. This is x86_64 coverage of 18 widget
+variants, not proof of ARM64 execution, visual font coverage or release packaging.
 
 ## Harness resource tree
 

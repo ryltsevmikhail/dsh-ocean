@@ -2,6 +2,21 @@
 use dsh_ocean::{i18n, localization::Preference};
 use gtk::prelude::*;
 
+fn named_button(widget: &gtk::Widget, name: &str) -> Option<gtk::Button> {
+    if widget.widget_name() == name {
+        return widget.clone().downcast().ok();
+    }
+    widget
+        .clone()
+        .downcast::<gtk::Container>()
+        .ok()
+        .and_then(|container| {
+            container
+                .children()
+                .iter()
+                .find_map(|child| named_button(child, name))
+        })
+}
 fn button(dialog: &gtk::Dialog, response: gtk::ResponseType, key: &str) {
     let widget = dialog
         .widget_for_response(response)
@@ -225,6 +240,119 @@ fn native_controls_follow_immutable_process_language_without_granting_actions() 
     assert!(!downloads.cancel.is_sensitive() && !downloads.cancel_selected.is_sensitive());
     assert!(records.lock().unwrap().entries().is_empty());
     downloads.dialog.close();
+    // Verification of our own synthetic snapshot: no existing home/profile is inspected.
+    let home = folder.join("synthetic-home");
+    let profile = home.join("profiles/web");
+    std::fs::create_dir_all(&profile).unwrap();
+    let content = b"{\"dsh\":{\"profile\":{\"bundles\":[]}}}\n";
+    std::fs::write(profile.join("package.json"), content).unwrap();
+    let snapshot = dsh_ocean::profile_backup::ProfileStore::new(&home, &folder.join("backups"))
+        .unwrap()
+        .create("web")
+        .unwrap();
+    let manifest = std::fs::read(snapshot.join("manifest.json")).unwrap();
+    let summary = dsh_ocean::profile_verify_ui::verify_snapshot(&snapshot).unwrap();
+    let verified = dsh_ocean::profile_verify_ui::build_summary(None, &summary);
+    assert_eq!(
+        verified.dialog.title().as_deref(),
+        Some(i18n::text("verification.summary_title"))
+    );
+    assert_eq!(verified.label.text().as_str(), summary.text_in(language));
+    assert!(!verified.label.property::<bool>("use-markup"));
+    button(&verified.dialog, gtk::ResponseType::Close, "common.close");
+    verified.dialog.close();
+    let work = std::sync::Arc::new(dsh_ocean::profile_verify_ui::Work::default());
+    let verifying = dsh_ocean::profile_verify_ui::build_progress(None, work.clone());
+    assert_eq!(
+        verifying.dialog.title().as_deref(),
+        Some(i18n::text("verification.progress_title"))
+    );
+    assert_eq!(
+        verifying.label.text().as_str(),
+        work.progress_text_in(language)
+    );
+    button(
+        &verifying.dialog,
+        gtk::ResponseType::Cancel,
+        "verification.cancel",
+    );
+    verifying.dialog.response(gtk::ResponseType::Cancel);
+    assert!(verifying
+        .label
+        .text()
+        .contains(i18n::text("verification.cancelling")));
+    assert!(work.take_result().is_none() && !work.finished());
+    // No worker started; run only the read-only verification of this synthetic snapshot to settle the cancellation.
+    work.run(&snapshot);
+    assert!(work.finished());
+    assert!(matches!(
+        work.take_result(),
+        Some(dsh_ocean::profile_verify_ui::Outcome::Cancelled)
+    ));
+    verifying.dialog.close();
+    assert_eq!(
+        std::fs::read(snapshot.join("manifest.json")).unwrap(),
+        manifest
+    );
+    assert_eq!(
+        std::fs::read(profile.join("package.json")).unwrap(),
+        content
+    );
+
+    // The updater builder auto-inspects state, so override inherited explicit paths before it starts.
+    std::env::set_var("DSH_HOME", folder.join("isolated-dsh"));
+    std::env::set_var("DSH_OCEAN_DATA_DIR", folder.join("isolated-ocean"));
+    std::env::set_var("DSH_OCEAN_URL", "http://127.0.0.1:9");
+    let settings = dsh_ocean::update_settings::path();
+    assert!(!settings.exists());
+    let registry = std::sync::Arc::new(dsh_ocean::native_updates::Registry::default());
+    let report = dsh_ocean::shell_status::classify(None, false, false);
+    let shell = dsh_ocean::shell_status_ui::build_with_registry(None, &report, registry.clone());
+    shell.dialog.show_all();
+    let refresh = named_button(shell.dialog.upcast_ref(), "shell-update-refresh").unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while registry.busy() || !refresh.is_sensitive() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "private updater inspection did not settle"
+        );
+        for _ in 0..32 {
+            if !gtk::glib::MainContext::default().pending() {
+                break;
+            }
+            gtk::glib::MainContext::default().iteration(false);
+        }
+        std::thread::yield_now();
+    }
+    assert_eq!(
+        shell.dialog.title().as_deref(),
+        Some(i18n::text("shell_ui.title"))
+    );
+    assert_eq!(
+        shell.label.text().as_str(),
+        dsh_ocean::shell_status::introduction_text_in(&report, language)
+    );
+    assert!(!shell.label.property::<bool>("use-markup"));
+    for action in [
+        "refresh", "check", "download", "apply", "enroll", "rollback", "recover", "cancel",
+    ] {
+        let widget =
+            named_button(shell.dialog.upcast_ref(), &format!("shell-update-{action}")).unwrap();
+        assert_eq!(
+            widget.label().as_deref(),
+            Some(i18n::message(language, &format!("shell_ui.{action}")).unwrap())
+        );
+        if ["check", "download", "apply", "rollback", "recover"].contains(&action) {
+            assert!(
+                !widget.is_sensitive(),
+                "unconfigured updater must not offer {action}"
+            );
+        }
+    }
+    button(&shell.dialog, gtk::ResponseType::Close, "common.close");
+    shell.dialog.close();
+    assert!(!registry.busy() && !settings.exists());
+    assert!(!dsh_ocean::managed_shell::prefix().exists());
     let storage = dsh_ocean::storage_ui::build(None, body);
     let plugins = dsh_ocean::plugins_ui::build(None, body);
     let history = dsh_ocean::profile_history_ui::build(None, body);
