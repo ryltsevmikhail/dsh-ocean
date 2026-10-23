@@ -240,24 +240,58 @@ async fn spawn_managed(
 /// Spawn and publish a managed child from an explicit runtime without touching
 /// the app or the log sink. The owned switch engine uses this to start a freshly
 /// selected generation without `bootstrap::detect()`.
+pub fn managed_arguments(patch: Option<&std::path::Path>) -> Result<Vec<String>> {
+    let mut args = [
+        "--profile",
+        "web",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "0",
+        "--no-open",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    if let Some(patch) = patch {
+        anyhow::ensure!(
+            patch.is_absolute()
+                && !patch
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir)),
+            "absolute locale patch path required"
+        );
+        args.extend([
+            "--patch".to_owned(),
+            patch
+                .to_str()
+                .context("locale patch path must be UTF-8")?
+                .to_owned(),
+        ]);
+    }
+    Ok(args)
+}
+
 pub(crate) async fn spawn_managed_logged(
     runtime: &Runtime,
     permit: &RuntimePermit,
     log: crate::managed_child::Log,
 ) -> Result<Server> {
+    spawn_managed_logged_with_patch(runtime, permit, log, None).await
+}
+
+pub async fn spawn_managed_logged_with_patch(
+    runtime: &Runtime,
+    permit: &RuntimePermit,
+    log: crate::managed_child::Log,
+    patch: Option<&std::path::Path>,
+) -> Result<Server> {
     permit.ensure_open()?;
+    let args = managed_arguments(patch)?;
+    let args = args.iter().map(String::as_str).collect::<Vec<_>>();
     let started = crate::managed_child::start(
         &runtime.node,
         &runtime.dsh,
-        &[
-            "--profile",
-            "web",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "0",
-            "--no-open",
-        ],
+        &args,
         &bootstrap::path_env(Some(&runtime.node)),
         Duration::from_secs(45),
         log,

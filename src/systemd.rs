@@ -58,7 +58,21 @@ fn systemd_escape(value: &str) -> String {
 }
 
 pub fn render_unit(runtime: &Runtime, base: &Url) -> String {
-    render(runtime, base, None)
+    render(runtime, base, None, None)
+}
+
+/// Pure explicit recipe; caller must validate ownership, consent and cache before
+/// installing it. Never consults ambient preferences or writes a unit.
+pub fn render_unit_with_patch(runtime: &Runtime, base: &Url, patch: &Path) -> Result<String> {
+    anyhow::ensure!(
+        patch.is_absolute()
+            && !patch
+                .components()
+                .any(|c| matches!(c, std::path::Component::ParentDir)),
+        "absolute locale patch path required"
+    );
+    let patch = patch.to_str().context("locale patch path must be UTF-8")?;
+    Ok(render(runtime, base, None, Some(patch)))
 }
 
 /// Recognize only our exact current template or its historical pre-UMask form.
@@ -98,7 +112,7 @@ pub fn render_exposed_unit(
         );
         units.push_str(&format!(" --trusted-host {}", systemd_escape(host)));
     }
-    let plain = render(runtime, base, None);
+    let plain = render(runtime, base, None, None);
     Ok(plain.replace(
         &format!("--host 127.0.0.1 --port {port} --no-open"),
         &format!("--host 0.0.0.0 --port {port}{units} --no-open"),
@@ -117,7 +131,7 @@ pub fn render_isolated_unit(runtime: &Runtime, base: &Url, home: &Path) -> Resul
             && fs::canonicalize(home)? != fs::canonicalize(config::home_dir())?,
         "a separate existing service HOME is required"
     );
-    Ok(render(runtime, base, Some(home)))
+    Ok(render(runtime, base, Some(home), None))
 }
 
 pub fn test_unit_name(name: &str) -> bool {
@@ -142,7 +156,10 @@ pub fn isolated_path_env(runtime: &Runtime) -> String {
     paths.join(":")
 }
 
-fn render(runtime: &Runtime, base: &Url, isolated: Option<&Path>) -> String {
+fn render(runtime: &Runtime, base: &Url, isolated: Option<&Path>, patch: Option<&str>) -> String {
+    let locale = patch
+        .map(|path| format!(" --patch \"{}\"", exec_escape(path)))
+        .unwrap_or_default();
     let port = config::server_port(base);
     let node = exec_escape(&runtime.node.display().to_string());
     let dsh = exec_escape(&runtime.dsh.display().to_string());
@@ -187,7 +204,7 @@ fn render(runtime: &Runtime, base: &Url, isolated: Option<&Path>) -> String {
          [Service]\n\
          Type=simple\n\
          UMask=0077\n\
-         ExecStart={prefix}\"{node}\" \"{dsh}\" --profile web --host 127.0.0.1 --port {port} --no-open\n\
+         ExecStart={prefix}\"{node}\" \"{dsh}\" --profile web --host 127.0.0.1 --port {port} --no-open{locale}\n\
          WorkingDirectory={working}\n\
          Environment=\"PATH={path}\"\n\
          Restart={restart}\n\
