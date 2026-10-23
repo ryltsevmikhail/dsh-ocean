@@ -568,6 +568,7 @@ mod tests {
             base_url: base.clone(),
             token: "t".into(),
             mode,
+            locale_patch: None,
             unit: match mode {
                 ServerMode::Systemd => Some("dsh-web.service".into()),
                 _ => None,

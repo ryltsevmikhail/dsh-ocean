@@ -80,6 +80,7 @@ fn server(base: Url, mode: ServerMode) -> Server {
         base_url: base,
         token: "pre-switch-token".into(),
         mode,
+        locale_patch: None,
         unit: match mode {
             ServerMode::Systemd => Some("dsh-web.service".into()),
             _ => None,
@@ -341,6 +342,34 @@ fn systemd_case() {
     fs::write(root.join("active"), b"").unwrap();
 
     match case.as_str() {
+        "locale-unit" | "locale-change" => {
+            let patch = root.join("old-resource/overlay.yml");
+            let captured = dsh_ocean::systemd::render_unit_with_patch(&old, &base, &patch).unwrap();
+            fs::write(&unit_path, &captured).unwrap();
+            let state = AppState::default();
+            let permit = state.begin_update().unwrap();
+            let mut launched = server(base.clone(), ServerMode::Systemd);
+            launched.locale_patch = Some(patch.clone());
+            permit.publish_server(launched).unwrap();
+            let mut c =
+                OwnedController::headless(permit, old.clone(), candidate.clone(), expected_home())
+                    .unwrap();
+            if case == "locale-change" {
+                c = c.with_candidate_locale_patch(None).unwrap();
+            }
+            c.ownership(&old_root).unwrap();
+            let image = c.unit().unwrap().unwrap();
+            assert_eq!(image.before, captured.as_bytes());
+            assert_eq!(
+                String::from_utf8_lossy(&image.after).contains(patch.to_str().unwrap()),
+                case != "locale-change"
+            );
+            c.switch_unit(&Some(image.clone()), true).unwrap();
+            c.start(&candidate).unwrap();
+            c.switch_unit(&Some(image), false).unwrap();
+            c.start(&old_root).unwrap();
+            assert_eq!(fs::read(&unit_path).unwrap(), captured.as_bytes());
+        }
         "legacy-unit" | "unsafe-umask-unit" => {
             let legacy = old_unit.replace("UMask=0077\n", "");
             let captured = if case == "legacy-unit" {
@@ -800,6 +829,20 @@ fn systemd_ownership_unit_switch_and_start_roundtrip() {
 }
 
 #[test]
+fn systemd_patch_recipe_keeps_exact_before_image_through_candidate_and_rollback() {
+    let f = SysFixture::new();
+    let output = f.command("locale-unit").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn systemd_plain_candidate_preserves_exact_patched_rollback_unit() {
+    let f = SysFixture::new();
+    let output = f.command("locale-change").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
 fn systemd_refuses_external_edit() {
     let f = SysFixture::new();
     let output = f.command("external-edit").output().unwrap();
@@ -1090,19 +1133,18 @@ fn child_case() {
     let old_node = old_root.join("runtime/node/bin/node");
     let old_dsh = old_root.join("harness/node_modules/.bin/dsh");
     let log: dsh_ocean::managed_child::Log = std::sync::Arc::new(|_| {});
+    let recipe = if case.starts_with("recipe-") {
+        Some(root.join("old-resource/overlay.yml"))
+    } else {
+        None
+    };
+    let launch_args = dsh_ocean::service::managed_arguments(recipe.as_deref()).unwrap();
+    let launch_args = launch_args.iter().map(String::as_str).collect::<Vec<_>>();
     let started = tauri::async_runtime::handle()
         .block_on(dsh_ocean::managed_child::start(
             &old_node,
             &old_dsh,
-            &[
-                "--profile",
-                "web",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                "0",
-                "--no-open",
-            ],
+            &launch_args,
             "/usr/bin:/bin",
             Duration::from_secs(10),
             log,
@@ -1110,11 +1152,48 @@ fn child_case() {
         .expect("old managed child starts");
     let base = started.base_url.clone();
     let child_pid = started.child.id().unwrap();
-    permit
-        .publish_child(server(base, ServerMode::Child), started.child)
-        .unwrap();
+    let mut launched = server(base, ServerMode::Child);
+    launched.locale_patch = recipe.clone();
+    permit.publish_child(launched, started.child).unwrap();
 
     match case.as_str() {
+        "recipe-roundtrip" | "recipe-change" => {
+            let mut c = OwnedController::headless(
+                permit,
+                old.clone(),
+                candidate.clone(),
+                root.join("home/.dsh"),
+            )
+            .unwrap();
+            if case == "recipe-change" {
+                c = c.with_candidate_locale_patch(None).unwrap();
+            }
+            c.ownership(&old_root).unwrap();
+            c.stop().unwrap();
+            c.stopped().unwrap();
+            fs::write(&marker, "").unwrap();
+            c.start(&candidate).unwrap();
+            let expected = if case == "recipe-change" {
+                None
+            } else {
+                recipe.clone()
+            };
+            assert_eq!(c.permit().server().unwrap().unwrap().locale_patch, expected);
+            assert_eq!(
+                fs::read_to_string(&marker)
+                    .unwrap()
+                    .contains(recipe.as_ref().unwrap().to_str().unwrap()),
+                expected.is_some()
+            );
+            c.stop().unwrap();
+            c.stopped().unwrap();
+            fs::write(&marker, "").unwrap();
+            c.start(&old_root).unwrap();
+            assert_eq!(c.permit().server().unwrap().unwrap().locale_patch, recipe);
+            assert!(fs::read_to_string(&marker)
+                .unwrap()
+                .contains(recipe.as_ref().unwrap().to_str().unwrap()));
+        }
         "stop-reaps" => {
             let mut c = OwnedController::headless(
                 permit,
@@ -1248,7 +1327,7 @@ impl ChildFixture {
             executable(
                 &dsh_dir.join("dsh"),
                 &format!(
-                    "#!/bin/bash\nprintf '%s\\n' \"$0\" >> \"$DSH_OCEAN_MARKER\"\nprintf 'dsh web: http://127.0.0.1:%s/?token=%s\\n' \"$DSH_OCEAN_PORT\" \"{token}\"\nexec sleep 30\n"
+                    "#!/bin/bash\nprintf '%s\\n' \"$0\" \"$@\" >> \"$DSH_OCEAN_MARKER\"\nprintf 'dsh web: http://127.0.0.1:%s/?token=%s\\n' \"$DSH_OCEAN_PORT\" \"{token}\"\nexec sleep 30\n"
                 ),
             );
         }
@@ -1277,6 +1356,20 @@ impl Drop for ChildFixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+
+#[test]
+fn child_candidate_and_rollback_retain_captured_launch_patch() {
+    let f = ChildFixture::new();
+    let output = f.command("recipe-roundtrip", None).output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn plain_candidate_does_not_replace_captured_patched_rollback_recipe() {
+    let f = ChildFixture::new();
+    let output = f.command("recipe-change", None).output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
 }
 
 #[test]

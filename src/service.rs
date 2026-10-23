@@ -23,9 +23,16 @@ pub struct Server {
     pub token: String,
     pub mode: ServerMode,
     pub unit: Option<String>,
+    /// Actual argv recipe; never reconstructed from a later preference.
+    pub locale_patch: Option<std::path::PathBuf>,
 }
 
 impl Server {
+    pub fn with_token(&self, token: String) -> Self {
+        let mut server = self.clone();
+        server.token = token;
+        server
+    }
     fn new(base_url: Url, token: String, mode: ServerMode) -> Self {
         let unit = match mode {
             ServerMode::Systemd => Some(config::UNIT_NAME.to_string()),
@@ -36,6 +43,7 @@ impl Server {
             token,
             mode,
             unit,
+            locale_patch: None,
         }
     }
 }
@@ -185,7 +193,7 @@ async fn prepare(app: &AppHandle, permit: &RuntimePermit) -> Result<Server> {
         }
     }
 
-    spawn_managed(app, &runtime, permit).await
+    spawn_managed(app, &runtime, permit, None).await
 }
 
 async fn start_with_systemd(
@@ -224,6 +232,7 @@ async fn spawn_managed(
     app: &AppHandle,
     runtime: &Runtime,
     permit: &RuntimePermit,
+    patch: Option<&std::path::Path>,
 ) -> Result<Server> {
     permit.ensure_open()?;
     let state = app.state::<AppState>();
@@ -232,7 +241,7 @@ async fn spawn_managed(
     let log: crate::managed_child::Log = std::sync::Arc::new(move |line: String| {
         log_app.state::<AppState>().log(line);
     });
-    let server = spawn_managed_logged(runtime, permit, log).await?;
+    let server = spawn_managed_logged_with_patch(runtime, permit, log, patch).await?;
     state.log(format!("Managed DSH is ready at {}", server.base_url));
     Ok(server)
 }
@@ -275,14 +284,6 @@ pub fn managed_arguments(patch: Option<&std::path::Path>) -> Result<Vec<String>>
     Ok(args)
 }
 
-pub(crate) async fn spawn_managed_logged(
-    runtime: &Runtime,
-    permit: &RuntimePermit,
-    log: crate::managed_child::Log,
-) -> Result<Server> {
-    spawn_managed_logged_with_patch(runtime, permit, log, None).await
-}
-
 pub async fn spawn_managed_logged_with_patch(
     runtime: &Runtime,
     permit: &RuntimePermit,
@@ -306,7 +307,8 @@ pub async fn spawn_managed_logged_with_patch(
         base_url,
         token,
     } = started;
-    let server = Server::new(base_url, token, ServerMode::Child);
+    let mut server = Server::new(base_url, token, ServerMode::Child);
+    server.locale_patch = patch.map(std::path::Path::to_path_buf);
     if let Err((error, mut child)) = permit.publish_child(server.clone(), child) {
         crate::managed_child::stop_child(&mut child)
             .await
@@ -426,7 +428,8 @@ async fn restart_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result
             lease.discard_stopped();
             permit.ensure_open()?;
             let runtime = bootstrap::detect().context("DSH runtime disappeared")?;
-            let new_server = spawn_managed(app, &runtime, permit).await?;
+            let new_server =
+                spawn_managed(app, &runtime, permit, server.locale_patch.as_deref()).await?;
             reload_window(app, permit, new_server, false).await?;
         }
         ServerMode::Systemd | ServerMode::Attached => {
@@ -470,7 +473,13 @@ pub(crate) async fn reload_systemd_server(
         permit.ensure_open()?;
         if let Ok(token) = auth::resolve_token(base, Some(config::UNIT_NAME)) {
             auth::cache_token(&token);
-            let new_server = Server::new(base.clone(), token, ServerMode::Systemd);
+            let new_server = match permit
+                .server()?
+                .filter(|server| server.mode == ServerMode::Systemd && server.base_url == *base)
+            {
+                Some(server) => server.with_token(token),
+                None => Server::new(base.clone(), token, ServerMode::Systemd),
+            };
             permit.publish_server(new_server.clone())?;
             reload_window(app, permit, new_server, false).await?;
             return Ok(());

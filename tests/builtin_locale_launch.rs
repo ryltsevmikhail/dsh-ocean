@@ -1,6 +1,21 @@
 use dsh_ocean::{bootstrap::Runtime, systemd};
 use std::path::{Path, PathBuf};
 #[test]
+fn published_server_retains_actual_launch_recipe_independently_of_future_preferences() {
+    let server = dsh_ocean::service::Server {
+        base_url: url::Url::parse("http://127.0.0.1:12345").unwrap(),
+        token: "private-fixture".into(),
+        mode: dsh_ocean::service::ServerMode::Child,
+        unit: None,
+        locale_patch: Some(PathBuf::from("/private/old-resource/overlay.yml")),
+    };
+    assert_eq!(server.clone().locale_patch, server.locale_patch);
+    let refreshed = server.with_token("rotated-token".into());
+    assert_eq!(refreshed.locale_patch, server.locale_patch);
+    assert_eq!(refreshed.token, "rotated-token");
+    assert_eq!(refreshed.base_url, server.base_url);
+}
+#[test]
 fn optional_locale_patch_changes_only_execstart_and_is_escaped_as_one_argument() {
     let runtime = Runtime {
         node: PathBuf::from("/private/runtime/node"),
@@ -30,6 +45,37 @@ fn optional_locale_patch_changes_only_execstart_and_is_escaped_as_one_argument()
         "global overlay option must precede forwarded web-app arguments"
     );
     assert_eq!(translated.replacen(addition, "", 1), plain);
+    assert!(systemd::matches_launch_unit(
+        &runtime,
+        &base,
+        Some(patch),
+        translated.as_bytes()
+    ));
+    assert!(!systemd::matches_launch_unit(
+        &runtime,
+        &base,
+        Some(patch),
+        plain.as_bytes()
+    ));
+    assert!(!systemd::matches_launch_unit(
+        &runtime,
+        &base,
+        None,
+        translated.as_bytes()
+    ));
+    assert!(!systemd::matches_launch_unit(
+        &runtime,
+        &base,
+        Some(Path::new("/other/overlay.yml")),
+        translated.as_bytes()
+    ));
+    let legacy = translated.replacen("Type=simple\nUMask=0077\n", "Type=simple\n", 1);
+    assert!(systemd::matches_launch_unit(
+        &runtime,
+        &base,
+        Some(patch),
+        legacy.as_bytes()
+    ));
     assert!(
         systemd::render_unit_with_patch(&runtime, &base, Path::new("relative/overlay.yml"))
             .is_err()

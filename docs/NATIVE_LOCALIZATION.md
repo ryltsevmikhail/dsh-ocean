@@ -89,6 +89,17 @@ seconds, kills/reaps failures and rejects extra protocol fields. An opt-in test
 executes the actual embedded helpers through this wrapper against the private SDK
 without creating a profile. Lifecycle/consent callers are still pending.
 
+Published owned-server metadata now retains the actual overlay path atomically
+with its child. Ordinary child restart and token refresh preserve that recipe.
+The live runtime-switch controller captures separate old, candidate and active
+recipes; candidate planning is restricted to before ownership/stop. Its systemd
+ownership comparison accepts only the explicitly captured patched template (or
+its exact historical pre-UMask image), with unchanged manager/provenance guards.
+Tests cover child and systemd candidate/rollback roundtrips, including a plain
+candidate restoring an old patched recipe. Durable journal recipe restoration
+and automatic cold-start planning are not wired yet; these are required before
+enabling the feature.
+
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls
 and package/native integration tests must establish that before completion.

@@ -87,6 +87,27 @@ pub(crate) fn is_generated_unit(runtime: &Runtime, base: &Url, bytes: &[u8]) -> 
                 .as_bytes()
 }
 
+/// Compare only the supplied actual launch recipe, including the historical
+/// pre-UMask before-image. This is not a manager/provenance ownership proof.
+pub fn matches_launch_unit(
+    runtime: &Runtime,
+    base: &Url,
+    patch: Option<&Path>,
+    bytes: &[u8],
+) -> bool {
+    let Some(patch) = patch else {
+        return is_generated_unit(runtime, base, bytes);
+    };
+    let Ok(current) = render_unit_with_patch(runtime, base, patch) else {
+        return false;
+    };
+    bytes == current.as_bytes()
+        || bytes
+            == current
+                .replacen("Type=simple\nUMask=0077\n", "Type=simple\n", 1)
+                .as_bytes()
+}
+
 /// Renders the same unit with a non-loopback bind and explicit trusted hosts.
 ///
 /// Used only to stage a candidate file for a human to inspect; this function never

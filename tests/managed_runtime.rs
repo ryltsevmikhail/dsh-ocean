@@ -586,6 +586,7 @@ fn recover_systemd_unit(root: &Path, prefix: &Path) {
             token: "test-token".into(),
             mode: ServerMode::Systemd,
             unit: Some("dsh-web.service".into()),
+            locale_patch: None,
         })
         .unwrap();
 
@@ -645,6 +646,7 @@ fn apply_child_rollback(prefix: &Path, home: &Path) {
                 token: started.token.clone(),
                 mode: dsh_ocean::service::ServerMode::Child,
                 unit: None,
+                locale_patch: None,
             },
             started.child,
         )
@@ -852,6 +854,7 @@ fn apply_refused_attached(root: &Path, prefix: &Path) {
             token: "t".into(),
             mode: ServerMode::Attached,
             unit: None,
+            locale_patch: None,
         })
         .unwrap();
 
