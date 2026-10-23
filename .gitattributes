@@ -11,3 +11,5 @@ docs/third-party/inventory.json linguist-generated
 packaging/license-inputs.txt -text
 # Supplemental compiler-source evidence must retain exact upstream bytes.
 docs/toolchain/source-evidence/** -text -whitespace
+# Reviewed release notices/source archives are also exact upstream bytes.
+docs/toolchain/rust-1.90.0/** -text -whitespace

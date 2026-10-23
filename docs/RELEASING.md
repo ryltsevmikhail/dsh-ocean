@@ -74,7 +74,12 @@ bytes/notices. Disposable validation keys authorize only isolated CI checks,
 including runtime native bindings/version/authenticated health and shell apply
 into a new private prefix. Dry-run reads no production signing secrets, uploads
 no binaries and creates no release/tag. It is not publisher authentication or
-production artifact/laptop acceptance.
+production artifact/laptop acceptance. Shell dry runs additionally retain public
+native JSON/link-map evidence only, after matching the exact Rust 1.90 sysroot,
+all tar payload bytes and the actual ELF, and running its isolated X11 launch/
+close/restore smoke on each native target. Reports are not binaries, keys or a
+complete license attestation; see [the scoped review](RELEASE_NATIVE_REVIEW.md).
+Preserve matching evidence with any eventual authorized release.
 
 Non-dry-run is additionally restricted to manual execution on `main`. It uploads
 short-lived candidate artifacts, then enters the product-specific protected

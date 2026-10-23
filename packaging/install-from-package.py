@@ -351,6 +351,31 @@ def license_payload(root_fd):
                 "docs/third-party/sources/cssparser-0.37.0.crate", "docs/third-party/sources/cssparser-macros-0.7.1.crate",
                 "docs/third-party/sources/dtoa-short-0.3.5.crate", "docs/third-party/sources/option-ext-0.2.0.crate",
                 "docs/third-party/sources/selectors-0.38.0.crate"}
+        base |= {'docs/toolchain/rust-1.90.0/index.json',
+            'docs/toolchain/rust-1.90.0/COPYRIGHT-library.html',
+            'docs/toolchain/rust-1.90.0/COPYRIGHT.html',
+            'docs/toolchain/rust-1.90.0/licenses/Apache-2.0.txt',
+            'docs/toolchain/rust-1.90.0/licenses/BSD-2-Clause.txt',
+            'docs/toolchain/rust-1.90.0/licenses/CC-BY-SA-4.0.txt',
+            'docs/toolchain/rust-1.90.0/licenses/GCC-exception-3.1.txt',
+            'docs/toolchain/rust-1.90.0/licenses/GPL-2.0-only.txt',
+            'docs/toolchain/rust-1.90.0/licenses/GPL-3.0-or-later.txt',
+            'docs/toolchain/rust-1.90.0/licenses/ISC.txt',
+            'docs/toolchain/rust-1.90.0/licenses/LLVM-exception.txt',
+            'docs/toolchain/rust-1.90.0/licenses/MIT.txt',
+            'docs/toolchain/rust-1.90.0/licenses/NCSA.txt',
+            'docs/toolchain/rust-1.90.0/licenses/OFL-1.1.txt',
+            'docs/toolchain/rust-1.90.0/licenses/Unicode-3.0.txt',
+            'docs/toolchain/rust-1.90.0/LICENSE-MIT',
+            'docs/toolchain/rust-1.90.0/LICENSE-APACHE',
+            'docs/toolchain/rust-1.90.0/LICENSE-COMPILER-BUILTINS',
+            'docs/toolchain/rust-1.90.0/LICENSE-COMPILER-BUILTINS-LIBM',
+            'docs/toolchain/rust-1.90.0/SOURCE-COMPILER-BUILTINS-Cargo.toml',
+            'docs/toolchain/rust-1.90.0/SOURCE-UNWIND-Cargo.toml',
+            'docs/toolchain/rust-1.90.0/SOURCE-UNWIND-lib.rs',
+            'docs/toolchain/rust-1.90.0/COPYRIGHT-guide.txt',
+            'docs/toolchain/rust-1.90.0/rust-src-1.90.0.tar.xz',
+            'docs/toolchain/rust-1.90.0/COMPILER-RT-CREDITS.TXT'}
         names = []
         for name in raw.decode("utf-8").splitlines():
             if not name or name.startswith("#"):
