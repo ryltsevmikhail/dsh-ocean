@@ -366,5 +366,10 @@
   "notice.download_saved": "Téléchargement enregistré ; consultez son chemin dans l’historique natif des téléchargements",
   "notice.preference_unreadable": "Préférence de notification illisible ; notifications désactivées sans modifier le fichier de la préférence",
   "notice.bridge_unavailable": "Passerelle de notification des tâches indisponible ; le comportement principal de la session reste inchangé",
-  "notice.error": "erreur : {message}"
+  "notice.error": "erreur : {message}",
+  "remote.active_note": "Le relais temporaire reste actif pendant {remaining} s : le serveur reste lié à l’interface de bouclage et ce port se ferme automatiquement. Toute personne qui scanne le code obtient le contrôle total de l’ensemble du système DSH pendant cette durée ; arrêtez le relais lorsque vous avez terminé.",
+  "remote.loopback_note": "DSH est lié à l’interface de bouclage, donc un téléphone ne peut pas y accéder directement. Utilisez le relais temporaire ci-dessous (ou démarrez-le avec --pairing-proxy) pour ouvrir un port du réseau local pendant une durée limitée ; le code QR n’apparaît que lorsque le relais est actif. Lier à nouveau dsh-web.service avec --host 0.0.0.0 est l’alternative permanente.",
+  "remote.direct_note": "Toute personne qui scanne ce code obtient le contrôle total de l’ensemble du système DSH. Utilisez-le uniquement sur un réseau de confiance et cessez d’exposer le serveur au réseau lorsque vous avez terminé.",
+  "remote.qr_label": "Code QR d’appairage",
+  "startup.attached_restart_refused": "Ce serveur DSH est connecté, mais Ocean ne le possède pas. Redémarrez-le là où il a été lancé ; aucun service local n’a été modifié."
 }

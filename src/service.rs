@@ -516,6 +516,14 @@ pub async fn restart_and_reload(app: &AppHandle) -> Result<()> {
     restart_under_permit(app, &permit).await
 }
 
+fn ensure_owned_restart(server: &Server) -> Result<()> {
+    anyhow::ensure!(
+        server.mode != ServerMode::Attached,
+        crate::i18n::text("startup.attached_restart_refused")
+    );
+    Ok(())
+}
+
 async fn restart_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result<()> {
     crate::runtime_switch::ensure_no_pending(&config::data_dir())?;
     let state = app.state::<AppState>();
@@ -523,6 +531,8 @@ async fn restart_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result
         .server()?
         .context("there is no running DSH server to restart")?;
 
+    // A loopback endpoint or active unit does not prove ownership of an attachment.
+    ensure_owned_restart(&server)?;
     state.log(crate::i18n::text("startup.restarting"));
     match server.mode {
         ServerMode::Child => {
@@ -661,6 +671,21 @@ mod recovery_tests {
         }
     }
 
+    #[test]
+    fn attached_metadata_never_authorizes_a_local_restart() {
+        let base = Url::parse("http://127.0.0.1:9/").unwrap();
+        assert!(ensure_owned_restart(&Server::new(
+            base.clone(),
+            "synthetic".into(),
+            ServerMode::Attached
+        ))
+        .is_err());
+        for mode in [ServerMode::Systemd, ServerMode::Child] {
+            assert!(
+                ensure_owned_restart(&Server::new(base.clone(), "synthetic".into(), mode)).is_ok()
+            );
+        }
+    }
     #[test]
     fn a_wedged_but_active_unit_is_restarted_not_ignored() {
         assert_eq!(systemd_recovery(true), SystemdRecovery::Restart);

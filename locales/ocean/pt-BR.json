@@ -366,5 +366,10 @@
   "notice.download_saved": "Download salvo; consulte o caminho no histórico nativo de downloads",
   "notice.preference_unreadable": "Não foi possível ler a preferência de notificações; notificações desativadas sem alterar o arquivo da preferência",
   "notice.bridge_unavailable": "Ponte de notificações de tarefas indisponível; o comportamento principal da sessão permanece inalterado",
-  "notice.error": "erro: {message}"
+  "notice.error": "erro: {message}",
+  "remote.active_note": "O encaminhador temporário ficará ativo por mais {remaining} s: o servidor permanece na interface de loopback e esta porta fecha automaticamente. Qualquer pessoa que escanear o código terá controle total de todo o sistema DSH enquanto o encaminhador estiver ativo; pare o encaminhador quando terminar.",
+  "remote.loopback_note": "O DSH está vinculado à interface de loopback, então um celular não consegue acessá-lo diretamente. Use o encaminhador temporário abaixo (ou inicie-o com --pairing-proxy) para abrir uma porta da rede local por tempo limitado; o código QR só aparece enquanto o encaminhador está ativo. Vincular novamente dsh-web.service com --host 0.0.0.0 é a alternativa permanente.",
+  "remote.direct_note": "Qualquer pessoa que escanear este código terá controle total de todo o sistema DSH. Use-o apenas em uma rede confiável e pare de expor o servidor à rede quando terminar.",
+  "remote.qr_label": "Código QR de pareamento",
+  "startup.attached_restart_refused": "Este servidor DSH está conectado, mas não pertence ao Ocean. Reinicie-o onde foi iniciado; nenhum serviço local foi alterado."
 }

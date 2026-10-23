@@ -366,5 +366,10 @@
   "notice.download_saved": "Descarga guardada; consulta su ruta en el historial de descargas nativo",
   "notice.preference_unreadable": "No se puede leer la preferencia de notificaciones; las notificaciones se han desactivado sin modificar su archivo",
   "notice.bridge_unavailable": "El puente de notificaciones de tareas no está disponible; el comportamiento principal de la sesión no cambia",
-  "notice.error": "error: {message}"
+  "notice.error": "error: {message}",
+  "remote.active_note": "El reenviador temporal seguirá activo durante {remaining} s: el servidor permanece en la interfaz de bucle local y este puerto se cierra automáticamente. Cualquier persona que escanee el código obtiene el control total de todo el sistema DSH mientras esté activo; detén el reenviador cuando termines.",
+  "remote.loopback_note": "DSH está vinculado a la interfaz de bucle local, por lo que un teléfono no puede acceder directamente. Usa el reenviador temporal de abajo (o inícialo con --pairing-proxy) para abrir un puerto de la red local por un tiempo limitado; el código QR solo aparece mientras el reenviador está activo. Volver a vincular dsh-web.service con --host 0.0.0.0 es la alternativa permanente.",
+  "remote.direct_note": "Cualquier persona que escanee este código obtiene el control total de todo el sistema DSH. Úsalo solo en una red de confianza y deja de exponer el servidor a la red cuando termines.",
+  "remote.qr_label": "Código QR de emparejamiento",
+  "startup.attached_restart_refused": "Este servidor DSH está conectado, pero no pertenece a Ocean. Reinícialo donde se inició; no se ha modificado ningún servicio local."
 }

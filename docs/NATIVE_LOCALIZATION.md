@@ -17,8 +17,11 @@ through guarded native IPC. The external Harness window cannot open the native
 language-setting control or request those catalogs.
 
 Message arguments are substituted once. GTK labels and web text use plain-text
-APIs. The pairing QR SVG is a separate native-generated trusted value, not a
-translation sink. Notification bodies are escaped for freedesktop markup.
+APIs. Pairing instructions and full-control safety warnings use the same embedded
+catalogs. QR geometry remains native-generated; its fixed accessible catalog label
+is XML-escaped before insertion, never raw user text. Notification bodies are escaped
+for freedesktop markup. Attached servers cannot authorize a local service restart:
+Ocean reports that they must be restarted where they were started.
 Read-only storage and plugin overviews now localize their titles, close controls,
 counts, empty/error states and safety notices. Their numeric/path filtering and
 non-destructive behavior are unchanged. Storage reports that names are not shown,
@@ -124,7 +127,10 @@ explicit licence payload.
 
 The low-level cache helper now publishes an exact, sealed, content-addressed
 resource tree using atomic no-replace rename. Existing conflicting trees, links
-and unexpected entries are refused rather than repaired. Its caller must first
+and unexpected entries are refused rather than repaired. Existing ancestors must
+also be owned/non-writable by others (with the existing root-owned sticky-directory
+exception), checked before and after directory creation: private final bytes do not
+protect a pathname under replaceable ancestry. Its caller must first
 establish owned-start, pending-operation and profile-consent gates; the cache is
 not inside a signed runtime generation.
 

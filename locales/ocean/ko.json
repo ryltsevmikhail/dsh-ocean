@@ -366,5 +366,10 @@
   "notice.download_saved": "다운로드가 저장되었습니다. 경로는 기본 다운로드 기록에서 확인하세요",
   "notice.preference_unreadable": "알림 설정을 읽을 수 없습니다. 설정 파일을 변경하지 않고 알림을 비활성화했습니다",
   "notice.bridge_unavailable": "작업 알림 브리지를 사용할 수 없습니다. 세션의 기본 동작은 변경되지 않습니다",
-  "notice.error": "오류: {message}"
+  "notice.error": "오류: {message}",
+  "remote.active_note": "임시 전달기가 앞으로 {remaining}초 동안 활성화됩니다. 서버는 루프백에 바인딩된 상태로 유지되며 이 포트는 자동으로 닫힙니다. 코드를 스캔하는 사람은 누구나 이 시간 동안 DSH 시스템 전체를 완전히 제어할 수 있습니다. 사용을 마치면 전달기를 중지하세요.",
+  "remote.loopback_note": "DSH가 루프백에 바인딩되어 있어 휴대전화에서 직접 접속할 수 없습니다. 아래의 임시 전달기를 사용하거나 --pairing-proxy로 전달기를 시작하여 시간 제한이 있는 LAN 포트를 여세요. QR 코드는 전달기가 활성화된 동안에만 표시됩니다. dsh-web.service를 --host 0.0.0.0으로 다시 바인딩하는 것은 영구적인 대안입니다.",
+  "remote.direct_note": "이 코드를 스캔하는 사람은 누구나 DSH 시스템 전체를 완전히 제어할 수 있습니다. 신뢰할 수 있는 네트워크에서만 사용하고, 사용을 마치면 서버의 네트워크 노출을 중단하세요.",
+  "remote.qr_label": "페어링 QR 코드",
+  "startup.attached_restart_refused": "이 DSH 서버는 연결된 서버이며 Ocean이 소유하지 않습니다. 시작된 곳에서 다시 시작하세요. 로컬 서비스는 변경되지 않았습니다."
 }

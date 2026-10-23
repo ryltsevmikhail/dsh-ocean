@@ -366,5 +366,10 @@
   "notice.download_saved": "Download saved; see native Downloads history for its path",
   "notice.preference_unreadable": "Notification preference unreadable; notifications disabled without changing its file",
   "notice.bridge_unavailable": "Task notification bridge unavailable; core session behavior is unchanged",
-  "notice.error": "error: {message}"
+  "notice.error": "error: {message}",
+  "remote.active_note": "Temporary forwarder active for {remaining}s: the server stays on loopback and this port closes automatically. Anyone who scans the code gets full control of the harness while it lasts; stop the forwarder when you are done.",
+  "remote.loopback_note": "DSH is bound to loopback, so a phone cannot reach it directly. Use the temporary forwarder below (or start it with --pairing-proxy) to open a bounded LAN port; the QR appears only while it is active. Rebinding dsh-web.service with --host 0.0.0.0 is the permanent alternative.",
+  "remote.direct_note": "Anyone who scans this code gets full control of the harness. Use it only on a trusted network, and stop exposing the server when you are done.",
+  "remote.qr_label": "Pairing QR code",
+  "startup.attached_restart_refused": "This DSH server is attached, not owned by Ocean. Restart it where it was started; no local service was changed."
 }

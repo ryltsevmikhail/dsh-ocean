@@ -366,5 +366,10 @@
   "notice.download_saved": "Download gespeichert; den Pfad finden Sie im nativen Downloadverlauf",
   "notice.preference_unreadable": "Benachrichtigungseinstellung nicht lesbar; Benachrichtigungen sind deaktiviert, ohne die Einstellungsdatei zu ändern",
   "notice.bridge_unavailable": "Brücke für Aufgabenbenachrichtigungen nicht verfügbar; das grundlegende Sitzungsverhalten bleibt unverändert",
-  "notice.error": "Fehler: {message}"
+  "notice.error": "Fehler: {message}",
+  "remote.active_note": "Die temporäre Weiterleitung ist noch {remaining} s aktiv: Der Server bleibt an die Loopback-Schnittstelle gebunden, und dieser Port wird automatisch geschlossen. Wer den Code scannt, erhält während dieser Zeit die vollständige Kontrolle über das gesamte DSH-System; beende die Weiterleitung, wenn du fertig bist.",
+  "remote.loopback_note": "DSH ist an die Loopback-Schnittstelle gebunden, daher kann ein Smartphone nicht direkt darauf zugreifen. Nutze die temporäre Weiterleitung unten (oder starte sie mit --pairing-proxy), um einen LAN-Port für begrenzte Zeit zu öffnen; der QR-Code erscheint nur, solange die Weiterleitung aktiv ist. dsh-web.service mit --host 0.0.0.0 an eine andere Adresse zu binden, ist die dauerhafte Alternative.",
+  "remote.direct_note": "Wer diesen Code scannt, erhält die vollständige Kontrolle über das gesamte DSH-System. Verwende ihn nur in einem vertrauenswürdigen Netzwerk und mache den Server nicht länger im Netzwerk zugänglich, wenn du fertig bist.",
+  "remote.qr_label": "QR-Code zur Kopplung",
+  "startup.attached_restart_refused": "Dieser DSH-Server ist angebunden, gehört aber nicht Ocean. Starten Sie ihn dort neu, wo er gestartet wurde; kein lokaler Dienst wurde geändert."
 }
