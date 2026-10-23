@@ -15,16 +15,45 @@ source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-$pkgver" || return 1
   cargo build --release --locked
 }
 
 package() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-$pkgver" || return 1
   local -a payload=() required=(LICENSE NOTICE THIRD_PARTY_NOTICES.txt docs/third-party/inventory.json docs/BINARY_LICENSE_AUDIT.md
     docs/third-party/sources/cssparser-0.37.0.crate docs/third-party/sources/cssparser-macros-0.7.1.crate
     docs/third-party/sources/dtoa-short-0.3.5.crate docs/third-party/sources/option-ext-0.2.0.crate
     docs/third-party/sources/selectors-0.38.0.crate)
+  required+=(
+    docs/toolchain/rust-1.90.0/index.json
+    docs/toolchain/rust-1.90.0/COPYRIGHT-library.html
+    docs/toolchain/rust-1.90.0/COPYRIGHT.html
+    docs/toolchain/rust-1.90.0/licenses/Apache-2.0.txt
+    docs/toolchain/rust-1.90.0/licenses/BSD-2-Clause.txt
+    docs/toolchain/rust-1.90.0/licenses/CC-BY-SA-4.0.txt
+    docs/toolchain/rust-1.90.0/licenses/GCC-exception-3.1.txt
+    docs/toolchain/rust-1.90.0/licenses/GPL-2.0-only.txt
+    docs/toolchain/rust-1.90.0/licenses/GPL-3.0-or-later.txt
+    docs/toolchain/rust-1.90.0/licenses/ISC.txt
+    docs/toolchain/rust-1.90.0/licenses/LLVM-exception.txt
+    docs/toolchain/rust-1.90.0/licenses/MIT.txt
+    docs/toolchain/rust-1.90.0/licenses/NCSA.txt
+    docs/toolchain/rust-1.90.0/licenses/OFL-1.1.txt
+    docs/toolchain/rust-1.90.0/licenses/Unicode-3.0.txt
+    docs/toolchain/rust-1.90.0/LICENSE-MIT
+    docs/toolchain/rust-1.90.0/LICENSE-APACHE
+    docs/toolchain/rust-1.90.0/LICENSE-COMPILER-BUILTINS
+    docs/toolchain/rust-1.90.0/LICENSE-COMPILER-BUILTINS-LIBM
+    docs/toolchain/rust-1.90.0/SOURCE-COMPILER-BUILTINS-Cargo.toml
+    docs/toolchain/rust-1.90.0/SOURCE-UNWIND-Cargo.toml
+    docs/toolchain/rust-1.90.0/SOURCE-UNWIND-lib.rs
+    docs/toolchain/rust-1.90.0/COPYRIGHT-guide.txt
+    docs/toolchain/rust-1.90.0/rust-src-1.90.0.tar.xz
+    docs/toolchain/rust-1.90.0/COMPILER-RT-CREDITS.TXT
+  )
+  local -A allowed=()
+  for name in "${required[@]}"; do allowed[$name]=1; done
   local -A seen=()
   local relative name current component
   local -a components=()
@@ -33,7 +62,7 @@ package() {
     [[ -z "$relative" || "$relative" == \#* ]] && continue
     case "$relative" in
       LICENSE|NOTICE|THIRD_PARTY_NOTICES.txt|docs/third-party/inventory.json|docs/BINARY_LICENSE_AUDIT.md) ;;
-      *) [[ "$relative" =~ ^docs/third-party/sources/[a-z0-9][a-z0-9_-]*-[0-9][0-9A-Za-z._+-]*\.crate$ ]] || return 1 ;;
+      *) [[ -n "${allowed[$relative]+yes}" || "$relative" =~ ^docs/third-party/sources/[a-z0-9][a-z0-9_-]*-[0-9][0-9A-Za-z._+-]*\.crate$ ]] || return 1 ;;
     esac
     [[ -z "${seen[$relative]+yes}" ]] || return 1
     seen[$relative]=1
