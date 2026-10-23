@@ -78,7 +78,11 @@ sharing. Technical backend details remain literal data. Fixed download reasons a
 localized when a record is created, including distinct retained-staging/no-recovery
 publication failures; existing persisted records retain their original message text.
 Typed transfer status, origin/size/concurrency checks and no-overwrite publication
-are unchanged. Startup/status log captions remain under coverage review.
+are unchanged. Fixed service startup/restart and installer status captions are
+localized before the existing token-redacting bounded log sink. Protocol phase IDs,
+attached/owned lifecycle decisions, cooperative/forced cancellation handling and raw
+subprocess diagnostic output remain unchanged. Remaining notice-log fallbacks are
+under coverage review.
 
 ## Harness resource tree
 

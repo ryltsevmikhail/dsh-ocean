@@ -75,7 +75,14 @@ pub async fn prepare_and_open(app: &AppHandle) -> Result<()> {
             permit.publish_server(server.clone())?;
         }
         auth::cache_token(&server.token);
-        state.log(format!("DSH is ready at {}", server.base_url));
+        state.log(
+            crate::i18n::render(
+                crate::i18n::active_language(),
+                "startup.ready",
+                &[("url", server.base_url.as_str())],
+            )
+            .expect("validated startup log arguments"),
+        );
         reload_window(app, &permit, server, true).await?;
         Ok(())
     }
@@ -162,13 +169,20 @@ async fn prepare(app: &AppHandle, permit: &RuntimePermit) -> Result<Server> {
             auth::validate(&server.base_url, &server.token),
             "the owned managed DSH is not ready; use Restart DSH server before retrying"
         );
-        state.log("Reopening the existing managed DSH window");
+        state.log(crate::i18n::text("startup.reopening"));
         return Ok(server);
     }
     // Probe before runtime detection: an existing server needs no local Node or
     // Harness installation, and attachment is not permission to rewrite a unit.
     if let Some(server) = attach_existing(&base)? {
-        state.log(format!("Found an existing DSH server at {base}; attaching"));
+        state.log(
+            crate::i18n::render(
+                crate::i18n::active_language(),
+                "startup.attached",
+                &[("url", base.as_str())],
+            )
+            .expect("validated startup log arguments"),
+        );
         return Ok(server);
     }
 
@@ -195,14 +209,19 @@ async fn prepare(app: &AppHandle, permit: &RuntimePermit) -> Result<Server> {
             match crate::builtin_locale_planner::prepare(app, &runtime, permit, &scope).await {
                 Ok(patch) => patch,
                 Err(error) => {
-                    state.log(format!(
-                        "Built-in DSH languages were not activated: {error:#}"
-                    ));
+                    state.log(
+                        crate::i18n::render(
+                            crate::i18n::active_language(),
+                            "startup.languages_failed",
+                            &[("error", &format!("{error:#}"))],
+                        )
+                        .expect("validated startup language diagnostic"),
+                    );
                     None
                 }
             };
         crate::runtime_controller::validate_systemd_scope(&scope.dsh_home)?;
-        state.log("Starting the background DSH service…");
+        state.log(crate::i18n::text("startup.start_service"));
         // A failed ownership/scope/start proof is never authority for another
         // backend against a potentially shared profile.
         return start_with_systemd(
@@ -224,17 +243,27 @@ async fn prepare(app: &AppHandle, permit: &RuntimePermit) -> Result<Server> {
             match crate::builtin_locale_planner::prepare(app, &runtime, permit, &scope).await {
                 Ok(patch) => patch,
                 Err(error) => {
-                    state.log(format!(
-                        "Built-in DSH languages were not activated: {error:#}"
-                    ));
+                    state.log(
+                        crate::i18n::render(
+                            crate::i18n::active_language(),
+                            "startup.languages_failed",
+                            &[("error", &format!("{error:#}"))],
+                        )
+                        .expect("validated startup language diagnostic"),
+                    );
                     None
                 }
             }
         }
         Err(error) => {
-            state.log(format!(
-                "Built-in DSH language scope could not be proven: {error:#}"
-            ));
+            state.log(
+                crate::i18n::render(
+                    crate::i18n::active_language(),
+                    "startup.scope_failed",
+                    &[("error", &format!("{error:#}"))],
+                )
+                .expect("validated startup language diagnostic"),
+            );
             None
         }
     };
@@ -270,7 +299,14 @@ async fn start_with_systemd(
         if let Some(status) = http::status(base) {
             last_status = Some(status);
             if let Ok(token) = auth::resolve_token(base, Some(config::UNIT_NAME)) {
-                state.log(format!("Background service is ready at {base}"));
+                state.log(
+                    crate::i18n::render(
+                        crate::i18n::active_language(),
+                        "startup.service_ready",
+                        &[("url", base.as_str())],
+                    )
+                    .expect("validated startup log arguments"),
+                );
                 let mut server = Server::new(base.clone(), token, ServerMode::Systemd);
                 server.locale_patch = patch.map(std::path::Path::to_path_buf);
                 return Ok(server);
@@ -294,13 +330,20 @@ async fn spawn_managed(
 ) -> Result<Server> {
     permit.ensure_open()?;
     let state = app.state::<AppState>();
-    state.log("Starting a managed DSH web process…");
+    state.log(crate::i18n::text("startup.start_child"));
     let log_app = app.clone();
     let log: crate::managed_child::Log = std::sync::Arc::new(move |line: String| {
         log_app.state::<AppState>().log(line);
     });
     let server = spawn_managed_logged_with_patch(runtime, permit, log, patch).await?;
-    state.log(format!("Managed DSH is ready at {}", server.base_url));
+    state.log(
+        crate::i18n::render(
+            crate::i18n::active_language(),
+            "startup.child_ready",
+            &[("url", server.base_url.as_str())],
+        )
+        .expect("validated startup log arguments"),
+    );
     Ok(server)
 }
 
@@ -427,7 +470,14 @@ pub fn start_health_monitor(app: AppHandle) {
             // A transiently recovered server must not be restarted from old probes.
             let result = recover_under_permit(&app, &permit).await;
             if let Err(error) = result {
-                state.log(format!("DSH recovery failed: {error:#}"));
+                state.log(
+                    crate::i18n::render(
+                        crate::i18n::active_language(),
+                        "startup.recovery_failed",
+                        &[("error", &format!("{error:#}"))],
+                    )
+                    .expect("validated startup log arguments"),
+                );
             }
         }
     });
@@ -442,7 +492,7 @@ async fn recover_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result
         return Ok(());
     }
     app.state::<AppState>()
-        .log("DSH server stopped responding; attempting recovery");
+        .log(crate::i18n::text("startup.recovery_attempt"));
     match server.mode {
         ServerMode::Child => restart_under_permit(app, permit).await?,
         ServerMode::Systemd => {
@@ -473,7 +523,7 @@ async fn restart_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result
         .server()?
         .context("there is no running DSH server to restart")?;
 
-    state.log("Restarting DSH…");
+    state.log(crate::i18n::text("startup.restarting"));
     match server.mode {
         ServerMode::Child => {
             let mut lease = permit.lease_child()?;
@@ -505,7 +555,7 @@ async fn restart_under_permit(app: &AppHandle, permit: &RuntimePermit) -> Result
             reload_systemd_server(app, &server.base_url, permit).await?;
         }
     }
-    state.log("DSH restarted");
+    state.log(crate::i18n::text("startup.restarted"));
     Ok(())
 }
 
