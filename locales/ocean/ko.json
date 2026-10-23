@@ -155,5 +155,22 @@
   "verification.stage.opening": "스냅샷 메타데이터 여는 중",
   "verification.stage.inventory": "정해진 범위 내에서 파일 목록 검사 중",
   "verification.stage.hashing": "구성 파일의 해시 계산 중",
-  "verification.stage.rechecking": "파일 목록 및 개체 동일성 재확인 중"
+  "verification.stage.rechecking": "파일 목록 및 개체 동일성 재확인 중",
+  "backup_history.title": "DSH Ocean 백업 기록",
+  "backup_history.failure": "백업 폴더를 읽을 수 없습니다. 폴더가 존재하고 파일의 소유자인지 확인한 다음 다시 시도하세요. 변경된 파일은 없습니다.",
+  "backup_history.empty": "설정 백업을 찾을 수 없습니다.\n\n“웹 설정 백업…”을 사용하여 만드세요.",
+  "backup_history.no_config": "설정 백업을 찾을 수 없습니다.\n\n",
+  "backup_history.config_count": "설정 백업 {count}개, 설정 크기 총 {bytes}바이트.\n",
+  "backup_history.config_row": "프로필:     {profile}\n시간:       {created}\n파일:       {files}\n디렉터리:   {directories}\n바이트:     {bytes}\n",
+  "backup_history.data_count": "전체 데이터 스냅샷(세션 및 공유 저장소) {count}개, 총 {bytes}바이트:\n",
+  "backup_history.data_row": "시간:       {created}\n파일:       {files}\n바이트:     {bytes}\n",
+  "backup_history.timestamp_unavailable": "타임스탬프를 사용할 수 없음",
+  "backup_history.notice": "체크섬은 서명이 아닙니다. 이 목록은 진위성, 스냅샷이 고정되었다는 사실 또는 다른 쓰기 프로세스가 중지되었다는 사실을 증명하지 않습니다. 프로필 파일에는 비밀 정보가 포함될 수 있습니다. 목록을 표시할 때는 스냅샷 매니페스트만 읽습니다.\n\n복원과 오래된 백업 정리는 여전히 오프라인 CLI에서 명시적으로 수행해야 하는 작업입니다. 이 창에서는 아무것도 변경하지 않았습니다.",
+  "backup.open_failed": "백업을 열 수 없습니다",
+  "backup.busy_title": "업데이트 진행 중",
+  "backup.busy": "프로필 스냅샷을 만들기 전에 런타임 업데이트가 완료될 때까지 기다리세요.",
+  "backup.saved_title": "프로필 설정 백업 완료",
+  "backup.saved": "접근을 제한하여 저장한 위치:\n{path}\n\n범위: 웹 프로필 설정만 해당합니다. 전역 자격 증명, 세션 및 node_modules는 제외됩니다. 프로필 파일 자체에 비밀 정보가 포함될 수 있습니다.\n\n실행 중인 스냅샷은 최선의 노력으로 생성되며 보장되지 않습니다. 일관성을 높이려면 다른 쓰기 프로세스를 중지하세요. 복원에는 오프라인 CLI 명령이 필요하며 교체된 프로필은 보존됩니다.",
+  "backup.saved_log": "웹 프로필 설정 스냅샷을 {path}에 저장했습니다",
+  "backup.failed_title": "프로필 백업 실패"
 }

@@ -37,6 +37,11 @@ repeated as raw text. Checksums remain explicitly distinguished from signatures,
 publisher authentication, immutable snapshots and data-schema rollback. No restore,
 service or package operation is added. Eight-catalog component tests and a private
 native GTK acceptance test cover these presentation changes.
+Backup history separately localizes configuration and whole-data metadata rows,
+empty/error states and authenticity/offline-operation notices. Configuration-backup
+creation localizes its update-busy warning, destination receipt and result headings;
+existing update guards, private storage creation and redacted technical errors are
+unchanged. No restore, prune or deletion action is added to the history window.
 Other native panels and status summaries are still being localized.
 
 ## Harness resource tree

@@ -155,5 +155,22 @@
   "verification.stage.opening": "スナップショットのメタデータを開いています",
   "verification.stage.inventory": "所定の範囲内でファイル一覧を走査しています",
   "verification.stage.hashing": "構成ファイルのハッシュを計算しています",
-  "verification.stage.rechecking": "ファイル一覧と各項目の同一性を再確認しています"
+  "verification.stage.rechecking": "ファイル一覧と各項目の同一性を再確認しています",
+  "backup_history.title": "DSH Ocean のバックアップ履歴",
+  "backup_history.failure": "バックアップフォルダーを読み取れませんでした。フォルダーが存在し、ファイルを所有していることを確認してから、再試行してください。ファイルは変更されていません。",
+  "backup_history.empty": "設定のバックアップが見つかりません。\n\n「Web 設定をバックアップ…」で作成できます。",
+  "backup_history.no_config": "設定のバックアップが見つかりません。\n\n",
+  "backup_history.config_count": "設定のバックアップ {count} 件、設定の合計サイズ {bytes} バイト。\n",
+  "backup_history.config_row": "プロファイル: {profile}\n日時:         {created}\nファイル数:   {files}\nディレクトリ数:{directories}\nバイト数:     {bytes}\n",
+  "backup_history.data_count": "全データのスナップショット（セッションと共有ストア）{count} 件、合計 {bytes} バイト:\n",
+  "backup_history.data_row": "日時:         {created}\nファイル数:   {files}\nバイト数:     {bytes}\n",
+  "backup_history.timestamp_unavailable": "タイムスタンプを取得できません",
+  "backup_history.notice": "チェックサムは署名ではありません。この一覧は、真正性、スナップショットが固定されていること、他の書き込みプロセスが停止していたことを証明しません。プロファイルファイルには機密情報が含まれる場合があります。一覧表示ではスナップショットのマニフェストのみを読み取ります。\n\n復元と古いバックアップの削除は、引き続きオフラインの CLI で明示的に実行する操作です。このウィンドウからは何も変更されていません。",
+  "backup.open_failed": "バックアップを開けませんでした",
+  "backup.busy_title": "更新中",
+  "backup.busy": "プロファイルのスナップショットを作成する前に、ランタイムの更新が完了するまでお待ちください。",
+  "backup.saved_title": "プロファイル設定をバックアップしました",
+  "backup.saved": "アクセスを制限して保存しました:\n{path}\n\n対象範囲: Web プロファイルの設定のみ。グローバル認証情報、セッション、node_modules は含まれません。プロファイルファイル自体に機密情報が含まれる場合があります。\n\n稼働中のスナップショットはベストエフォートであり、保証はありません。一貫性を高めるには、他の書き込みプロセスを停止してください。復元にはオフラインの CLI コマンドが必要で、置き換えられたプロファイルは保持されます。",
+  "backup.saved_log": "Web プロファイル設定のスナップショットを {path} に保存しました",
+  "backup.failed_title": "プロファイルのバックアップに失敗しました"
 }

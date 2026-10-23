@@ -155,5 +155,22 @@
   "verification.stage.opening": "Abriendo los metadatos de la instantánea",
   "verification.stage.inventory": "Explorando el inventario dentro de los límites establecidos",
   "verification.stage.hashing": "Calculando hashes de los archivos de configuración",
-  "verification.stage.rechecking": "Volviendo a comprobar el inventario y las identidades"
+  "verification.stage.rechecking": "Volviendo a comprobar el inventario y las identidades",
+  "backup_history.title": "Historial de copias de seguridad de DSH Ocean",
+  "backup_history.failure": "No se pudo leer la carpeta de copias de seguridad. Comprueba que exista y que seas el propietario de los archivos; después, inténtalo de nuevo. No se modificó ningún archivo.",
+  "backup_history.empty": "No se encontraron copias de seguridad de la configuración.\n\nUsa «Crear copia de la configuración web…» para crear una.",
+  "backup_history.no_config": "No se encontraron copias de seguridad de la configuración.\n\n",
+  "backup_history.config_count": "{count} copia(s) de seguridad de la configuración, {bytes} bytes de configuración en total.\n",
+  "backup_history.config_row": "perfil:     {profile}\nhora:       {created}\narchivos:   {files}\ndirectorios:{directories}\nbytes:      {bytes}\n",
+  "backup_history.data_count": "{count} instantánea(s) de todos los datos (sesiones y almacenes compartidos), {bytes} bytes en total:\n",
+  "backup_history.data_row": "hora:       {created}\narchivos:   {files}\nbytes:      {bytes}\n",
+  "backup_history.timestamp_unavailable": "marca de tiempo no disponible",
+  "backup_history.notice": "Las sumas de comprobación no son firmas: esta lista no demuestra la autenticidad, que la instantánea esté congelada ni que se hayan detenido otros procesos de escritura. Los archivos del perfil pueden contener secretos. Para elaborar la lista solo se leen los manifiestos de las instantáneas.\n\nLa restauración y la eliminación de copias antiguas siguen siendo operaciones explícitas de la CLI sin conexión; no se cambió nada desde esta ventana.",
+  "backup.open_failed": "No se pudieron abrir las copias de seguridad",
+  "backup.busy_title": "Actualización en curso",
+  "backup.busy": "Espera a que termine la actualización del entorno de ejecución antes de crear una instantánea del perfil.",
+  "backup.saved_title": "Copia de seguridad de la configuración del perfil creada",
+  "backup.saved": "Guardado de forma privada en:\n{path}\n\nAlcance: solo la configuración del perfil web. Se excluyen las credenciales globales, las sesiones y node_modules. Los propios archivos del perfil pueden contener secretos.\n\nUna instantánea en vivo se realiza con el mejor esfuerzo, sin garantías; detén otros procesos de escritura para mejorar la coherencia. La restauración requiere el comando de la CLI sin conexión y conserva el perfil reemplazado.",
+  "backup.saved_log": "Instantánea de la configuración del perfil web guardada en {path}",
+  "backup.failed_title": "Error al crear la copia de seguridad del perfil"
 }

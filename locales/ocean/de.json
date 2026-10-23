@@ -155,5 +155,22 @@
   "verification.stage.opening": "Snapshot-Metadaten werden geöffnet",
   "verification.stage.inventory": "Bestandsliste wird innerhalb festgelegter Grenzen durchsucht",
   "verification.stage.hashing": "Konfigurationsdateien werden gehasht",
-  "verification.stage.rechecking": "Bestandsliste und Identitäten werden erneut geprüft"
+  "verification.stage.rechecking": "Bestandsliste und Identitäten werden erneut geprüft",
+  "backup_history.title": "Sicherungsverlauf von DSH Ocean",
+  "backup_history.failure": "Der Sicherungsordner konnte nicht gelesen werden. Prüfe, ob er existiert und ob du Eigentümer der Dateien bist, und versuche es erneut. Es wurden keine Dateien geändert.",
+  "backup_history.empty": "Keine Konfigurationssicherungen gefunden.\n\nVerwende „Webkonfiguration sichern…“, um eine zu erstellen.",
+  "backup_history.no_config": "Keine Konfigurationssicherungen gefunden.\n\n",
+  "backup_history.config_count": "{count} Konfigurationssicherung(en), insgesamt {bytes} Konfigurationsbytes.\n",
+  "backup_history.config_row": "Profil:       {profile}\nZeit:         {created}\nDateien:      {files}\nVerzeichnisse:{directories}\nBytes:        {bytes}\n",
+  "backup_history.data_count": "{count} Gesamtdatenabbild(er) (Sitzungen und gemeinsame Datenspeicher), insgesamt {bytes} Bytes:\n",
+  "backup_history.data_row": "Zeit:         {created}\nDateien:      {files}\nBytes:        {bytes}\n",
+  "backup_history.timestamp_unavailable": "Zeitstempel nicht verfügbar",
+  "backup_history.notice": "Prüfsummen sind keine Signaturen: Diese Liste belegt weder die Authentizität noch ein eingefrorenes Abbild oder dass andere Schreibprozesse angehalten wurden. Profildateien können Geheimnisse enthalten. Für die Auflistung werden nur die Manifestdateien der Abbilder gelesen.\n\nWiederherstellung und Bereinigung bleiben ausdrücklich auszuführende Offline-CLI-Vorgänge; in diesem Fenster wurde nichts geändert.",
+  "backup.open_failed": "Sicherungen konnten nicht geöffnet werden",
+  "backup.busy_title": "Aktualisierung läuft",
+  "backup.busy": "Warte auf den Abschluss der Laufzeitaktualisierung, bevor du ein Profilabbild erstellst.",
+  "backup.saved_title": "Profilkonfiguration gesichert",
+  "backup.saved": "Mit privatem Zugriff gespeichert unter:\n{path}\n\nUmfang: nur die Webprofilkonfiguration. Globale Zugangsdaten, Sitzungen und node_modules sind ausgeschlossen. Die Profildateien selbst können Geheimnisse enthalten.\n\nEin Abbild im laufenden Betrieb wird nach bestem Bemühen und ohne Garantie erstellt; halte andere Schreibprozesse für höhere Konsistenz an. Die Wiederherstellung erfordert den Offline-CLI-Befehl und bewahrt das ersetzte Profil auf.",
+  "backup.saved_log": "Abbild der Webprofilkonfiguration unter {path} gespeichert",
+  "backup.failed_title": "Profilsicherung fehlgeschlagen"
 }

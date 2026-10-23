@@ -155,5 +155,22 @@
   "verification.stage.opening": "Opening snapshot metadata",
   "verification.stage.inventory": "Scanning bounded inventory",
   "verification.stage.hashing": "Hashing configuration files",
-  "verification.stage.rechecking": "Rechecking inventory and identities"
+  "verification.stage.rechecking": "Rechecking inventory and identities",
+  "backup_history.title": "DSH Ocean backup history",
+  "backup_history.failure": "Could not read the backup folder. Check that it exists and that you own the files, then try again. No files were changed.",
+  "backup_history.empty": "No configuration backups found.\n\nUse \"Back up web configuration…\" to create one.",
+  "backup_history.no_config": "No configuration backups found.\n\n",
+  "backup_history.config_count": "{count} configuration backup(s), {bytes} configuration bytes in total.\n",
+  "backup_history.config_row": "profile:    {profile}\ntime:       {created}\nfiles:      {files}\ndirectories:{directories}\nbytes:      {bytes}\n",
+  "backup_history.data_count": "{count} whole-data snapshot(s) (sessions and shared stores), {bytes} bytes in total:\n",
+  "backup_history.data_row": "time:       {created}\nfiles:      {files}\nbytes:      {bytes}\n",
+  "backup_history.timestamp_unavailable": "timestamp unavailable",
+  "backup_history.notice": "Checksums are not signatures: this list does not prove authenticity, a frozen snapshot or that other writers were stopped. Profile files can contain secrets. Listing reads snapshot manifests only.\n\nRestoring and pruning remain explicit offline CLI operations; nothing was changed from this window.",
+  "backup.open_failed": "Could not open backups",
+  "backup.busy_title": "Update in progress",
+  "backup.busy": "Wait for the runtime update before creating a profile snapshot.",
+  "backup.saved_title": "Profile configuration backed up",
+  "backup.saved": "Saved privately to:\n{path}\n\nScope: web profile configuration only. Global credentials, sessions and node_modules are excluded. Profile files may themselves contain secrets.\n\nA live snapshot is best-effort; stop other writers for stronger consistency. Restore requires the offline CLI command and retains the replaced profile.",
+  "backup.saved_log": "Web profile configuration snapshot saved at {path}",
+  "backup.failed_title": "Profile backup failed"
 }

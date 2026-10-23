@@ -155,5 +155,22 @@
   "verification.stage.opening": "Ouverture des métadonnées de l’instantané",
   "verification.stage.inventory": "Analyse de l’inventaire dans les limites définies",
   "verification.stage.hashing": "Hachage des fichiers de configuration",
-  "verification.stage.rechecking": "Nouvelle vérification de l’inventaire et des identités"
+  "verification.stage.rechecking": "Nouvelle vérification de l’inventaire et des identités",
+  "backup_history.title": "Historique des sauvegardes de DSH Ocean",
+  "backup_history.failure": "Impossible de lire le dossier de sauvegarde. Vérifiez qu’il existe et que vous êtes propriétaire des fichiers, puis réessayez. Aucun fichier n’a été modifié.",
+  "backup_history.empty": "Aucune sauvegarde de configuration trouvée.\n\nUtilisez « Sauvegarder la configuration web… » pour en créer une.",
+  "backup_history.no_config": "Aucune sauvegarde de configuration trouvée.\n\n",
+  "backup_history.config_count": "{count} sauvegarde(s) de configuration, {bytes} octets de configuration au total.\n",
+  "backup_history.config_row": "profil :       {profile}\ndate :         {created}\nfichiers :     {files}\nrépertoires :  {directories}\noctets :       {bytes}\n",
+  "backup_history.data_count": "{count} instantané(s) de toutes les données (sessions et espaces de stockage partagés), {bytes} octets au total :\n",
+  "backup_history.data_row": "date :         {created}\nfichiers :     {files}\noctets :       {bytes}\n",
+  "backup_history.timestamp_unavailable": "horodatage indisponible",
+  "backup_history.notice": "Les sommes de contrôle ne sont pas des signatures : cette liste ne prouve ni l’authenticité, ni le caractère figé de l’instantané, ni l’arrêt des autres processus d’écriture. Les fichiers de profil peuvent contenir des secrets. La liste est établie en lisant uniquement les manifestes des instantanés.\n\nLa restauration et la suppression des anciennes sauvegardes restent des opérations explicites de la CLI hors ligne ; rien n’a été modifié depuis cette fenêtre.",
+  "backup.open_failed": "Impossible d’ouvrir les sauvegardes",
+  "backup.busy_title": "Mise à jour en cours",
+  "backup.busy": "Attendez la fin de la mise à jour de l’environnement d’exécution avant de créer un instantané du profil.",
+  "backup.saved_title": "Configuration du profil sauvegardée",
+  "backup.saved": "Enregistré avec un accès privé dans :\n{path}\n\nPérimètre : configuration du profil web uniquement. Les identifiants globaux, les sessions et node_modules sont exclus. Les fichiers de profil eux-mêmes peuvent contenir des secrets.\n\nUn instantané à chaud est réalisé au mieux, sans garantie ; arrêtez les autres processus d’écriture pour une meilleure cohérence. La restauration nécessite la commande CLI hors ligne et conserve le profil remplacé.",
+  "backup.saved_log": "Instantané de la configuration du profil web enregistré dans {path}",
+  "backup.failed_title": "Échec de la sauvegarde du profil"
 }

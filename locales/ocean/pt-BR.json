@@ -155,5 +155,22 @@
   "verification.stage.opening": "Abrindo metadados do snapshot",
   "verification.stage.inventory": "Examinando o inventário dentro dos limites definidos",
   "verification.stage.hashing": "Calculando hashes dos arquivos de configuração",
-  "verification.stage.rechecking": "Verificando novamente o inventário e as identidades"
+  "verification.stage.rechecking": "Verificando novamente o inventário e as identidades",
+  "backup_history.title": "Histórico de backups do DSH Ocean",
+  "backup_history.failure": "Não foi possível ler a pasta de backups. Verifique se ela existe e se você é o proprietário dos arquivos e tente novamente. Nenhum arquivo foi alterado.",
+  "backup_history.empty": "Nenhum backup de configuração encontrado.\n\nUse “Criar cópia da configuração web…” para criar um.",
+  "backup_history.no_config": "Nenhum backup de configuração encontrado.\n\n",
+  "backup_history.config_count": "{count} backup(s) de configuração, {bytes} bytes de configuração no total.\n",
+  "backup_history.config_row": "perfil:     {profile}\nhorário:    {created}\narquivos:   {files}\ndiretórios: {directories}\nbytes:      {bytes}\n",
+  "backup_history.data_count": "{count} captura(s) de todos os dados (sessões e armazenamentos compartilhados), {bytes} bytes no total:\n",
+  "backup_history.data_row": "horário:    {created}\narquivos:   {files}\nbytes:      {bytes}\n",
+  "backup_history.timestamp_unavailable": "registro de data e hora indisponível",
+  "backup_history.notice": "Somas de verificação não são assinaturas: esta lista não comprova autenticidade, uma captura congelada nem que outros processos de gravação tenham sido interrompidos. Os arquivos do perfil podem conter segredos. A listagem lê apenas os manifestos das capturas.\n\nA restauração e a remoção de cópias antigas continuam sendo operações explícitas da CLI offline; nada foi alterado nesta janela.",
+  "backup.open_failed": "Não foi possível abrir os backups",
+  "backup.busy_title": "Atualização em andamento",
+  "backup.busy": "Aguarde a atualização do ambiente de execução antes de criar uma captura do perfil.",
+  "backup.saved_title": "Backup da configuração do perfil criado",
+  "backup.saved": "Salvo de forma privada em:\n{path}\n\nEscopo: somente a configuração do perfil web. Credenciais globais, sessões e node_modules são excluídos. Os próprios arquivos do perfil podem conter segredos.\n\nUma captura ao vivo é feita na medida do possível, sem garantias; interrompa outros processos de gravação para maior consistência. A restauração exige o comando da CLI offline e mantém o perfil substituído.",
+  "backup.saved_log": "Captura da configuração do perfil web salva em {path}",
+  "backup.failed_title": "Falha no backup do perfil"
 }
