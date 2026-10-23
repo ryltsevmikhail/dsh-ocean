@@ -47,6 +47,32 @@ impl Drop for Fixture {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
+#[test]
+fn executable_cache_rejects_replaceable_ancestors_before_creation_and_reuse() {
+    let fixture = Fixture::new();
+    let parent = fixture.0.join("replaceable");
+    fs::create_dir(&parent).unwrap();
+    fs::set_permissions(&parent, fs::Permissions::from_mode(0o777)).unwrap();
+    let cache = parent.join("cache");
+    assert!(
+        materialize(&cache).is_err(),
+        "private cache below a replaceable ancestor is not safe"
+    );
+    assert!(
+        !cache.exists(),
+        "reject before materializing executable resources"
+    );
+    fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
+    let tree = materialize(&cache).unwrap();
+    let before = fs::read(tree.join("package.json")).unwrap();
+    fs::set_permissions(&parent, fs::Permissions::from_mode(0o777)).unwrap();
+    assert!(
+        materialize(&cache).is_err(),
+        "sealed bytes do not make a replaceable pathname safe"
+    );
+    assert_eq!(fs::read(tree.join("package.json")).unwrap(), before);
+    fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
+}
 fn older_tree(cache: &Path) -> PathBuf {
     use sha2::{Digest, Sha256};
     let current = materialize(cache).unwrap();

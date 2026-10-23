@@ -208,10 +208,14 @@ pub fn materialize(cache_root: &Path) -> Result<PathBuf> {
                 .any(|c| matches!(c, Component::ParentDir)),
         "absolute built-in cache path required"
     );
+    // These resources are later reopened by pathname by Node/the SDK. A sealed
+    // final directory is insufficient if another UID can replace its ancestry.
+    crate::util::check_owned_ancestors(cache_root)?;
     fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
         .create(cache_root)?;
+    crate::util::check_owned_ancestors(cache_root)?;
     let root = fs_at::open_dir(cache_root)?;
     let metadata = root.metadata()?;
     anyhow::ensure!(
