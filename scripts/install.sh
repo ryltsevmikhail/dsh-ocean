@@ -104,7 +104,7 @@ license_pattern='^docs/third-party/sources/[a-z0-9][a-z0-9_-]*-[0-9][0-9A-Za-z._
 while IFS= read -r relative || [ -n "$relative" ]; do
   [[ -z "$relative" || "$relative" == \#* ]] && continue
   case "$relative" in
-    LICENSE|NOTICE|THIRD_PARTY_NOTICES.txt|docs/third-party/inventory.json|docs/BINARY_LICENSE_AUDIT.md) ;;
+    LICENSE|NOTICE|THIRD_PARTY_NOTICES.txt|locales/dsh/LICENSE|docs/third-party/inventory.json|docs/BINARY_LICENSE_AUDIT.md) ;;
     *) [[ -n "${RELEASE_TOOLCHAIN_ALLOWED[$relative]+yes}" || "$relative" =~ $license_pattern ]] || { echo "unsupported license payload path" >&2; exit 1; } ;;
   esac
   [[ -z "${LICENSE_SEEN[$relative]+yes}" ]] || { echo "duplicate license payload path" >&2; exit 1; }
@@ -118,7 +118,7 @@ while IFS= read -r relative || [ -n "$relative" ]; do
   done
   [ -f "$current" ] || { echo "missing license payload" >&2; exit 1; }
 done < "$ROOT/packaging/license-inputs.txt"
-REQUIRED_LICENSE_FILES=(LICENSE NOTICE THIRD_PARTY_NOTICES.txt docs/third-party/inventory.json docs/BINARY_LICENSE_AUDIT.md
+REQUIRED_LICENSE_FILES=(LICENSE NOTICE THIRD_PARTY_NOTICES.txt locales/dsh/LICENSE docs/third-party/inventory.json docs/BINARY_LICENSE_AUDIT.md
   docs/third-party/sources/cssparser-0.37.0.crate docs/third-party/sources/cssparser-macros-0.7.1.crate
   docs/third-party/sources/dtoa-short-0.3.5.crate docs/third-party/sources/option-ext-0.2.0.crate
   docs/third-party/sources/selectors-0.38.0.crate)

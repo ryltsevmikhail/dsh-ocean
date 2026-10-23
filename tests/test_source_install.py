@@ -85,6 +85,13 @@ class SourceInstall(unittest.TestCase):
                                        ["gtk-update-icon-cache", "-f", "-t", str(self.data / "icons/hicolor")]])
         self.assertFalse((self.home / ".config").exists())
 
+    def test_embedded_dictionary_license_is_mandatory_before_install(self):
+        manifest = self.source / 'packaging/license-inputs.txt'
+        manifest.write_text('\n'.join(line for line in manifest.read_text().splitlines() if line != 'locales/dsh/LICENSE') + '\n')
+        result = self.run_install('--no-build')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.bin / 'dsh-ocean').exists())
+
     def test_covered_source_entries_are_mandatory(self):
         manifest = self.source / "packaging/license-inputs.txt"
         rows = manifest.read_text().splitlines()
