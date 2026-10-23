@@ -68,8 +68,12 @@ contexts and their original-distribution guidance, without changing classificati
 machine-readable ownership flags or probing package managers. Explicit runtime
 recovery confirmations and outcomes are localized, preserving the difference between
 an incomplete blocked transaction and completed recovery with a failed window refresh;
-all eight language cases retain diagnostic credential redaction. Runtime update/apply
-and diagnostic dialogs are still being localized.
+all eight language cases retain diagnostic credential redaction. Runtime update
+checks, current/available summaries, explicit apply questions and terminal messages
+are localized too. Attached/external/remote/no-server guidance remains check-only;
+unencrypted full-home backup, credential-content and server/WebSocket restart
+warnings are retained. Diagnostic and remaining tray error dialogs are still being
+localized.
 
 ## Harness resource tree
 
