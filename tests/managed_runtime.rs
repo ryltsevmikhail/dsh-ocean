@@ -33,6 +33,8 @@ use url::Url;
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 const DOMAIN: &[u8] = b"DSH Ocean runtime manifest v1\n";
+// These fixtures exercise native candidate selection/import, not a cross-target feed.
+const ARCH: &str = std::env::consts::ARCH;
 
 fn executable(path: &Path, text: &str) {
     fs::write(path, text).unwrap();
@@ -68,7 +70,7 @@ impl Fixture {
             fs::set_permissions(root.join(name), fs::Permissions::from_mode(0o700)).unwrap();
         }
         let now = Utc::now();
-        let manifest = json!({"version":1,"product":"dsh-ocean-runtime","channel":"stable","sequence":9,"release":"0.2.1","publishedAt":(now-ChronoDuration::minutes(1)).to_rfc3339(),"expiresAt":(now+ChronoDuration::days(1)).to_rfc3339(),"components":{"node":"24.14.1","dsh":"0.2.1","pnpm":"10.30.3"},"stateScope":"web-profile-sessions-storages-v1","artifacts":[{"target":"linux-x86_64","kind":"tar.gz","url":"https://github.com/ryltsevmikhail/dsh-ocean/releases/download/runtime-stable-v0.2.1-r9/dsh-ocean-runtime-stable-0.2.1-9-x86_64.tar.gz","size":6,"sha256":"11".repeat(32),"nodeArchiveSha256":"22".repeat(32)}]});
+        let manifest = json!({"version":1,"product":"dsh-ocean-runtime","channel":"stable","sequence":9,"release":"0.2.1","publishedAt":(now-ChronoDuration::minutes(1)).to_rfc3339(),"expiresAt":(now+ChronoDuration::days(1)).to_rfc3339(),"components":{"node":"24.14.1","dsh":"0.2.1","pnpm":"10.30.3"},"stateScope":"web-profile-sessions-storages-v1","artifacts":[{"target":format!("linux-{ARCH}"),"kind":"tar.gz","url":format!("https://github.com/ryltsevmikhail/dsh-ocean/releases/download/runtime-stable-v0.2.1-r9/dsh-ocean-runtime-stable-0.2.1-9-{ARCH}.tar.gz"),"size":6,"sha256":"11".repeat(32),"nodeArchiveSha256":"22".repeat(32)}]});
         let fixture = Self {
             root,
             key: SigningKey::from_bytes(&[81; 32]),
@@ -187,7 +189,7 @@ impl Fixture {
                 header.set_cksum();
                 tar.append_data(
                     &mut header,
-                    format!("dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/{name}"),
+                    format!("dsh-ocean-runtime-stable-0.2.1-9-linux-{ARCH}/{name}"),
                     body,
                 )
                 .unwrap();
@@ -197,7 +199,7 @@ impl Fixture {
                 header.set_mode(0o644);
                 header.set_size(18);
                 header.set_cksum();
-                tar.append_data(&mut header,format!("dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/harness/node_modules/@deepseek-ai/dsh/node_modules/{name}/index.js"),b"module.exports={};".as_slice()).unwrap();
+                tar.append_data(&mut header,format!("dsh-ocean-runtime-stable-0.2.1-9-linux-{ARCH}/harness/node_modules/@deepseek-ai/dsh/node_modules/{name}/index.js"),b"module.exports={};".as_slice()).unwrap();
             }
             tar.finish().unwrap();
         }
@@ -236,7 +238,7 @@ impl Fixture {
                 header.set_cksum();
                 tar.append_data(
                     &mut header,
-                    format!("dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/{name}"),
+                    format!("dsh-ocean-runtime-stable-0.2.1-9-linux-{ARCH}/{name}"),
                     body,
                 )
                 .unwrap();
@@ -246,7 +248,7 @@ impl Fixture {
                 header.set_mode(0o644);
                 header.set_size(18);
                 header.set_cksum();
-                tar.append_data(&mut header, format!("dsh-ocean-runtime-stable-0.2.1-9-linux-x86_64/harness/node_modules/@deepseek-ai/dsh/node_modules/{name}/index.js"), b"module.exports={};".as_slice()).unwrap();
+                tar.append_data(&mut header, format!("dsh-ocean-runtime-stable-0.2.1-9-linux-{ARCH}/harness/node_modules/@deepseek-ai/dsh/node_modules/{name}/index.js"), b"module.exports={};".as_slice()).unwrap();
             }
             tar.finish().unwrap();
         }
