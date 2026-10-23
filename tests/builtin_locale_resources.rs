@@ -6,6 +6,8 @@ fn builtin_locale_tree_is_embedded_complete_and_has_stable_content_identity() {
         files.iter().map(|x| x.path).collect::<Vec<_>>(),
         vec![
             "LICENSE",
+            "builtin-locale-preflight.mjs",
+            "builtin-locale-sdk-preflight.mjs",
             "lib/client.js",
             "lib/index.js",
             "overlay.yml",

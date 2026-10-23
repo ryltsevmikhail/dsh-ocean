@@ -33,7 +33,7 @@ node --test tests/builtin_locales.mjs
 ```
 
 The checked-in snapshot in `locales/dsh/` avoids adding Node or network access to
-Cargo builds. Rust includes the five resource files directly; no optional tarball,
+Cargo builds. Rust includes the seven resource files directly; no optional tarball,
 npm install or downloaded language supplement is needed for that data. The
 SHA-256 resource identity uses sorted paths and fixed-width big-endian length
 prefixes, so it is independent of native CPU architecture.
@@ -60,6 +60,15 @@ plain profile text, and operation-stamp checks before display and persistence.
 Dismissal never approves; invalidation closes the outstanding dialog and late
 responses are ignored. The dialog is not exposed as a webview command. Actual
 owned-runtime launch wiring remains to be implemented.
+
+Two embedded preflight helpers now classify configured potential legacy language
+packs using resolved manifest identity, including file-based entries and literal
+group disable ancestry. They use public SDK detached-composition APIs, not Loader
+boot or configured-plugin imports. A fresh profile is synthesized in memory;
+existing user patches are retained as input. Missing scope, warnings, unresolved
+modules, dynamic expressions and nested includes return `unknown`, never absence.
+These helpers have isolated metadata-fixture tests; execution against a complete
+pinned SDK installation and Rust lifecycle invocation remain unverified.
 
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls

@@ -25,6 +25,8 @@ const files={
  'lib/client.js':renderClient(catalogs,manifest.name),
  'overlay.yml':'# Application-owned activation; native profile consent is required.\n- insert:\n    - id: ocean-builtin-locales\n      name: ./lib/index.js\n',
  LICENSE:readFileSync(resolve(root,'language-pack/LICENSE'),'utf8'),
+ 'builtin-locale-preflight.mjs':readFileSync(resolve(root,'scripts/builtin-locale-preflight.mjs'),'utf8'),
+ 'builtin-locale-sdk-preflight.mjs':readFileSync(resolve(root,'scripts/builtin-locale-sdk-preflight.mjs'),'utf8'),
 };
 for(const [name,expected] of Object.entries(files)){
  const path=resolve(destination,name);

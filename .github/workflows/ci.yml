@@ -160,7 +160,7 @@ jobs:
         run: node scripts/build-builtin-locales.mjs --check
 
       - name: Task observer, isolated runtime health and offline signer tests
-        run: node --test tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs tests/owned_ui_localization.mjs tests/builtin_locales.mjs tests/runtime_health.mjs tests/publisher_signer.mjs
+        run: node --test tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs tests/owned_ui_localization.mjs tests/builtin_locales.mjs tests/builtin_locale_preflight.mjs tests/builtin_locale_sdk_preflight.mjs tests/runtime_health.mjs tests/publisher_signer.mjs
         env:
           DSH_OCEAN_TEST_VERIFIER: ${{ github.workspace }}/target/debug/dsh-ocean
 

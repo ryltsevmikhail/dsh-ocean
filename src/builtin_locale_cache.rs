@@ -44,7 +44,15 @@ fn verify(root: &File, id: &str) -> Result<()> {
     let tree = fs_at::open_at(root, id, true)?;
     sealed_directory(&tree)?;
     anyhow::ensure!(
-        names(&tree, 4)? == ["LICENSE", "lib", "overlay.yml", "package.json"],
+        names(&tree, 6)?
+            == [
+                "LICENSE",
+                "builtin-locale-preflight.mjs",
+                "builtin-locale-sdk-preflight.mjs",
+                "lib",
+                "overlay.yml",
+                "package.json"
+            ],
         "unexpected built-in resource entries"
     );
     let lib = fs_at::open_at(&tree, "lib", true)?;

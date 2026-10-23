@@ -16,6 +16,14 @@ pub fn resources() -> &'static [Resource] {
             bytes: include_bytes!("../locales/dsh/LICENSE"),
         },
         Resource {
+            path: "builtin-locale-preflight.mjs",
+            bytes: include_bytes!("../locales/dsh/builtin-locale-preflight.mjs"),
+        },
+        Resource {
+            path: "builtin-locale-sdk-preflight.mjs",
+            bytes: include_bytes!("../locales/dsh/builtin-locale-sdk-preflight.mjs"),
+        },
+        Resource {
             path: "lib/client.js",
             bytes: include_bytes!("../locales/dsh/lib/client.js"),
         },
