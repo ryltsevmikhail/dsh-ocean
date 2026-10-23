@@ -97,5 +97,17 @@
   "builtin.allow": "이 프로필에서 활성화",
   "builtin.decline": "기본 제공 언어 없이 계속",
   "builtin.failed_title": "기본 제공 언어를 사용할 수 없음",
-  "builtin.failed_body": "기본 제공 언어가 활성화되지 않았습니다. {detail}"
+  "builtin.failed_body": "기본 제공 언어가 활성화되지 않았습니다. {detail}",
+  "storage.title": "DSH Ocean 저장 공간 사용량",
+  "storage.counts": "세션: 파일 {session_files}개, {session_bytes}바이트\n공유 저장소: 파일 {storage_files}개, {storage_bytes}바이트\n건너뛴 항목(링크/특수 파일): {skipped}",
+  "storage.truncated": "검색 한도({entries}개 항목 / {depth}개 깊이)에 도달하여 중지했습니다. 표시된 수치는 실제 값의 하한입니다.",
+  "storage.incomplete": "검사하지 못한 저장소 디렉터리가 있어 수치가 불완전할 수 있습니다.",
+  "storage.notice": "개수와 크기만 표시하며 파일 이름이나 내용은 표시하지 않습니다. 파일 내용은 읽지 않았으며 심볼릭 링크와 특수 파일은 따라가지 않고 건너뛰었습니다.\n\n여기서는 아무것도 삭제하거나 이동하지 않았습니다. 세션이나 공유 저장소 정리는 DSH를 중지한 후 명시적으로 수행해야 하는 별도 작업이며, 데이터의 기준은 DSH 자체에 있습니다.",
+  "plugins.title": "DSH Ocean 플러그인",
+  "plugins.failure": "웹 프로필의 package.json을 읽을 수 없습니다. 읽을 수 있는 일반 파일이어야 하며 심볼릭 링크가 아니고, 유효한 JSON을 포함하며, 크기가 1 MiB 이하여야 합니다. 아무것도 변경하지 않았습니다.",
+  "plugins.empty": "웹 프로필에 선언된 플러그인이 없습니다.\n\nDSH가 자체 플러그인을 관리하며, 이 창은 프로필의 선언 내용만 표시합니다.",
+  "plugins.summary": "웹 프로필에 선언된 번들: {bundles}개, 패키지 의존성: {packages}개.",
+  "plugins.bundles": "플러그인 번들:",
+  "plugins.packages": "패키지:",
+  "plugins.notice": "읽기 전용입니다. 이름과 버전만 표시하며 파일 내용이나 경로는 표시하지 않습니다. 플러그인 설치·삭제·업데이트는 이 창이 아닌 DSH에서 관리합니다."
 }

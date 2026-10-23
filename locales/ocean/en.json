@@ -97,5 +97,17 @@
   "builtin.allow": "Enable for this profile",
   "builtin.decline": "Continue without built-in languages",
   "builtin.failed_title": "Built-in languages unavailable",
-  "builtin.failed_body": "Built-in languages were not activated. {detail}"
+  "builtin.failed_body": "Built-in languages were not activated. {detail}",
+  "storage.title": "DSH Ocean storage usage",
+  "storage.counts": "Sessions: {session_files} file(s), {session_bytes} bytes\nShared stores: {storage_files} file(s), {storage_bytes} bytes\nSkipped entries (links/special): {skipped}",
+  "storage.truncated": "Note: the scan stopped at its bound ({entries} entries / {depth} levels); the numbers are a lower bound.",
+  "storage.incomplete": "One storage directory could not be inspected; the numbers may be incomplete.",
+  "storage.notice": "Counts only: no file names or contents are shown. File contents were not read; symlinked or special files were skipped rather than followed.\n\nNothing was deleted or moved here. Cleaning up sessions or shared stores is an explicit offline decision, and DSH keeps its own source of truth.",
+  "plugins.title": "DSH Ocean plugins",
+  "plugins.failure": "Could not read the web profile's package.json. It must be readable, valid JSON, a regular non-symlink file and at most 1 MiB. Nothing was changed.",
+  "plugins.empty": "No plugins are declared in the web profile.\n\nDSH manages its own plugin set; this window only reports what the profile declares.",
+  "plugins.summary": "{bundles} bundle(s) and {packages} package dependency(ies) are declared by the web profile.",
+  "plugins.bundles": "Bundles:",
+  "plugins.packages": "Packages:",
+  "plugins.notice": "Read-only: names and versions only, never file contents or paths. Installing, removing or updating plugins is DSH's job, not this window's."
 }

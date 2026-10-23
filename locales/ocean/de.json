@@ -97,5 +97,17 @@
   "builtin.allow": "Für dieses Profil aktivieren",
   "builtin.decline": "Ohne integrierte Sprachen fortfahren",
   "builtin.failed_title": "Integrierte Sprachen nicht verfügbar",
-  "builtin.failed_body": "Die integrierten Sprachen wurden nicht aktiviert. {detail}"
+  "builtin.failed_body": "Die integrierten Sprachen wurden nicht aktiviert. {detail}",
+  "storage.title": "DSH Ocean – Speicherbelegung",
+  "storage.counts": "Sitzungen: {session_files} Datei(en), {session_bytes} Byte\nGemeinsame Speicher: {storage_files} Datei(en), {storage_bytes} Byte\nÜbersprungene Einträge (Links/Spezialdateien): {skipped}",
+  "storage.truncated": "Der Scan wurde an seiner Grenze beendet ({entries} Einträge / {depth} Ebenen); die Zahlen sind Untergrenzen.",
+  "storage.incomplete": "Ein Speicherverzeichnis konnte nicht geprüft werden; die Zahlen sind möglicherweise unvollständig.",
+  "storage.notice": "Nur Zählwerte: Dateinamen und Inhalte werden nicht angezeigt. Dateiinhalte wurden nicht gelesen; symbolische Links und Spezialdateien wurden übersprungen statt verfolgt.\n\nHier wurde nichts gelöscht oder verschoben. Das Bereinigen von Sitzungen oder gemeinsamen Speichern ist eine ausdrückliche Entscheidung bei beendetem DSH; DSH behält seine eigene maßgebliche Datenquelle.",
+  "plugins.title": "DSH Ocean – Plugins",
+  "plugins.failure": "Die package.json des Webprofils konnte nicht gelesen werden. Sie muss eine lesbare reguläre Datei ohne symbolischen Link sein, gültiges JSON enthalten und höchstens 1 MiB groß sein. Nichts wurde geändert.",
+  "plugins.empty": "Im Webprofil sind keine Plugins deklariert.\n\nDSH verwaltet seine Plugins selbst; dieses Fenster zeigt nur die Angaben im Profil.",
+  "plugins.summary": "Im Webprofil deklarierte Plugin-Bündel: {bundles}; Paketabhängigkeiten: {packages}.",
+  "plugins.bundles": "Plugin-Bündel:",
+  "plugins.packages": "Pakete:",
+  "plugins.notice": "Schreibgeschützt: nur Namen und Versionen, niemals Dateiinhalte oder Pfade. Plugins zu installieren, zu entfernen oder zu aktualisieren ist Aufgabe von DSH, nicht dieses Fensters."
 }

@@ -97,5 +97,17 @@
   "builtin.allow": "Activer pour ce profil",
   "builtin.decline": "Continuer sans langues intégrées",
   "builtin.failed_title": "Langues intégrées indisponibles",
-  "builtin.failed_body": "Les langues intégrées n’ont pas été activées. {detail}"
+  "builtin.failed_body": "Les langues intégrées n’ont pas été activées. {detail}",
+  "storage.title": "Utilisation du stockage de DSH Ocean",
+  "storage.counts": "Sessions : {session_files} fichier(s), {session_bytes} octets\nStockages partagés : {storage_files} fichier(s), {storage_bytes} octets\nEntrées ignorées (liens/fichiers spéciaux) : {skipped}",
+  "storage.truncated": "L’analyse a atteint sa limite ({entries} entrées / {depth} niveaux) ; les chiffres sont des valeurs minimales.",
+  "storage.incomplete": "Un répertoire de stockage n’a pas pu être examiné ; les chiffres peuvent être incomplets.",
+  "storage.notice": "Uniquement des décomptes : aucun nom ni contenu de fichier n’est affiché. Le contenu des fichiers n’a pas été lu ; les liens symboliques et fichiers spéciaux ont été ignorés plutôt que suivis.\n\nRien n’a été supprimé ni déplacé ici. Le nettoyage des sessions ou stockages partagés est une décision explicite à effectuer lorsque DSH est arrêté ; DSH conserve sa propre source de données de référence.",
+  "plugins.title": "Plugins de DSH Ocean",
+  "plugins.failure": "Impossible de lire le package.json du profil web. Il doit s’agir d’un fichier ordinaire lisible, sans lien symbolique, contenant un JSON valide et ne dépassant pas 1 Mio. Rien n’a été modifié.",
+  "plugins.empty": "Aucun plugin n’est déclaré dans le profil web.\n\nDSH gère ses propres plugins ; cette fenêtre affiche uniquement les déclarations du profil.",
+  "plugins.summary": "Le profil web déclare {bundles} lot(s) et {packages} dépendance(s) de paquets.",
+  "plugins.bundles": "Lots de plugins :",
+  "plugins.packages": "Paquets :",
+  "plugins.notice": "Lecture seule : uniquement les noms et versions, jamais le contenu ni les chemins des fichiers. L’installation, la suppression et la mise à jour des plugins relèvent de DSH, pas de cette fenêtre."
 }

@@ -77,7 +77,7 @@ fn plugins_window_is_read_only_and_shows_names_only() {
     let window = ui::build(None, &body);
     window.dialog.show_all();
     tick();
-    assert_eq!(window.dialog.title().as_deref(), Some(ui::TITLE));
+    assert_eq!(window.dialog.title().as_deref(), Some("DSH Ocean plugins"));
     assert!(window.label.is_selectable() && !window.label.uses_markup());
     for response in [
         gtk::ResponseType::Accept,

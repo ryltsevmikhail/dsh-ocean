@@ -97,5 +97,17 @@
   "builtin.allow": "このプロファイルで有効にする",
   "builtin.decline": "組み込み言語なしで続行",
   "builtin.failed_title": "組み込み言語を利用できません",
-  "builtin.failed_body": "組み込み言語は有効になっていません。{detail}"
+  "builtin.failed_body": "組み込み言語は有効になっていません。{detail}",
+  "storage.title": "DSH Ocean のストレージ使用量",
+  "storage.counts": "セッション: ファイル {session_files} 件、{session_bytes} バイト\n共有ストア: ファイル {storage_files} 件、{storage_bytes} バイト\nスキップした項目（リンク・特殊ファイル）: {skipped}",
+  "storage.truncated": "走査は上限（{entries} 項目 / {depth} 階層）で停止しました。表示値は下限です。",
+  "storage.incomplete": "確認できなかったストレージディレクトリがあるため、数値は不完全な場合があります。",
+  "storage.notice": "件数とサイズのみを表示し、ファイル名や内容は表示しません。ファイルの内容は読み取らず、シンボリックリンクや特殊ファイルはたどらずにスキップしました。\n\nここでは何も削除・移動していません。セッションや共有ストアの整理は、DSH を停止して明示的に行う別の操作です。信頼できるデータの管理元は DSH 自体です。",
+  "plugins.title": "DSH Ocean のプラグイン",
+  "plugins.failure": "Web プロファイルの package.json を読み取れませんでした。読み取り可能な通常ファイルで、シンボリックリンクではなく、有効な JSON を含み、サイズが 1 MiB 以下である必要があります。何も変更していません。",
+  "plugins.empty": "Web プロファイルにプラグインの宣言はありません。\n\nプラグインは DSH 自体が管理します。この画面はプロファイルの宣言内容を表示するだけです。",
+  "plugins.summary": "Web プロファイルで宣言されているバンドル: {bundles} 件、パッケージ依存関係: {packages} 件。",
+  "plugins.bundles": "プラグインバンドル:",
+  "plugins.packages": "パッケージ:",
+  "plugins.notice": "読み取り専用です。名前とバージョンのみを表示し、ファイルの内容やパスは表示しません。プラグインのインストール・削除・更新は、この画面ではなく DSH が行います。"
 }

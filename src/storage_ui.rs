@@ -8,40 +8,46 @@ use tauri::{AppHandle, Manager};
 
 use crate::session_inventory::{Summary, MAX_DEPTH, MAX_ENTRIES};
 
-pub const TITLE: &str = "DSH Ocean storage usage";
-
-/// Fixed, content-free rendering.
+/// Count-only plain rendering in the startup language snapshot.
 pub fn text(summary: &Summary) -> String {
-    use std::fmt::Write as _;
-    let mut output = String::new();
-    let _ = writeln!(
-        output,
-        "Sessions: {} file(s), {} bytes\nShared stores: {} file(s), {} bytes\nSkipped entries (links/special): {}\n",
-        summary.session_files,
-        summary.session_bytes,
-        summary.storage_files,
-        summary.storage_bytes,
-        summary.skipped
-    );
+    text_in(summary, crate::i18n::active_language())
+}
+pub fn text_in(summary: &Summary, language: crate::i18n::Language) -> String {
+    let mut output = crate::i18n::render(
+        language,
+        "storage.counts",
+        &[
+            ("session_files", &summary.session_files.to_string()),
+            ("session_bytes", &summary.session_bytes.to_string()),
+            ("storage_files", &summary.storage_files.to_string()),
+            ("storage_bytes", &summary.storage_bytes.to_string()),
+            ("skipped", &summary.skipped.to_string()),
+        ],
+    )
+    .expect("validated storage count placeholders");
+    output.push_str("\n\n");
     if summary.truncated {
-        let _ = writeln!(
-            output,
-            "Note: the scan stopped at its bound ({} entries / {} levels); the numbers \
-             are a lower bound.\n",
-            MAX_ENTRIES, MAX_DEPTH
+        output.push_str(
+            &crate::i18n::render(
+                language,
+                "storage.truncated",
+                &[
+                    ("entries", &MAX_ENTRIES.to_string()),
+                    ("depth", &MAX_DEPTH.to_string()),
+                ],
+            )
+            .expect("validated storage bound placeholders"),
         );
+        output.push_str("\n\n");
     }
     if summary.error.is_some() {
-        let _ = writeln!(
-            output,
-            "One storage directory could not be inspected; the numbers may be incomplete.\n"
+        output.push_str(
+            crate::i18n::message(language, "storage.incomplete").expect("embedded storage message"),
         );
+        output.push_str("\n\n");
     }
     output.push_str(
-        "Counts only: no file names or contents were read, and symlinked or special \
-         files were skipped rather than followed.\n\n\
-         Nothing was deleted or moved here. Cleaning up sessions or shared stores is \
-         an explicit offline decision, and DSH keeps its own source of truth.",
+        crate::i18n::message(language, "storage.notice").expect("embedded storage notice"),
     );
     output
 }
@@ -57,10 +63,10 @@ pub struct Window {
 
 pub fn build(parent: Option<&gtk::Window>, body: &str) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some(TITLE),
+        Some(crate::i18n::text("storage.title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Close", gtk::ResponseType::Close)],
+        &[(crate::i18n::text("common.close"), gtk::ResponseType::Close)],
     );
     dialog.set_default_size(640, 380);
     let label = gtk::Label::new(Some(body));
@@ -114,6 +120,39 @@ mod tests {
         }
     }
 
+    #[test]
+    fn storage_messages_use_selected_language_without_exposing_backend_paths() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            let rendered = text_in(
+                &summary(4, 2048, true, Some("/home/private/<script>")),
+                language,
+            );
+            assert!(
+                rendered.contains("2048") && rendered.contains("100") && rendered.contains("3")
+            );
+            assert!(
+                !rendered.contains("/home/private")
+                    && !rendered.contains("<script>")
+                    && !rendered.contains("{session_files}")
+            );
+            assert!(
+                rendered.contains(crate::i18n::message(language, "storage.incomplete").unwrap())
+            );
+            if language != crate::i18n::Language::En {
+                assert_ne!(
+                    rendered,
+                    text_in(
+                        &summary(4, 2048, true, Some("private")),
+                        crate::i18n::Language::En
+                    )
+                );
+            }
+        }
+        assert!(
+            text_in(&summary(4, 2048, false, None), crate::i18n::Language::Ru)
+                .contains("Файлы сеансов")
+        );
+    }
     #[test]
     fn text_is_count_only_and_explicitly_non_destructive() {
         let rendered = text(&summary(4, 2_048, false, None));

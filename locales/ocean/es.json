@@ -97,5 +97,17 @@
   "builtin.allow": "Activar para este perfil",
   "builtin.decline": "Continuar sin idiomas integrados",
   "builtin.failed_title": "Idiomas integrados no disponibles",
-  "builtin.failed_body": "Los idiomas integrados no se han activado. {detail}"
+  "builtin.failed_body": "Los idiomas integrados no se han activado. {detail}",
+  "storage.title": "Uso del almacenamiento de DSH Ocean",
+  "storage.counts": "Sesiones: {session_files} archivo(s), {session_bytes} bytes\nAlmacenes compartidos: {storage_files} archivo(s), {storage_bytes} bytes\nEntradas omitidas (enlaces/especiales): {skipped}",
+  "storage.truncated": "El análisis se detuvo en su límite ({entries} entradas / {depth} niveles); las cifras son un límite inferior.",
+  "storage.incomplete": "No se pudo examinar un directorio de almacenamiento; las cifras pueden estar incompletas.",
+  "storage.notice": "Solo recuentos: no se muestran nombres ni contenidos de archivos. No se leyó el contenido; los enlaces simbólicos y archivos especiales se omitieron en vez de seguirse.\n\nAquí no se eliminó ni movió nada. Limpiar sesiones o almacenes compartidos es una decisión explícita que debe realizarse sin DSH en ejecución; DSH conserva su propia fuente de datos autorizada.",
+  "plugins.title": "Plugins de DSH Ocean",
+  "plugins.failure": "No se pudo leer package.json del perfil web. Debe ser un archivo normal legible, sin enlace simbólico, con JSON válido y de hasta 1 MiB. No se cambió nada.",
+  "plugins.empty": "No hay plugins declarados en el perfil web.\n\nDSH gestiona sus propios plugins; esta ventana solo muestra lo que declara el perfil.",
+  "plugins.summary": "El perfil web declara {bundles} conjunto(s) y {packages} dependencia(s) de paquetes.",
+  "plugins.bundles": "Conjuntos de plugins:",
+  "plugins.packages": "Paquetes:",
+  "plugins.notice": "Solo lectura: únicamente nombres y versiones, nunca contenidos ni rutas de archivos. La instalación, eliminación o actualización de plugins corresponde a DSH, no a esta ventana."
 }

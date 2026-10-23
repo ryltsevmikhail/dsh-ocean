@@ -19,6 +19,10 @@ language-setting control or request those catalogs.
 Message arguments are substituted once. GTK labels and web text use plain-text
 APIs. The pairing QR SVG is a separate native-generated trusted value, not a
 translation sink. Notification bodies are escaped for freedesktop markup.
+Read-only storage and plugin overviews now localize their titles, close controls,
+counts, empty/error states and safety notices. Their numeric/path filtering and
+non-destructive behavior are unchanged. Storage reports that names are not shown,
+not that directory enumeration never encounters names; file contents remain unread.
 Remaining native panels and status summaries are still being localized.
 
 ## Harness resource tree
