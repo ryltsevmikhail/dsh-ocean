@@ -64,7 +64,11 @@ jobs:
         run: cargo check --locked --all-targets
 
   test:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -159,8 +163,31 @@ jobs:
       - name: Check built-in DSH dictionary resources
         run: node scripts/build-builtin-locales.mjs --check
 
+      - name: Prepare pinned native SDK in a private fixture
+        run: |
+          python3 -B tests/test_ci_sdk_env.py
+          root="$(mktemp -d "$RUNNER_TEMP/ocean-sdk.XXXXXX")"
+          root="$(realpath -- "$root")"
+          python3 -B scripts/ci-sdk-env.py --fixture-root "$root" > "$root/environment"
+          while IFS= read -r assignment; do export "$assignment"; done < "$root/environment"
+          DSH_HOME="$root/dsh-home" DSH_OCEAN_DATA_DIR="$root/ocean-data" \
+            bash scripts/bootstrap-runtime.sh
+          test -f "$DSH_LOCALE_CLIENT_SOURCE"
+          test -f "$DSH_CLIENT_MODULES_SOURCE"
+          "$DSH_OCEAN_SDK_FIXTURE/runtime/node/bin/node" -p 'process.arch'
+          while IFS= read -r assignment; do printf '%s\n' "$assignment" >> "$GITHUB_ENV"; done < "$root/environment"
+
+      - name: Genuine private managed SDK child lifecycle and embedded languages
+        run: |
+          export DSH_OCEAN_TEST_RUNTIME_ROOT="$(readlink -f -- "$DSH_OCEAN_SDK_FIXTURE")"
+          test -d "$DSH_OCEAN_TEST_RUNTIME_ROOT"
+          test ! -L "$DSH_OCEAN_TEST_RUNTIME_ROOT"
+          cargo test --locked --test real_managed_child real_managed_child_ -- --ignored --test-threads=1 --nocapture
+
       - name: Task observer, isolated runtime health and offline signer tests
-        run: node --test tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs tests/owned_ui_localization.mjs tests/builtin_locales.mjs tests/builtin_locale_coexistence.mjs tests/builtin_locale_managed_graph.mjs tests/builtin_locale_preflight.mjs tests/builtin_locale_sdk_preflight.mjs tests/builtin_locale_sdk_runtime.mjs tests/runtime_health.mjs tests/publisher_signer.mjs
+        run: |
+          node --test --test-reporter=tap tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs tests/owned_ui_localization.mjs tests/builtin_locales.mjs tests/builtin_locale_coexistence.mjs tests/builtin_locale_managed_graph.mjs tests/builtin_locale_preflight.mjs tests/builtin_locale_sdk_preflight.mjs tests/builtin_locale_sdk_runtime.mjs tests/runtime_health.mjs tests/publisher_signer.mjs | tee "$RUNNER_TEMP/sdk-node-tests.tap"
+          test "$(sed -n 's/^# skipped //p' "$RUNNER_TEMP/sdk-node-tests.tap")" = 0
         env:
           DSH_OCEAN_TEST_VERIFIER: ${{ github.workspace }}/target/debug/dsh-ocean
 
@@ -362,14 +389,18 @@ jobs:
         run: python3 -B tests/test_package_install.py --real-smoke
 
       - name: Validate runtime manifest
-        run: jq -e '.schema == 1 and .node.archives["linux-x64"].sha256 and .dsh.version' runtime-manifest.json
+        run: jq -e '.schema == 1 and .node.archives["linux-x64"].sha256 and .node.archives["linux-arm64"].sha256 and .dsh.version' runtime-manifest.json
 
       - name: Bootstrap check
         run: |
-          tmp="$(mktemp -d)"
-          export DSH_NODE_VERSION="$(jq -r '.node.version' runtime-manifest.json)"
-          export DSH_NODE_SHA256="$(jq -r '.node.archives["linux-x64"].sha256' runtime-manifest.json)"
-          export DSH_VERSION="$(jq -r '.dsh.version' runtime-manifest.json)"
-          export DSH_PNPM_VERSION="$(jq -r '.pnpm.version' runtime-manifest.json)"
-          DSH_OCEAN_DATA_DIR="$tmp" bash scripts/bootstrap-runtime.sh --check
-          rm -rf "$tmp"
+          parent="$(realpath -- "$RUNNER_TEMP")"
+          tmp="$(mktemp -d "$parent/ocean-bootstrap-check.XXXXXX")"
+          tmp="$(realpath -- "$tmp")"
+          cleanup() {
+            [[ "$(realpath -- "${tmp:?}")" == "$tmp" && "$tmp" == "${parent:?}"/ocean-bootstrap-check.* && ! -L "$tmp" ]] || return 1
+            rm -rf -- "${tmp:?}"
+          }
+          trap cleanup EXIT
+          python3 -B scripts/ci-sdk-env.py --fixture-root "$tmp" > "$tmp/environment"
+          while IFS= read -r assignment; do export "$assignment"; done < "$tmp/environment"
+          DSH_HOME="$tmp/dsh-home" DSH_OCEAN_DATA_DIR="$tmp/ocean-data" bash scripts/bootstrap-runtime.sh --check
