@@ -11,13 +11,15 @@ export async function classify(rows,resolveIdentity) {
   for(const entry of entries){
    if(++count>2048){unknown=true;return;}
    if(!entry||typeof entry!=='object'||typeof entry.name!=='string'||!entry.name||
-      ![undefined,null,true,false].includes(entry.disabled)||![undefined,null,true,false].includes(entry.group)) {unknown=true;continue;}
-   if(entry.group){await visit(entry.config,ancestorDisabled||entry.disabled===true,depth+1);continue;}
+      ![undefined,null,true,false].includes(entry.group)) {unknown=true;continue;}
+   const literalDisabled=[undefined,null,true,false].includes(entry.disabled);
+   if(entry.group){if(!literalDisabled){unknown=true;continue;}await visit(entry.config,ancestorDisabled||entry.disabled===true,depth+1);continue;}
    if(entry.name==='cordis:include'){unknown=true;continue;}
    let identity;try{identity=await resolveIdentity(entry.name);}catch{unknown=true;continue;}
    if(!identity||typeof identity.name!=='string'){unknown=true;continue;}
    if(identity.name==='@deepseek-ai/cordis-plugin-include'){unknown=true;continue;}
    if(identity.name===legacy||identity.name===builtin){
+    if(!literalDisabled){unknown=true;continue;}
     if(ancestorDisabled||entry.disabled===true)disabled=true;else enabled=true;
    }
   }

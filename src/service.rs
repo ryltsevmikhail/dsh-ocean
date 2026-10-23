@@ -260,13 +260,17 @@ pub fn managed_arguments(patch: Option<&std::path::Path>) -> Result<Vec<String>>
                     .any(|c| matches!(c, std::path::Component::ParentDir)),
             "absolute locale patch path required"
         );
-        args.extend([
-            "--patch".to_owned(),
-            patch
-                .to_str()
-                .context("locale patch path must be UTF-8")?
-                .to_owned(),
-        ]);
+        // Commander forwards everything after the first web-app option.
+        args.splice(
+            2..2,
+            [
+                "--patch".to_owned(),
+                patch
+                    .to_str()
+                    .context("locale patch path must be UTF-8")?
+                    .to_owned(),
+            ],
+        );
     }
     Ok(args)
 }

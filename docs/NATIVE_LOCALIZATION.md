@@ -66,9 +66,21 @@ packs using resolved manifest identity, including file-based entries and literal
 group disable ancestry. They use public SDK detached-composition APIs, not Loader
 boot or configured-plugin imports. A fresh profile is synthesized in memory;
 existing user patches are retained as input. Missing scope, warnings, unresolved
-modules, dynamic expressions and nested includes return `unknown`, never absence.
-These helpers have isolated metadata-fixture tests; execution against a complete
-pinned SDK installation and Rust lifecycle invocation remain unverified.
+modules, dynamic names or legacy/group conditions, and nested includes return
+`unknown`, never absence. Unrelated stock-plugin disable expressions do not decide
+whether a legacy locale package is configured.
+These helpers now pass private complete-SDK tests for fresh web profiles,
+configured legacy bundles, explicit disabled policy, dynamic legacy conditions
+and nested includes, without profile creation or authoritative-file rewrites.
+The metadata subprocess requires Node's documented
+`--experimental-import-meta-resolve` flag to resolve against the explicit profile
+base and releases its public Cordis root fiber afterwards.
+
+An opt-in isolated production-child test also boots the embedded overlay twice,
+verifies its package in the actual authenticated client boot graph, preserves the
+stock empty generated root and avoids adding profile dependencies. It checks
+restart authentication and descendant cleanup. This does not yet prove the
+application's cold-start/systemd/update paths select that overlay automatically.
 
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls

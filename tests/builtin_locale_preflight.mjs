@@ -21,6 +21,7 @@ test('configured legacy identity follows resolved manifests, not names or instal
  const {classify}=await import(source);
  const resolve=name=>({name:name==='alias'?'@dsh-ocean/desktop-language-pack':name});
  assert.equal((await classify([{id:'core',name:'@deepseek-ai/dsh-client-locale'}],resolve)).state,'absent');
+ assert.equal((await classify([{id:'settings',name:'@deepseek-ai/dsh-settings',disabled:{__jsExpr:'runtimeFlag'}}],resolve)).state,'absent');
  assert.equal((await classify([{id:'manual',name:'alias'}],resolve)).state,'enabled');
  assert.equal((await classify([{id:'manual',name:'alias',disabled:true}],resolve)).state,'disabled');
 });

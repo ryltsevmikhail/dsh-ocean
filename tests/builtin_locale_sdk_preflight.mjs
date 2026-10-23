@@ -4,14 +4,9 @@ import {mkdtempSync,mkdirSync,writeFileSync,existsSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve,dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {owningManifest,readOnlyProfile,preflight,ordinaryModuleTarget} from '../scripts/builtin-locale-sdk-preflight.mjs';
+import {owningManifest,readOnlyProfile,preflight,disposeMetadataContext} from '../scripts/builtin-locale-sdk-preflight.mjs';
 function fixture(t){const root=mkdtempSync(join(tmpdir(),'ocean-preflight-test-'));t.after(()=>{const path=resolve(root);assert.equal(dirname(path),resolve(tmpdir()));assert(path.split('/').at(-1).startsWith('ocean-preflight-test-'));rmSync(path,{recursive:true});});return root;}
-test('published SDK types/default export is ordinary but custom conditions stay unknown',()=>{
- assert.equal(ordinaryModuleTarget({exports:{'.':{types:'./lib/types/index.d.ts',default:'./lib/index.js'}}}),'./lib/index.js');
- assert.equal(ordinaryModuleTarget({main:'lib/index.js'}),'./lib/index.js');
- assert.equal(ordinaryModuleTarget({exports:{'.':{node:'./node.js',default:'./fallback.js'}}}),undefined);
- assert.equal(ordinaryModuleTarget({exports:'../foreign/index.js'}),undefined);
-});
+test('metadata context releases public root fiber effects, not a nonexistent context method',async()=>{let disposed=0;await disposeMetadataContext({fiber:{async dispose(){disposed++;}}});assert.equal(disposed,1);});
 test('file identity is obtained from metadata without importing plugin code',t=>{
  const root=fixture(t);mkdirSync(join(root,'lib'));writeFileSync(join(root,'package.json'),JSON.stringify({name:'@dsh-ocean/desktop-language-pack'}));
  writeFileSync(join(root,'lib/anything.js'),"throw new Error('configured plugin must never execute');");

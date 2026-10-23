@@ -1,21 +1,12 @@
 // Owned-runtime metadata subprocess only. Never boots Loader or imports row code.
 import {statSync,realpathSync,openSync,fstatSync,readSync,closeSync,constants} from 'node:fs';
-import {dirname,join,resolve,isAbsolute} from 'node:path';
+import {dirname,join,isAbsolute} from 'node:path';
 import {createRequire} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {inspectConfigured} from './builtin-locale-preflight.mjs';
 function json(path){const fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);try{const stat=fstatSync(fd);if(!stat.isFile()||stat.size>1048576)throw new Error('manifest bound');const bytes=Buffer.alloc(1048577);let length=0;while(length<bytes.length){const count=readSync(fd,bytes,length,bytes.length-length,null);if(!count)break;length+=count;}if(length>1048576)throw new Error('manifest bound');return JSON.parse(bytes.subarray(0,length).toString('utf8'));}finally{closeSync(fd);}}
 function missing(path){try{statSync(path);return false;}catch(error){if(error.code==='ENOENT')return true;throw error;}}
-export function ordinaryModuleTarget(manifest){
- let target=typeof manifest.exports==='string'?manifest.exports:manifest.exports?.['.'];
- if(target&&typeof target==='object'&&!Array.isArray(target)){
-  if(Object.keys(target).some(key=>key!=='types'&&key!=='default'))return undefined;
-  target=target.default;
- }
- if(target===undefined&&manifest.exports===undefined){target=manifest.main;if(typeof target==='string'&&!target.startsWith('.')&&!isAbsolute(target))target='./'+target;}
- if(typeof target!=='string'||!target.startsWith('./')||target.split('/').includes('..'))return undefined;
- return target;
-}
+export async function disposeMetadataContext(context){await context.fiber.dispose();}
 export function owningManifest(moduleURL){
  if(!moduleURL.startsWith('file:'))return undefined;
  let directory=dirname(realpathSync(fileURLToPath(moduleURL)));
@@ -51,20 +42,14 @@ export async function preflight({installAnchor,profileDir,home,cwd,telemetryDisa
    if(name.startsWith('file:'))return owningManifest(name);
    if(name.startsWith('.')||isAbsolute(name)||name.includes(':'))return undefined;
    packages??=new sdk.PluginPackages(context,{resolution});
-   const found=packages.packageOf(name,pathToFileURL(profileDir+'/').href);
-   if(!found)return undefined;
-   const manifest=found.manifest;
-   // Arbitrary subpaths/conditional exports may select a differently named
-   // nested package. Refuse those rather than approximating Node's resolver.
-   const root=name.startsWith('@')?name.split('/').slice(0,2).join('/'):name.split('/')[0];
-   if(root!==name)return undefined;
-   const target=ordinaryModuleTarget(manifest);
-   if(target===undefined)return undefined;
-   const modulePath=resolve(found.dir,target);
-   return owningManifest(pathToFileURL(modulePath).href);
+   // Public Node resolution, with the SDK's public metadata service hooks.
+   // The explicit-parent form requires the documented Node CLI flag; without
+   // it Node ignores the profile base, so never guess or use ambient lookup.
+   if(!process.execArgv.includes('--experimental-import-meta-resolve'))return undefined;
+   return owningManifest(import.meta.resolve(name,pathToFileURL(profileDir+'/').href));
   }});
  }catch{return {state:'unknown'};}
- finally{if(context)await context.dispose();}
+ finally{if(context)await disposeMetadataContext(context);}
 }
 // Explicit CLI entry; imports by tests never discover a runtime or home.
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){

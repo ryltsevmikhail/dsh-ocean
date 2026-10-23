@@ -204,7 +204,7 @@ fn render(runtime: &Runtime, base: &Url, isolated: Option<&Path>, patch: Option<
          [Service]\n\
          Type=simple\n\
          UMask=0077\n\
-         ExecStart={prefix}\"{node}\" \"{dsh}\" --profile web --host 127.0.0.1 --port {port} --no-open{locale}\n\
+         ExecStart={prefix}\"{node}\" \"{dsh}\" --profile web{locale} --host 127.0.0.1 --port {port} --no-open\n\
          WorkingDirectory={working}\n\
          Environment=\"PATH={path}\"\n\
          Restart={restart}\n\
