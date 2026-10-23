@@ -82,6 +82,20 @@ RELEASE_TOOLCHAIN_FILES=(
   docs/toolchain/rust-1.90.0/COPYRIGHT-guide.txt
   docs/toolchain/rust-1.90.0/rust-src-1.90.0.tar.xz
   docs/toolchain/rust-1.90.0/COMPILER-RT-CREDITS.TXT
+  docs/toolchain/rust-1.90.0/GNU-glibc-source.dsc
+  docs/toolchain/rust-1.90.0/GNU-glibc-copyright
+  docs/toolchain/rust-1.90.0/GNU-gcc-13-source.dsc
+  docs/toolchain/rust-1.90.0/GNU-gcc-13-copyright
+  docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-start.S
+  docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-crti.S
+  docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-crtn.S
+  docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-start.S
+  docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-crti.S
+  docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-crtn.S
+  docs/toolchain/rust-1.90.0/GNU-glibc-COPYING.LIB
+  docs/toolchain/rust-1.90.0/GNU-gcc-crtstuff.c
+  docs/toolchain/rust-1.90.0/COMPILER-RT-AARCH64-source.tar.gz
+  docs/toolchain/rust-1.90.0/COMPILER-RT-AARCH64-index.json
 )
 declare -A RELEASE_TOOLCHAIN_ALLOWED=()
 for notice in "${RELEASE_TOOLCHAIN_FILES[@]}"; do RELEASE_TOOLCHAIN_ALLOWED[$notice]=1; done

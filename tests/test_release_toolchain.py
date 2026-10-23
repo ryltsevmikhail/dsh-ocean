@@ -25,6 +25,36 @@ class ReleaseToolchain(unittest.TestCase):
         self.assertTrue(required <= manifest, required-manifest)
         self.assertIn('docs/toolchain/rust-1.90.0/COPYRIGHT-library.html', manifest)
 
+    def test_observed_native_arm_members_have_exact_retained_source_and_license(self):
+        import hashlib
+        import tarfile
+        manifest=json.loads((PROFILE/'COMPILER-RT-AARCH64-index.json').read_text())
+        expected={e['path']:e for e in manifest['files']}
+        self.assertEqual(len(expected),11)
+        self.assertIn('compiler-rt/LICENSE.TXT',expected)
+        self.assertIn('compiler-rt/lib/builtins/cpu_model/aarch64/fmv/getauxval.inc',expected)
+        with tarfile.open(PROFILE/'COMPILER-RT-AARCH64-source.tar.gz') as archive:
+            actual={}
+            for m in archive.getmembers():
+                self.assertTrue(m.isfile())
+                name=m.name.split('/',1)[1]
+                self.assertIn(name,expected)
+                self.assertNotIn(name,actual)
+                actual[name]=hashlib.sha256(archive.extractfile(m).read()).hexdigest()
+            self.assertEqual(actual,{p:e['sha256'] for p,e in expected.items()})
+        with tarfile.open(PROFILE/'rust-src-1.90.0.tar.xz') as archive:
+            script=archive.extractfile('rust-src-1.90.0/rust-src/lib/rustlib/src/rust/library/compiler-builtins/compiler-builtins/build.rs').read()
+            self.assertEqual(hashlib.sha256(script).hexdigest(),manifest['rustBuildScript']['sha256'])
+
+    def test_native_startup_notices_preserve_the_actual_linking_exceptions(self):
+        for arch in ('x86_64','aarch64'):
+            for name in ('start.S','crti.S','crtn.S'):
+                text=' '.join((PROFILE/f'GNU-glibc-{arch}-{name}').read_text().split())
+                self.assertIn('unlimited permission to link the compiled version',text)
+                self.assertIn('without any restriction coming from the use of this file',text)
+        self.assertIn('GNU LESSER GENERAL PUBLIC LICENSE',(PROFILE/'GNU-glibc-COPYING.LIB').read_text())
+        self.assertIn('GCC Runtime Library Exception',(PROFILE/'GNU-gcc-crtstuff.c').read_text())
+
     def test_actual_compiler_and_installed_notice_identity_are_required(self):
         with tempfile.TemporaryDirectory(prefix='ocean-installed-toolchain-') as tmp:
             tmp=Path(tmp);sysroot=tmp/'sysroot';installed=sysroot/'share/doc/rust'

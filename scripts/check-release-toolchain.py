@@ -9,7 +9,7 @@ import stat
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-INDEX_SHA256 = 'deaae9ffafdd11a2604d61d9b4494fc0b633eb3ce97ca91f28327faefba819a7'
+INDEX_SHA256 = '0079400d088aadbb00d4b0728cf6ba7c5f5cdde24c02b41e8a951fbb1c731c9d'
 COMMIT = '1159e78c4747b02ef996e55082b704c09b970588'
 TARGETS = {'x86_64-unknown-linux-gnu', 'aarch64-unknown-linux-gnu'}
 

@@ -150,6 +150,17 @@ jobs:
           else
             "$verifier" --apply-release "${args[@]}" --kind tar.gz --prefix "$RUNNER_TEMP/checked-shell" --confirm-apply yes
           fi
+      - name: Exercise actual GTK backup and verification dialogs with release compiler
+        if: ${{ inputs.product == 'shell' }}
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_DIALOGS: "1"
+        run: |
+          # Build ignored native fixtures first; the timed run is the real dialog
+          # exercise, not a timeout spent compiling. Separate debug target keeps
+          # the release link map/ELF untouched.
+          cargo test --locked --no-run --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui
+          timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui -- --ignored --test-threads=1 --nocapture
       - name: Exercise exact release ELF and bind native evidence to actual tar
         if: ${{ inputs.product == 'shell' }}
         env:
@@ -159,6 +170,9 @@ jobs:
           binary="$RUNNER_TEMP/release-native-target/release/dsh-ocean"
           bash scripts/test-native.sh xvfb-run -a bash scripts/smoke-app-launch.sh "$binary"
           python3 -B scripts/release-native-evidence.py --archive "${{ steps.package.outputs.archive }}" --binary "$binary" --link-map "$RUNNER_TEMP/release-native.map" --target "$ARCH-unknown-linux-gnu" --source-commit "$GITHUB_SHA" --output-dir "$RUNNER_TEMP/native-release-evidence"
+          # Installer receives the same already-bound canonical tar, not a rebuilt
+          # default-linker package. Fresh private HOME, forbidden service helpers.
+          python3 -B tests/test_package_install.py --real-archive "${{ steps.package.outputs.archive }}"
       - name: Retain public native evidence only (including dry-run, never ELF/keys)
         if: ${{ inputs.product == 'shell' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

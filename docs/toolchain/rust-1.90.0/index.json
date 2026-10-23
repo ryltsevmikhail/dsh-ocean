@@ -169,9 +169,110 @@
       "sha256": "a9901f47a089da41e4690682d00ce4cedaa2baf41fedbe79beee366d43ac2461",
       "size": 1049,
       "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/CREDITS.TXT"
+    },
+    {
+      "path": "GNU-glibc-source.dsc",
+      "size": 9387,
+      "sha256": "1b73a89e0910eb3e5920cde639ac7eb606256d8ee809688ff9b5912b67002711",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39-0ubuntu8.9.dsc"
+    },
+    {
+      "path": "GNU-glibc-copyright",
+      "size": 26462,
+      "sha256": "d3c95b56fa33e28b57860580f0baf4e4f4de2a268a2b80f1d031a5191bade265",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39-0ubuntu8.9.debian.tar.xz",
+      "sourceArchiveMember": "debian/copyright"
+    },
+    {
+      "path": "GNU-gcc-13-source.dsc",
+      "size": 39540,
+      "sha256": "86b4012c312ac13e3e092877719a62a5b5dbab082ae7e9680780a25c6a13ddc6",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1.dsc"
+    },
+    {
+      "path": "GNU-gcc-13-copyright",
+      "size": 69100,
+      "sha256": "08c6f3dee4c19aa1e57eb7d4ad45829b2e99656313bd07fa0922e2553f500be5",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1.debian.tar.xz",
+      "sourceArchiveMember": "debian/copyright"
+    },
+    {
+      "path": "GNU-glibc-x86_64-start.S",
+      "size": 4431,
+      "sha256": "740cdc597fa8ae1f9cba6b410afba1567a87798875dba03b568b28ee9d0b10a2",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/x86_64/start.S"
+    },
+    {
+      "path": "GNU-glibc-x86_64-crti.S",
+      "size": 2805,
+      "sha256": "4c631e070152e1e31084c54a688cbf911a99057ba89a83e40860d8bd15af7e87",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/x86_64/crti.S"
+    },
+    {
+      "path": "GNU-glibc-x86_64-crtn.S",
+      "size": 1971,
+      "sha256": "89c62a403ff48916a7a69c6e0a0a7d47ca87e1651a5977276f2d8a2311463afd",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/x86_64/crtn.S"
+    },
+    {
+      "path": "GNU-glibc-aarch64-start.S",
+      "size": 3747,
+      "sha256": "41b722594bd7aeaefe7dd07ae1f696bb373ce57af8e46cff6a1de186737fc557",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/aarch64/start.S"
+    },
+    {
+      "path": "GNU-glibc-aarch64-crti.S",
+      "size": 3033,
+      "sha256": "95d327fddd197566251b8057eaea2ff63525ccb2bcd9cb23a96835c4be8a41eb",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/aarch64/crti.S"
+    },
+    {
+      "path": "GNU-glibc-aarch64-crtn.S",
+      "size": 2094,
+      "sha256": "63ecdd181a23a1c5f0ed6a6b642786d77d120f8813f7be1e05dbe74ed5ea31bf",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/aarch64/crtn.S"
+    },
+    {
+      "path": "GNU-glibc-COPYING.LIB",
+      "size": 26530,
+      "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/COPYING.LIB"
+    },
+    {
+      "path": "GNU-gcc-crtstuff.c",
+      "size": 26399,
+      "sha256": "aae037dc5d57342cfad14bbd951fd68527a0521d3196f6909cbfe7f03540818b",
+      "source": "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-13.3.0/libgcc/crtstuff.c"
+    },
+    {
+      "path": "COMPILER-RT-AARCH64-source.tar.gz",
+      "size": 13222,
+      "sha256": "082d17c5f6017f47e46aa86c21c194a34cd4836e754bac387a4b331220adf70f",
+      "source": "Immutable LLVM file copies; see COMPILER-RT-AARCH64-index.json"
+    },
+    {
+      "path": "COMPILER-RT-AARCH64-index.json",
+      "size": 4501,
+      "sha256": "0d89d5a444450720441dcb5d8dc0d0f4584f0626093959440b3ac9d7a78bc3f5",
+      "source": "Immutable LLVM file copies; see COMPILER-RT-AARCH64-index.json"
     }
   ],
   "scope": "Conservative exact-distribution/source notices, not a claim that all compiler-wide components are linked. Full COPYRIGHT retained without truncation because library-only HTML omits some distributed std dependencies. Release evidence must bind compiler and final tar ELF; other compiler builds are not covered by this profile.",
   "llvmCommit": "e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51",
-  "sourceArchiveScope": "Unchanged official std/compiler-builtins/libm source with per-file notices; compiler-rt is not in rust-src, so exact LLVM gitlink credits retained separately."
+  "sourceArchiveScope": "Unchanged official std/compiler-builtins/libm source with per-file notices; compiler-rt is not in rust-src, so exact LLVM gitlink credits retained separately.",
+  "nativeStartupSources": {
+    "glibc": "2.39-0ubuntu8.9",
+    "gcc-13": "13.3.0-6ubuntu2~24.04.1",
+    "glibcOrigSha256": "f77bd47cf8170c57365ae7bf86696c118adb3b120d3259c64c502d3dc1e2d926",
+    "glibcDebianSha256": "d6114f2302896a3c8612453e1bf1d0e61603e3029ba4a7c246fbb1ab4c48d2b0",
+    "gccDebianSha256": "5523658f272ad6d15a83b6e26d178fbd5cb7709ec7ce2ca52b0c843e19c228e3",
+    "note": "Actual selected startup objects, not LOAD-only archive membership. glibc source preserves unlimited linked-program exception. GCC release-tag source is corroborative, exact Ubuntu source-package copyright is retained. No PGP verification claimed."
+  }
 }

@@ -44,7 +44,21 @@ BASE_LICENSE_INPUTS |= {'docs/toolchain/rust-1.90.0/index.json',
     'docs/toolchain/rust-1.90.0/SOURCE-UNWIND-lib.rs',
     'docs/toolchain/rust-1.90.0/COPYRIGHT-guide.txt',
     'docs/toolchain/rust-1.90.0/rust-src-1.90.0.tar.xz',
-    'docs/toolchain/rust-1.90.0/COMPILER-RT-CREDITS.TXT'}
+    'docs/toolchain/rust-1.90.0/COMPILER-RT-CREDITS.TXT',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-source.dsc',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-copyright',
+    'docs/toolchain/rust-1.90.0/GNU-gcc-13-source.dsc',
+    'docs/toolchain/rust-1.90.0/GNU-gcc-13-copyright',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-start.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-crti.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-crtn.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-start.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-crti.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-crtn.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-COPYING.LIB',
+    'docs/toolchain/rust-1.90.0/GNU-gcc-crtstuff.c',
+    'docs/toolchain/rust-1.90.0/COMPILER-RT-AARCH64-source.tar.gz',
+    'docs/toolchain/rust-1.90.0/COMPILER-RT-AARCH64-index.json'}
 # SHA-256 of the provenance blob in the asserted, immutable public 86bb883ae6979427a50bb7bca528abc668588e3d tree.
 GLIB_PROVENANCE_SHA256 = '9768d4c48c8efab1c3f6d51fe35a9f22c7da69e40dfbf4415449cd9faed86179'
 GLIB_PATCHED_SHA256 = 'a0f5ee8acb8faa089bcdfbc9a57372609fce7654026ccef7d9a224d05a654ccc'

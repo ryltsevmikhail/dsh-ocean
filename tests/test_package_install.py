@@ -406,14 +406,44 @@ class PortableInstall(unittest.TestCase):
         self.assertFalse(self.desktop.exists())
 
 
-def real_smoke():
+class ExactReleaseArchiveSmoke(unittest.TestCase):
+    def test_prebuilt_canonical_archive_is_checked_without_rebuilding_it(self):
+        import inspect
+        self.assertIn('archive_path',inspect.signature(real_smoke).parameters)
+        version=tomllib.loads((ROOT/'Cargo.toml').read_text())['package']['version']
+        prefix=f'dsh-ocean-{version}-linux-{platform.machine()}'
+        paths=['dsh-ocean','install.sh','install.py','packaging/dsh-ocean.desktop','packaging/license-inputs.txt',*LICENSE_NAMES]+[f'icons/{s}x{s}.png' for s in (32,64,128,256,512)]
+        class StopBeforeInstall(Exception):pass
+        def first_command(command,**kwargs):
+            self.assertEqual(command[0],'bash')
+            self.assertEqual(command[-1],'--check')
+            self.assertTrue(command[1].endswith('/trusted-package/install.sh'))
+            raise StopBeforeInstall()
+        with tempfile.TemporaryDirectory(prefix='ocean-exact-release-smoke-') as tmp:
+            archive=Path(tmp)/'canonical-publisher-name.tar.gz'
+            with tarfile.open(archive,'w:gz') as tar:
+                for name in paths:
+                    data=b'synthetic trusted fixture, never executed'
+                    entry=tarfile.TarInfo(prefix+'/'+name);entry.size=len(data)
+                    tar.addfile(entry,io.BytesIO(data))
+            with patch.object(subprocess,'run',side_effect=first_command),self.assertRaises(StopBeforeInstall):
+                real_smoke(archive)
+
+
+def real_smoke(archive_path=None):
+    """Only trusted locally built archives; this is not an untrusted-code sandbox."""
     with tempfile.TemporaryDirectory(prefix="dsh-ocean-private-install-smoke-") as temporary:
         root = Path(temporary)
-        output = root / "output"
-        subprocess.run(["bash", str(ROOT / "scripts/package.sh"), "--output-dir", str(output)], cwd=ROOT, check=True)
-        archives = list(output.glob("*.tar.gz"))
+        if archive_path is None:
+            output = root / "output"
+            subprocess.run(["bash", str(ROOT / "scripts/package.sh"), "--output-dir", str(output)], cwd=ROOT, check=True)
+            archives = list(output.glob("*.tar.gz"))
+        else:
+            archives = [Path(archive_path).resolve(strict=True)]
         assert len(archives) == 1
-        prefix = archives[0].name.removesuffix(".tar.gz")
+        version=tomllib.loads((ROOT/'Cargo.toml').read_text())['package']['version']
+        # Publisher canonical names differ from the immutable package root.
+        prefix = f'dsh-ocean-{version}-linux-{platform.machine()}'
         package = root / "trusted-package"
         package.mkdir()
         paths = ["dsh-ocean", "install.sh", "install.py", "packaging/dsh-ocean.desktop", "packaging/license-inputs.txt", *LICENSE_NAMES] + [f"icons/{size}x{size}.png" for size in (32,64,128,256,512)]
@@ -436,6 +466,7 @@ def real_smoke():
         assert not list(home.iterdir())
         subprocess.run(["bash", str(package / "install.sh")], env=environment, check=True)
         binary = Path(environment["DSH_OCEAN_BIN_DIR"]) / "dsh-ocean"
+        assert binary.read_bytes() == (package / 'dsh-ocean').read_bytes()
         result = subprocess.run([str(binary), "--version"], env=environment, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
         expected = tomllib.loads((ROOT / "Cargo.toml").read_text())["package"]["version"]
         assert result.stdout.strip() == f"dsh-ocean {expected}"
@@ -460,5 +491,7 @@ def real_smoke():
 if __name__ == "__main__":
     if sys.argv[1:] == ["--real-smoke"]:
         real_smoke()
+    elif len(sys.argv)==3 and sys.argv[1]=='--real-archive':
+        real_smoke(Path(sys.argv[2]))
     else:
         unittest.main()

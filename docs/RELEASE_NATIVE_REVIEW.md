@@ -54,14 +54,61 @@ credits come from Rust's exact LLVM gitlink
 | Five MPL crates | Existing exact covered-source `.crate` archives, hashes and recipient access remain. No source modifications hidden behind old archives. |
 | Rust std | Exact 1.90 distribution full/library copyright and all distribution license files, root MIT/Apache, source archive and provenance. Other compiler versions are outside this profile. |
 | Compiler-builtins/libm | Exact source licenses, including MIT **AND** Apache-2.0 WITH LLVM-exception and applicable additional offered terms; preserved per-file source notices and immutable compiler-rt credits. |
-| GNU unwinding / compiler runtime | Record the actual linker inputs and system package origins. Do not infer LLVM libunwind membership from rustc's LLVM version; do not drop GCC runtime exception requirements where applicable. Relevant distribution license texts are retained; selected static system inputs still require review of their exact origins/terms. |
+| GNU startup / compiler runtime | Actual maps select glibc Scrt1/crti/crtn and GCC crtbeginS/crtendS. Retain exact Ubuntu source-package copyrights, all six glibc architecture source notices, complete LGPL2.1 and corroborative GCC crtstuff source, alongside existing GPL3/GCC runtime exception3.1. glibc startup files expressly grant unlimited linked-program distribution permission; do not omit that exception or impose a generic static-LGPL relink requirement on these exception-covered objects. GCC Target Code/Independent Module permission is conditional on eligible compilation; stock Rust/LLVM plus the recorded GCC/BFD driver is not evidence of a prohibited proprietary GCC IR optimizer. |
 | GTK/WebKit/libsoup/appindicator and other host shared libraries | Portable tar copies no shared-library tree. Native evidence records loader-resolved system libraries and dpkg origins, explicitly marked **not redistributed by tar**. Later plugins/dlopen/subprocesses are not asserted universally inventoried. |
 | Original Ice artwork / embedded UI/scripts | Existing project `NOTICE` and branding provenance assertions apply; retain/hash supplied assets. Automated byte checks do not prove authorship or contributor authority; owner confirms the existing declaration. No font files are deliberately bundled. |
+
+Ocean uses the GLib/GTK/WebKitGTK interfaces. LGPL-covered portions of those
+system libraries retain their LGPL terms (complete LGPL2.1 text accompanies the
+native notices); other portions retain their own licenses. The tar does not
+bundle or lock those shared libraries. Ocean's MIT terms impose no restriction
+on replacing them or reverse engineering for debugging modified libraries.
 
 Retaining offered terms is not a new upstream license election or a claim that
 all expression branches apply to all linked bytes. Review the actual component,
 applicable exception and notice rather than the inventory's syntactic
 `manual_review` flag.
+
+### ARM compiler-rt source supplement
+
+The actual ARM map selects 31 generated LSE assembly objects, one native CPU-model
+object and one Rust compiler-builtins object. Rust1.90's retained build script
+maps them to `aarch64/lse.S` and `cpu_model/aarch64.c`; the map also retains the
+FMV initialization path. The supplemental locally packed source archive therefore
+preserves all ten relevant source/include/fragment files **and** the exact
+compiler-rt license (49,886 bytes before compression), with immutable LLVM
+commit URLs and per-file hashes. It is not advertised as an official upstream
+archive. Unit checks match every member and the Rust build-script hash.
+
+The inspected source headers specify Apache-2.0 WITH LLVM-exception; four platform
+fragments have no separate notices. The `Ported from libgcc` ancestry comment is
+preserved but is not invented into a GPL declaration. The full compiler-rt license
+also preserves its legacy MIT/NCSA text and credits references. The LLVM embedded
+object exception is conditional; it does not require shipping the entire LLVM
+source tree. Exact system headers from Rust's distribution build cannot be
+identified from the application-host map; this source/notice retention is not a
+claim of binary-identical compiler reconstruction.
+
+### Concrete native map review (07f65b5 validation)
+
+Both actual native reports identify glibc **2.39-0ubuntu8.9**, GCC
+**13.3.0-6ubuntu2~24.04.1**, GNU BFD2.42 and required symbols up through
+**GLIBC_2.39**. This is an Ubuntu24.04-class preview, not an older-glibc binary.
+Both maps have no selected `libgcc.a(member)` or `libc_nonshared.a(member)`:
+those archives are LOAD-only references. The 8-byte dl/pthread/rt/util archives
+contribute no code. Startup object sections are actually retained, including
+crtendS's small `.eh_frame`; this is why their own notices are now included.
+The absent root `.rcgu.o` is the compiler-cleaned Ocean/LTO temporary, not an
+unidentified external dependency; the retained final OUTPUT/ELF hashes bind it.
+
+The exact Ubuntu source `.dsc` records and source-package copyright files are
+retained. The glibc orig/debian archive hashes were checked; no distro patch
+mentions any of the six retained startup paths. Its generic Debian copyright
+still says2.23 and omits the startup exception, so it is **not** substituted for
+the actual2.39 source notices. GCC release-tag crtstuff source is corroboration,
+not a claim of byte-identical Ubuntu-patched source. No upstream PGP signature
+verification is claimed. These are scoped source/license findings, not a blanket
+statement that every host library was copied or a universal legal opinion.
 
 ## Exact native evidence path
 
@@ -78,7 +125,13 @@ For a shell candidate the native release workflow:
    against the checkout and the archive's executable against that exact Cargo ELF.
    Stale/rebuilt ELF, omitted/changed notice bytes and extra/duplicate paths fail.
 4. Runs the existing isolated X11 real-release-ELF launch/single-instance/close/
-   restore smoke, not only `--version`, on both native architectures.
+   restore smoke, not only `--version`, on both native architectures. It also
+   builds/runs genuine GTK backup/download/verification dialog fixtures with the
+   same1.90 compiler in a separate debug target (not pretending those test
+   executables are the tar ELF). Finally it fresh-installs the same canonical,
+   already-bound tar into private HOME/XDG paths, checks exact installed ELF and
+   every retained notice/source byte, runs `--version`, then uninstalls. Service,
+   cache and desktop-open helpers are forbidden; no real profile/runtime is made.
 5. Records ELF interpreter/DT_NEEDED, ABI symbol requirements, map-referenced
    archive/object hashes with sanitized full path/member identity, system loader
    dependencies and dpkg package/source versions. The reference list includes
