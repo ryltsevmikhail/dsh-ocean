@@ -1,0 +1,12 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "Abbrechen",
+  "common.close": "Schließen",
+  "language.title": "Sprache",
+  "language.system": "Systemsprache",
+  "language.restart_notice": "Die Sprachänderung wird nach einem Neustart von Ocean wirksam.",
+  "setup.starting": "Wird gestartet…",
+  "setup.retry": "Erneut versuchen",
+  "setup.recover": "Runtime wiederherstellen…",
+  "setup.log_lines": "Protokollzeilen: {count}"
+}

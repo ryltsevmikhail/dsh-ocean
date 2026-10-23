@@ -1,0 +1,12 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "Annuler",
+  "common.close": "Fermer",
+  "language.title": "Langue",
+  "language.system": "Langue du système",
+  "language.restart_notice": "Le changement de langue prendra effet après le redémarrage d’Ocean.",
+  "setup.starting": "Démarrage…",
+  "setup.retry": "Réessayer",
+  "setup.recover": "Restaurer le runtime…",
+  "setup.log_lines": "Lignes du journal : {count}"
+}

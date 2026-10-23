@@ -1,0 +1,12 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "キャンセル",
+  "common.close": "閉じる",
+  "language.title": "言語",
+  "language.system": "システムの言語",
+  "language.restart_notice": "言語の変更は Ocean の再起動後に反映されます。",
+  "setup.starting": "起動中…",
+  "setup.retry": "再試行",
+  "setup.recover": "ランタイムを復旧…",
+  "setup.log_lines": "ログ行数: {count}"
+}

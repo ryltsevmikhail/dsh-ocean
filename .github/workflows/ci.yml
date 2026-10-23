@@ -140,6 +140,7 @@ jobs:
           python3 -B -m unittest discover -s tests -p 'test_gui_child_fixture.py' -v
           python3 -B -m unittest discover -s tests -p 'test_child_recovery_smoke.py' -v
           python3 -B -m unittest discover -s tests -p 'test_branding.py' -v
+          python3 -B tests/test_native_locale_catalogs.py
 
       - name: Shell script lint
         run: |

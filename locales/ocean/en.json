@@ -1,0 +1,12 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "Cancel",
+  "common.close": "Close",
+  "language.title": "Language",
+  "language.system": "System language",
+  "language.restart_notice": "The language change takes effect after restarting Ocean.",
+  "setup.starting": "Starting…",
+  "setup.retry": "Retry",
+  "setup.recover": "Recover runtime…",
+  "setup.log_lines": "Log lines: {count}"
+}

@@ -1,0 +1,12 @@
+{
+  "common.ok": "ОК",
+  "common.cancel": "Отмена",
+  "common.close": "Закрыть",
+  "language.title": "Язык",
+  "language.system": "Язык системы",
+  "language.restart_notice": "Изменение языка вступит в силу после перезапуска Ocean.",
+  "setup.starting": "Запуск…",
+  "setup.retry": "Повторить",
+  "setup.recover": "Восстановить runtime…",
+  "setup.log_lines": "Строк журнала: {count}"
+}
