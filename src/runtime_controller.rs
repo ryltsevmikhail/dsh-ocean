@@ -134,7 +134,19 @@ fn resolve_manager_dsh_home(env: &systemd::ManagerEnvironment, home: &Path) -> R
 /// never shell-evaluated). Anything that cannot be proven — a query failure,
 /// timeout, oversized block, or a quoted/duplicate/relative/empty value — is
 /// refused (fail closed) instead of silently snapshotting the wrong environment.
-fn validate_systemd_scope(expected_home: &Path) -> Result<()> {
+pub fn systemd_launch_scope() -> Result<crate::builtin_locale_planner::LaunchScope> {
+    anyhow::ensure!(
+        std::env::var_os("DSH_HOME").is_none(),
+        "client DSH_HOME override cannot authorize the user manager profile"
+    );
+    let environment = systemd::show_environment()?;
+    let home = resolve_manager_home(&environment)?;
+    let dsh_home = resolve_manager_dsh_home(&environment, &home)?;
+    let cwd = config::account_home()
+        .context("resolve passwd working directory used by the managed unit")?;
+    crate::builtin_locale_planner::LaunchScope::checked(home, Some(dsh_home.into_os_string()), cwd)
+}
+pub(crate) fn validate_systemd_scope(expected_home: &Path) -> Result<()> {
     // Round1 strict refusal preserved: a client DSH_HOME override makes the
     // snapshot scope ambiguous and is refused before any manager query.
     if std::env::var_os("DSH_HOME").is_some() {

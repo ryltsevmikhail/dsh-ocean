@@ -58,8 +58,9 @@ store does not create the profile or grant process/unit ownership. The native
 approval dialog now provides explicit allow/refuse actions, conservative default,
 plain profile text, and operation-stamp checks before display and persistence.
 Dismissal never approves; invalidation closes the outstanding dialog and late
-responses are ignored. The dialog is not exposed as a webview command. Actual
-owned-runtime launch wiring remains to be implemented.
+responses are ignored. The dialog is not exposed as a webview command. The native
+owned-start planner now calls this dialog and requires its matching persisted
+allow record before materializing resources or running metadata inspection.
 
 Two embedded preflight helpers now classify configured potential legacy language
 packs using resolved manifest identity, including file-based entries and literal
@@ -79,15 +80,20 @@ base and releases its public Cordis root fiber afterwards.
 An opt-in isolated production-child test also boots the embedded overlay twice,
 verifies its package in the actual authenticated client boot graph, preserves the
 stock empty generated root and avoids adding profile dependencies. It checks
-restart authentication and descendant cleanup. This does not yet prove the
-application's cold-start/systemd/update paths select that overlay automatically.
+restart authentication and descendant cleanup. It now obtains the overlay through
+the recorded-permission/actual-scope planner rather than passing a cache path
+directly. This is not yet a real Tauri-window or native user-manager integration
+test; the application call sites and manager transitions are tested separately.
 
 The Rust metadata subprocess wrapper now supplies an explicit executable, script,
 profile scope, process home and cwd. It clears inherited credentials and Node
 startup injections, bounds both output pipes to 8 KiB and the operation to 30
 seconds, kills/reaps failures and rejects extra protocol fields. An opt-in test
 executes the actual embedded helpers through this wrapper against the private SDK
-without creating a profile. Lifecycle/consent callers are still pending.
+without creating a profile. The planner binds it to the selected executable's
+nearest SDK manifest, actual launch HOME/DSH_HOME/cwd and scoped native permission.
+Relative/empty overrides, unsafe directory ancestry and profile aliases are
+refused rather than silently selecting another profile.
 
 Published owned-server metadata now retains the actual overlay path atomically
 with its child. Ordinary child restart and token refresh preserve that recipe.
@@ -103,8 +109,23 @@ legacy strict readers retain their original schema. Malformed relative,
 parent-escaping or non-overlay paths are refused before transaction mutation.
 Same-session child recovery and fresh-session systemd recovery retain the saved
 old recipe rather than consulting current preferences or candidate metadata.
-Automatic cold-start planning and its scoped consent callers are still pending;
-these are required before enabling the feature.
+Both owned cold-start backends now call the native planner after the existing
+pending/reopen/Attached early gates. Only an explicitly approved, compatible SDK
+with metadata `absent` receives the overlay. Systemd uses the manager's HOME and
+DSH_HOME, but passwd `%h` for cwd. Its slot must be explicitly inactive, use the
+exact known generated file and have matching fragment/no drop-ins before the
+permission dialog or cache work. The proof is repeated before replacement and
+start; refusal does not trigger a different backend. Missing units are published
+without overwrite; exact known native units can return to plain on opt-out.
+Runtime replacement re-inspects the imported SDK before stop/commit for an already
+native server; a previously plain server is never implicitly enabled by update.
+Rollback continues using saved recipes, never a fresh preference/preflight.
+
+Remaining validation includes real Tauri-window and user-manager integration,
+ARM64 native runs, retained-cache/inter-version compatibility, dynamic manual-pack
+coexistence, and the complete current packaging/license report. Cold systemd
+migration currently recognizes the plain template and this build's exact native
+cache path; unknown older paths remain refused, not rewritten or executed.
 
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls

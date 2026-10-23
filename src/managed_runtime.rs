@@ -279,6 +279,45 @@ pub fn apply_native(
     let prepared = crate::runtime_bundle::import(staged.path(), &verified, &paths.prefix)?;
     control.check()?;
 
+    // Native dictionaries are planned against the imported selected SDK before
+    // any stop/snapshot/commit. Never carry an old patch blindly into a new SDK,
+    // and never enable dictionaries during update for a previously plain server.
+    let running = permit
+        .server()?
+        .context("owned server metadata disappeared")?;
+    let candidate_patch = if running.locale_patch.is_some() {
+        let launch = match running.mode {
+            ServerMode::Child => crate::builtin_locale_planner::LaunchScope::child()?,
+            ServerMode::Systemd => crate::runtime_controller::systemd_launch_scope()?,
+            ServerMode::Attached => {
+                anyhow::bail!("attached runtime cannot plan native dictionaries")
+            }
+        };
+        anyhow::ensure!(
+            same_root(&launch.dsh_home, &paths.home),
+            "native dictionary scope differs from the runtime snapshot scope"
+        );
+        let root = prepared.root();
+        let candidate_runtime = Runtime {
+            node: root.join("runtime/node/bin/node"),
+            dsh: root.join("harness/node_modules/.bin/dsh"),
+            version: String::new(),
+            install_root: Some(root.join("harness")),
+        };
+        let patch = tauri::async_runtime::handle().block_on(
+            crate::builtin_locale_planner::recorded_plan(
+                &candidate_runtime,
+                &permit,
+                &launch,
+                &paths.prefix.join("builtin-locales"),
+                &crate::builtin_locale_ui::preference_path(),
+            ),
+        )?;
+        control.check()?;
+        patch
+    } else {
+        None
+    };
     // 7. build the owned controller (owns the permit).
     let mut controller = build_controller(
         Authority::from_app(app),
@@ -286,7 +325,8 @@ pub fn apply_native(
         old,
         prepared.root().to_path_buf(),
         paths.home.clone(),
-    )?;
+    )?
+    .with_candidate_locale_patch(candidate_patch)?;
 
     // 8. apply with a fresh pre-start revalidate decorator + exact floor record.
     let new_root = prepared.root().to_path_buf();

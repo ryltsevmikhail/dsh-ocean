@@ -529,10 +529,39 @@ async fn real_worker(builtin_locales: bool) {
     fs::write(&marker, b"survives restart").unwrap();
     let path = format!("{}:/usr/bin:/bin", root.join("runtime/node/bin").display());
     let patch = if builtin_locales {
+        let runtime = dsh_ocean::bootstrap::Runtime {
+            node: root.join("runtime/node/bin/node"),
+            dsh: root.join("harness/node_modules/.bin/dsh"),
+            version: String::new(),
+            install_root: Some(root.join("harness")),
+        };
+        let scope = dsh_ocean::builtin_locale_planner::LaunchScope::child().unwrap();
+        let (_, version) = dsh_ocean::builtin_locale_planner::selected_sdk(&runtime).unwrap();
+        let consent = fixture.join("config/native-language-approval.json");
+        let approval = dsh_ocean::builtin_locale_consent::Scope::new(
+            &scope.dsh_home.join("profiles/web"),
+            &version,
+        )
+        .unwrap();
+        dsh_ocean::builtin_locale_consent::record(&consent, &approval, true).unwrap();
+        let lifecycle = dsh_ocean::runtime_lifecycle::Lifecycle::<
+            dsh_ocean::service::Server,
+            tokio::process::Child,
+        >::new(|_| {});
+        let permit = lifecycle
+            .try_begin(dsh_ocean::runtime_lifecycle::Operation::Update)
+            .unwrap();
         Some(
-            dsh_ocean::builtin_locale_cache::materialize(&fixture.join("cache/builtin-locales"))
-                .unwrap()
-                .join("overlay.yml"),
+            dsh_ocean::builtin_locale_planner::recorded_plan(
+                &runtime,
+                &permit,
+                &scope,
+                &fixture.join("cache/builtin-locales"),
+                &consent,
+            )
+            .await
+            .unwrap()
+            .expect("approved fresh private SDK must receive embedded locales"),
         )
     } else {
         None

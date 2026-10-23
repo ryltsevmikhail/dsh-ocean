@@ -233,7 +233,7 @@ cmd="$2"
 case "$cmd" in
   show)
     if [[ "$*" == *--property=FragmentPath* ]]; then
-      if [ "${MOCK_BAD_FRAGMENT:-0}" = 1 ]; then echo /wrong/unit.service; else echo "$DSH_OCEAN_UNIT_PATH"; fi
+      if [ "${MOCK_BAD_FRAGMENT:-0}" = 1 ]; then echo /wrong/unit.service; elif [ -f "$DSH_OCEAN_UNIT_PATH" ]; then echo "$DSH_OCEAN_UNIT_PATH"; else echo; fi
     elif [[ "$*" == *--property=DropInPaths* ]]; then
       if [ "${MOCK_DROP_IN:-0}" = 1 ]; then echo "$DSH_OCEAN_UNIT_PATH.d/custom.conf"; fi
     elif [[ "$*" == *--property=ActiveState* ]]; then
@@ -261,6 +261,7 @@ case "$cmd" in
     echo "start" >> "$FIXTURE/actions"
     touch "$FIXTURE/active"
     if [ "${MOCK_START_FAIL:-0}" = 1 ]; then exit 1; fi ;;
+  enable) echo "enable" >> "$FIXTURE/actions" ;;
   daemon-reload)
     echo "reload" >> "$FIXTURE/actions"
     if [ "${MOCK_RELOAD_FAIL:-0}" = 1 ]; then exit 1; fi ;;
@@ -351,6 +352,78 @@ fn systemd_case() {
     fs::write(root.join("active"), b"").unwrap();
 
     match case.as_str() {
+        "cold-locale-refusal"
+        | "cold-locale-active"
+        | "cold-locale-corrupt"
+        | "cold-locale-pending" => {
+            let bytes = if case == "cold-locale-corrupt" {
+                b"custom unit".to_vec()
+            } else {
+                old_unit.as_bytes().to_vec()
+            };
+            fs::write(&unit_path, &bytes).unwrap();
+            if case != "cold-locale-active" {
+                dsh_ocean::systemd::stop().unwrap();
+            }
+            if case == "cold-locale-pending" {
+                fs::write(prefix.join(".runtime-pending.json"), "pending").unwrap();
+            }
+            let patch = root.join("known-resource/overlay.yml");
+            assert!(dsh_ocean::systemd::ensure_unit_for_launch(
+                &old,
+                &base,
+                Some(&patch),
+                Some(&patch)
+            )
+            .is_err());
+            assert_eq!(fs::read(&unit_path).unwrap(), bytes);
+            let actions = fs::read_to_string(root.join("actions")).unwrap_or_default();
+            assert!(!actions
+                .lines()
+                .any(|line| matches!(line, "reload" | "enable" | "start")));
+        }
+        "cold-locale-missing" => {
+            dsh_ocean::systemd::stop().unwrap();
+            assert!(!unit_path.exists());
+            let patch = root.join("known-resource/overlay.yml");
+            dsh_ocean::systemd::prove_cold_launch(&old, &base, Some(&patch)).unwrap();
+            assert!(!unit_path.exists());
+            dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, Some(&patch), Some(&patch))
+                .unwrap();
+            assert_eq!(
+                fs::read(&unit_path).unwrap(),
+                dsh_ocean::systemd::render_unit_with_patch(&old, &base, &patch)
+                    .unwrap()
+                    .as_bytes()
+            );
+        }
+        "cold-locale" => {
+            let launch = dsh_ocean::runtime_controller::systemd_launch_scope().unwrap();
+            assert_eq!(launch.cwd, account_home());
+            assert_eq!(launch.dsh_home, account_home().join(".dsh"));
+            fs::write(&unit_path, &old_unit).unwrap();
+            dsh_ocean::systemd::stop().unwrap();
+            let patch = root.join("known-resource/overlay.yml");
+            dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, Some(&patch), Some(&patch))
+                .unwrap();
+            assert_eq!(
+                fs::read(&unit_path).unwrap(),
+                dsh_ocean::systemd::render_unit_with_patch(&old, &base, &patch)
+                    .unwrap()
+                    .as_bytes()
+            );
+            dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, None, Some(&patch)).unwrap();
+            assert_eq!(fs::read(&unit_path).unwrap(), old_unit.as_bytes());
+            dsh_ocean::systemd::start().unwrap();
+            assert!(dsh_ocean::systemd::ensure_unit_for_launch(
+                &old,
+                &base,
+                Some(&patch),
+                Some(&patch)
+            )
+            .is_err());
+            assert_eq!(fs::read(&unit_path).unwrap(), old_unit.as_bytes());
+        }
         "locale-unit" | "locale-change" => {
             let patch = root.join("old-resource/overlay.yml");
             let captured = dsh_ocean::systemd::render_unit_with_patch(&old, &base, &patch).unwrap();
@@ -858,6 +931,47 @@ fn systemd_patch_recipe_keeps_exact_before_image_through_candidate_and_rollback(
 fn systemd_plain_candidate_preserves_exact_patched_rollback_unit() {
     let f = SysFixture::new();
     let output = f.command("locale-change").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn cold_systemd_native_recipe_updates_only_exact_inactive_owned_unit() {
+    let f = SysFixture::new();
+    let output = f.command("cold-locale").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn cold_native_systemd_refusals_leave_unit_bytes_and_service_actions_untouched() {
+    for flag in [
+        "MOCK_DROP_IN",
+        "MOCK_BAD_FRAGMENT",
+        "MOCK_IS_ACTIVE_UNKNOWN",
+        "MOCK_IS_ACTIVE_FAILED",
+    ] {
+        let f = SysFixture::new();
+        let output = f
+            .command("cold-locale-refusal")
+            .env(flag, "1")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}: {}", flag, describe(&output));
+    }
+    for case in [
+        "cold-locale-active",
+        "cold-locale-corrupt",
+        "cold-locale-pending",
+    ] {
+        let f = SysFixture::new();
+        let output = f.command(case).output().unwrap();
+        assert!(output.status.success(), "{}", describe(&output));
+    }
+}
+
+#[test]
+fn cold_native_systemd_proves_missing_slot_before_creation() {
+    let f = SysFixture::new();
+    let output = f.command("cold-locale-missing").output().unwrap();
     assert!(output.status.success(), "{}", describe(&output));
 }
 

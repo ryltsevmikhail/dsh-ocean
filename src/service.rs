@@ -184,16 +184,63 @@ async fn prepare(app: &AppHandle, permit: &RuntimePermit) -> Result<Server> {
         runtime.node.display()
     ));
     if systemd::available() {
+        let scope = crate::runtime_controller::systemd_launch_scope()?;
+        let previous = config::data_dir()
+            .join("builtin-locales")
+            .join(crate::builtin_locales::bundle_id())
+            .join("overlay.yml");
+        // Prove the actual manager slot before any permission UI or cache work.
+        systemd::prove_cold_launch(&runtime, &base, Some(&previous))?;
+        let patch =
+            match crate::builtin_locale_planner::prepare(app, &runtime, permit, &scope).await {
+                Ok(patch) => patch,
+                Err(error) => {
+                    state.log(format!(
+                        "Built-in DSH languages were not activated: {error:#}"
+                    ));
+                    None
+                }
+            };
+        crate::runtime_controller::validate_systemd_scope(&scope.dsh_home)?;
         state.log("Starting the background DSH service…");
-        match start_with_systemd(app, &runtime, &base, permit).await {
-            Ok(server) => return Ok(server),
-            Err(error) => state.log(format!(
-                "systemd service did not start: {error:#}; falling back to a managed process"
-            )),
-        }
+        // A failed ownership/scope/start proof is never authority for another
+        // backend against a potentially shared profile.
+        return start_with_systemd(
+            app,
+            &runtime,
+            &base,
+            permit,
+            patch.as_deref(),
+            &previous,
+            &scope,
+        )
+        .await;
     }
 
-    spawn_managed(app, &runtime, permit, None).await
+    // Reached only when the user manager was genuinely unavailable; no failed
+    // systemd proof is converted into managed-child launch authority.
+    let patch = match crate::builtin_locale_planner::LaunchScope::child() {
+        Ok(scope) => {
+            match crate::builtin_locale_planner::prepare(app, &runtime, permit, &scope).await {
+                Ok(patch) => patch,
+                Err(error) => {
+                    state.log(format!(
+                        "Built-in DSH languages were not activated: {error:#}"
+                    ));
+                    None
+                }
+            }
+        }
+        Err(error) => {
+            state.log(format!(
+                "Built-in DSH language scope could not be proven: {error:#}"
+            ));
+            None
+        }
+    };
+    permit.ensure_open()?;
+    crate::runtime_switch::ensure_no_pending(&config::data_dir())?;
+    spawn_managed(app, &runtime, permit, patch.as_deref()).await
 }
 
 async fn start_with_systemd(
@@ -201,10 +248,19 @@ async fn start_with_systemd(
     runtime: &Runtime,
     base: &Url,
     permit: &RuntimePermit,
+    patch: Option<&std::path::Path>,
+    previous: &std::path::Path,
+    scope: &crate::builtin_locale_planner::LaunchScope,
 ) -> Result<Server> {
     let state = app.state::<AppState>();
     permit.ensure_open()?;
-    systemd::ensure_unit(runtime, base)?;
+    scope.verify()?;
+    crate::runtime_controller::validate_systemd_scope(&scope.dsh_home)?;
+    systemd::ensure_unit_for_launch(runtime, base, patch, Some(previous))?;
+    permit.ensure_open()?;
+    scope.verify()?;
+    crate::runtime_controller::validate_systemd_scope(&scope.dsh_home)?;
+    crate::runtime_switch::ensure_no_pending(&config::data_dir())?;
     systemd::start()?;
 
     let deadline = Instant::now() + Duration::from_secs(30);
@@ -215,7 +271,9 @@ async fn start_with_systemd(
             last_status = Some(status);
             if let Ok(token) = auth::resolve_token(base, Some(config::UNIT_NAME)) {
                 state.log(format!("Background service is ready at {base}"));
-                return Ok(Server::new(base.clone(), token, ServerMode::Systemd));
+                let mut server = Server::new(base.clone(), token, ServerMode::Systemd);
+                server.locale_patch = patch.map(std::path::Path::to_path_buf);
+                return Ok(server);
             }
         }
         if Instant::now() >= deadline {

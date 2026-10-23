@@ -12,6 +12,7 @@ pub mod bootstrap;
 pub mod bootstrap_supervisor;
 pub mod builtin_locale_cache;
 pub mod builtin_locale_consent;
+pub mod builtin_locale_planner;
 pub mod builtin_locale_ui;
 pub mod builtin_locale_worker;
 pub mod builtin_locales;
