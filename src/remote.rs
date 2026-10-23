@@ -71,9 +71,7 @@ pub fn state(app: &AppHandle) -> Result<RemoteState> {
                 loopback,
                 pairing_url: Some(url.to_string()),
                 qr_svg: Some(svg),
-                note: format!(
-                    "Temporary forwarder active for {remaining}s: the server stays on loopback and this port closes automatically. Anyone who scans the code gets full control of the harness while it lasts; stop the forwarder when you are done."
-                ),
+                note: temporary_note_in(remaining, crate::i18n::active_language()),
             });
         }
     }
@@ -84,7 +82,7 @@ pub fn state(app: &AppHandle) -> Result<RemoteState> {
             loopback,
             pairing_url: None,
             qr_svg: None,
-            note: "DSH is bound to loopback, so a phone cannot reach it directly. Use the temporary forwarder below (or start it with --pairing-proxy) to open a bounded LAN port; the QR appears only while it is active. Rebinding dsh-web.service with --host 0.0.0.0 is the permanent alternative.".to_string(),
+            note: crate::i18n::text("remote.loopback_note").to_string(),
         });
     }
 
@@ -95,7 +93,7 @@ pub fn state(app: &AppHandle) -> Result<RemoteState> {
         loopback,
         pairing_url: Some(url.to_string()),
         qr_svg: Some(svg),
-        note: "Anyone who scans this code gets full control of the harness. Use it only on a trusted network, and stop exposing the server when you are done.".to_string(),
+        note: crate::i18n::text("remote.direct_note").to_string(),
     })
 }
 
@@ -120,7 +118,7 @@ pub fn open_window(app: &AppHandle) -> Result<()> {
     }
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png"))?;
     tauri::WebviewWindowBuilder::new(app, "remote", tauri::WebviewUrl::App("remote.html".into()))
-        .title("Pair a device")
+        .title(crate::i18n::text("remote.title"))
         .inner_size(540.0, 680.0)
         .min_inner_size(460.0, 540.0)
         .center()
@@ -129,7 +127,21 @@ pub fn open_window(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
+fn temporary_note_in(remaining: u64, language: crate::i18n::Language) -> String {
+    crate::i18n::render(
+        language,
+        "remote.active_note",
+        &[("remaining", &remaining.to_string())],
+    )
+    .expect("validated temporary pairing safety note")
+}
 fn qr_svg(text: &str) -> Result<String> {
+    qr_svg_in(text, crate::i18n::active_language())
+}
+fn qr_svg_in(text: &str, language: crate::i18n::Language) -> Result<String> {
+    let label = gtk::glib::markup_escape_text(
+        crate::i18n::message(language, "remote.qr_label").expect("embedded QR label"),
+    );
     let code = QrCode::encode_text(text, QrCodeEcc::Medium)?;
     let size = code.size();
     let border = 4i32;
@@ -146,7 +158,7 @@ fn qr_svg(text: &str) -> Result<String> {
         bail!("QR encoder produced an empty code");
     }
     Ok(format!(
-        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {total} {total}" shape-rendering="crispEdges" role="img" aria-label="Pairing QR code"><rect width="100%" height="100%" fill="#ffffff"/><path d="{path}" fill="#0b0d12"/></svg>"##
+        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {total} {total}" shape-rendering="crispEdges" role="img" aria-label="{label}"><rect width="100%" height="100%" fill="#ffffff"/><path d="{path}" fill="#0b0d12"/></svg>"##
     ))
 }
 
@@ -154,6 +166,28 @@ fn qr_svg(text: &str) -> Result<String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn pairing_safety_notes_and_qr_label_follow_selected_language() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            let note = temporary_note_in(57, language);
+            assert!(note.contains("57"));
+            for key in ["remote.loopback_note", "remote.direct_note"] {
+                let value = crate::i18n::message(language, key).expect("embedded safety note");
+                if language != crate::i18n::Language::En {
+                    assert_ne!(
+                        value,
+                        crate::i18n::message(crate::i18n::Language::En, key).unwrap()
+                    );
+                }
+            }
+            let svg = qr_svg_in("http://127.0.0.1:9/?token=synthetic", language).unwrap();
+            let label = gtk::glib::markup_escape_text(
+                crate::i18n::message(language, "remote.qr_label").unwrap(),
+            );
+            assert!(svg.contains(&format!("aria-label=\"{label}\"")));
+            assert!(!svg.contains("token=synthetic"));
+        }
+    }
     #[test]
     fn qr_svg_contains_a_path_and_viewbox() {
         let svg = qr_svg("http://192.168.1.2:3080/?token=test").expect("qr");

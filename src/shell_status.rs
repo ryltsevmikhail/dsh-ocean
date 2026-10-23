@@ -87,6 +87,33 @@ pub fn detect() -> Report {
         present("FLATPAK_ID"),
     )
 }
+/// Localized native presentation only; classification and machine-readable fields stay unchanged.
+pub fn introduction_text_in(report: &Report, language: crate::i18n::Language) -> String {
+    let hint = match report.installation_hint {
+        Hint::AppImageEnvironment => "appimage",
+        Hint::FlatpakEnvironment => "flatpak",
+        Hint::DevelopmentPath => "development",
+        Hint::SystemPrefix => "system",
+        Hint::Conflicting => "conflicting",
+        Hint::Unknown => "unknown",
+    };
+    let part = |suffix| {
+        crate::i18n::message(language, &format!("installation.{hint}.{suffix}"))
+            .expect("embedded installation guidance")
+    };
+    crate::i18n::render(
+        language,
+        "installation.introduction",
+        &[
+            ("version", report.shell_version),
+            ("hint", part("label")),
+            ("evidence", part("evidence")),
+            ("guidance", part("guidance")),
+        ],
+    )
+    .expect("validated installation hint presentation")
+}
+
 pub fn text(report: &Report) -> String {
     format!("DSH Ocean shell {}\n\nInstallation hint: {}\n{}\n\n{}\n\nAutomatic shell update: unavailable\nProduction signed feed: not configured\n\n{}",report.shell_version,report.installation_hint.label(),report.evidence,report.guidance,report.limits)
 }

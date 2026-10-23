@@ -84,7 +84,10 @@ fn storage_window_reports_counts_read_only_and_closes() {
     let window = ui::build(None, &body);
     window.dialog.show_all();
     tick();
-    assert_eq!(window.dialog.title().as_deref(), Some(ui::TITLE));
+    assert_eq!(
+        window.dialog.title().as_deref(),
+        Some("DSH Ocean storage usage")
+    );
     assert!(window.dialog.is_modal());
     assert!(window.label.is_selectable() && !window.label.uses_markup());
     for response in [

@@ -47,6 +47,27 @@ impl Cancellation {
 
 #[cfg(test)]
 #[test]
+fn publication_failure_messages_use_selected_language_and_distinguish_retained_staging() {
+    for (language, _) in crate::i18n::LANGUAGES {
+        let retained = publication_failure_message_in(true, language);
+        let missing = publication_failure_message_in(false, language);
+        assert_ne!(retained, missing);
+        assert_eq!(
+            retained,
+            crate::i18n::message(language, "download_reason.retained").unwrap()
+        );
+        assert_eq!(
+            missing,
+            crate::i18n::message(language, "download_reason.no_recovery").unwrap()
+        );
+        assert!(!retained.contains("/home") && !missing.contains("http"));
+        if language == crate::i18n::Language::Ru {
+            assert!(retained.contains("копи"));
+        }
+    }
+}
+#[cfg(test)]
+#[test]
 fn cancellation_requests_are_bounded_coalesced_and_disconnected_safe() {
     assert!(!Cancellation::default().request(vec!["id".into()]));
     #[allow(deprecated)]
@@ -70,6 +91,18 @@ fn cancellation_requests_are_bounded_coalesced_and_disconnected_safe() {
     assert!(!control.request(vec!["owned-id".into()]));
     assert!(!control.pending.load(std::sync::atomic::Ordering::Acquire));
 }
+fn publication_failure_message_in(retained: bool, language: crate::i18n::Language) -> &'static str {
+    crate::i18n::message(
+        language,
+        if retained {
+            "download_reason.retained"
+        } else {
+            "download_reason.no_recovery"
+        },
+    )
+    .expect("embedded download staging outcome")
+}
+
 fn store(history: &SharedHistory, entry: Entry) {
     // This runs in WebKit signal handlers on the GTK main thread. Keep the lock only
     // for the in-memory change and do the fsync outside it, so slow storage cannot
@@ -209,7 +242,7 @@ pub fn attach(
                 {
                     let mut entry = state.entry.borrow_mut();
                     entry.status = Status::Cancelled;
-                    entry.message = Some("cancelled by user; destination left untouched".into());
+                    entry.message = Some(crate::i18n::text("download_reason.cancelled").into());
                 }
                 cancel_native(&download, &state);
             }
@@ -217,49 +250,123 @@ pub fn attach(
         glib::ControlFlow::Continue
     });
     web_context.connect_download_started(move |_, download| {
-        let Some(expected) = weak.upgrade() else { download.cancel(); return; };
-        if download.web_view().as_ref() != Some(&expected) { download.cancel(); return; }
+        let Some(expected) = weak.upgrade() else {
+            download.cancel();
+            return;
+        };
+        if download.web_view().as_ref() != Some(&expected) {
+            download.cancel();
+            return;
+        }
         let source = origin(download, &server);
-        let blocked = source.is_none() || history.lock().expect("downloads mutex").receiving() >= 4 || prompting.get();
-        let mut entry = Entry::new(source, "download".into(), if blocked { Status::Blocked } else { Status::Receiving });
-        if blocked { entry.message = Some("download blocked: origin, active limit or save dialog already open".into()); }
+        let blocked = source.is_none()
+            || history.lock().expect("downloads mutex").receiving() >= 4
+            || prompting.get();
+        let mut entry = Entry::new(
+            source,
+            "download".into(),
+            if blocked {
+                Status::Blocked
+            } else {
+                Status::Receiving
+            },
+        );
+        if blocked {
+            entry.message = Some(crate::i18n::text("download_reason.blocked").into());
+        }
         store(&history, entry.clone());
         // A JS/blob request has no native caller holding its Download object.
         // Own accepted operations until the terminal signal, bounded to four.
         let active_for_finish = Rc::downgrade(&active);
-        let state = Rc::new(Context { entry: RefCell::new(entry), transfer: RefCell::new(None), failed: Cell::new(false), bytes: Cell::new(0), reason: RefCell::new(None), last_progress: Cell::new(None), finished: Cell::new(false), cancel_called: Cell::new(false) });
-        if !blocked { active.borrow_mut().insert(state.entry.borrow().id.clone(), (download.clone(), state.clone())); }
+        let state = Rc::new(Context {
+            entry: RefCell::new(entry),
+            transfer: RefCell::new(None),
+            failed: Cell::new(false),
+            bytes: Cell::new(0),
+            reason: RefCell::new(None),
+            last_progress: Cell::new(None),
+            finished: Cell::new(false),
+            cancel_called: Cell::new(false),
+        });
+        if !blocked {
+            active.borrow_mut().insert(
+                state.entry.borrow().id.clone(),
+                (download.clone(), state.clone()),
+            );
+        }
         let state_for_decide = state.clone();
-        let chooser = chooser.clone(); let history_for_decide = history.clone(); let prompting = prompting.clone(); let server = server.clone();
+        let chooser = chooser.clone();
+        let history_for_decide = history.clone();
+        let prompting = prompting.clone();
+        let server = server.clone();
         download.connect_decide_destination(move |download, suggested| {
             let _keep_alive = download.clone();
             let state = &state_for_decide;
-            let receiving = !state.finished.get() && state.entry.borrow().status == Status::Receiving;
-            if !receiving { cancel_native(download,state); return true; }
+            let receiving =
+                !state.finished.get() && state.entry.borrow().status == Status::Receiving;
+            if !receiving {
+                cancel_native(download, state);
+                return true;
+            }
             if origin(download, &server).is_none() {
-                state.entry.borrow_mut().status = Status::Blocked; cancel_native(download,state); return true;
+                state.entry.borrow_mut().status = Status::Blocked;
+                cancel_native(download, state);
+                return true;
             }
             if download.response().is_some_and(|r| r.status_code() >= 400) {
-                *state.reason.borrow_mut() = Some("server refused the download".into()); state.failed.set(true); cancel_native(download,state); return true;
+                *state.reason.borrow_mut() =
+                    Some(crate::i18n::text("download_reason.refused").into());
+                state.failed.set(true);
+                cancel_native(download, state);
+                return true;
             }
-            if download.response().is_some_and(|r| r.content_length() > MAX_BYTES) {
-                *state.reason.borrow_mut() = Some("download exceeds the 1 GiB limit".into()); state.failed.set(true); cancel_native(download,state); return true;
+            if download
+                .response()
+                .is_some_and(|r| r.content_length() > MAX_BYTES)
+            {
+                *state.reason.borrow_mut() = Some(crate::i18n::text("download_reason.size").into());
+                state.failed.set(true);
+                cancel_native(download, state);
+                return true;
             }
-            state.entry.borrow_mut().reported_total = download.response().map(|response| response.content_length()).filter(|size| *size > 0 && *size <= MAX_BYTES);
+            state.entry.borrow_mut().reported_total = download
+                .response()
+                .map(|response| response.content_length())
+                .filter(|size| *size > 0 && *size <= MAX_BYTES);
             let name = downloads::suggested_name(suggested);
-            let source = state.entry.borrow().source_origin.clone().unwrap_or_default();
+            let source = state
+                .entry
+                .borrow()
+                .source_origin
+                .clone()
+                .unwrap_or_default();
             state.entry.borrow_mut().name = name.clone();
             prompting.set(true);
             let selected = chooser(&name, &source);
             prompting.set(false);
             // The network can fail while GTK runs a nested save-dialog loop.
-            if state.finished.get() || state.failed.get() { return true; }
-            if state.entry.borrow().status != Status::Receiving { cancel_native(download,state); return true; }
-            let Some(selected) = selected else { state.entry.borrow_mut().status = Status::Cancelled; cancel_native(download,state); return true; };
+            if state.finished.get() || state.failed.get() {
+                return true;
+            }
+            if state.entry.borrow().status != Status::Receiving {
+                cancel_native(download, state);
+                return true;
+            }
+            let Some(selected) = selected else {
+                state.entry.borrow_mut().status = Status::Cancelled;
+                cancel_native(download, state);
+                return true;
+            };
             match Transfer::prepare(&selected) {
                 Ok(transfer) => {
-                    let Ok(uri) = Url::from_file_path(&transfer.payload) else { state.failed.set(true); cancel_native(download,state); return true; };
-                    if let Some(name) = transfer.destination.file_name().and_then(|s| s.to_str()) { state.entry.borrow_mut().name = name.to_owned(); }
+                    let Ok(uri) = Url::from_file_path(&transfer.payload) else {
+                        state.failed.set(true);
+                        cancel_native(download, state);
+                        return true;
+                    };
+                    if let Some(name) = transfer.destination.file_name().and_then(|s| s.to_str()) {
+                        state.entry.borrow_mut().name = name.to_owned();
+                    }
                     state.entry.borrow_mut().destination = Some(transfer.destination.clone());
                     state.entry.borrow_mut().recovery = Some(transfer.payload.clone());
                     store(&history_for_decide, state.entry.borrow().clone());
@@ -268,54 +375,107 @@ pub fn attach(
                     download.set_destination(uri.as_str());
                 }
                 Err(_) => {
-                    *state.reason.borrow_mut() = Some("cannot stage download: choose a new filename in a writable directory; existing files are never overwritten".into());
-                    state.failed.set(true); cancel_native(download,state);
+                    *state.reason.borrow_mut() =
+                        Some(crate::i18n::text("download_reason.staging").into());
+                    state.failed.set(true);
+                    cancel_native(download, state);
                 }
             }
             true
         });
-        let state_for_data = state.clone(); let history_for_progress = history.clone();
+        let state_for_data = state.clone();
+        let history_for_progress = history.clone();
         download.connect_received_data(move |download, size| {
-            if state_for_data.finished.get() || state_for_data.entry.borrow().status != Status::Receiving { return; }
-            let total = state_for_data.bytes.get().saturating_add(size); state_for_data.bytes.set(total);
+            if state_for_data.finished.get()
+                || state_for_data.entry.borrow().status != Status::Receiving
+            {
+                return;
+            }
+            let total = state_for_data.bytes.get().saturating_add(size);
+            state_for_data.bytes.set(total);
             state_for_data.entry.borrow_mut().received_bytes = total.min(MAX_BYTES + 1);
             if progress_due(&state_for_data.last_progress, Instant::now()) {
                 // Volatile metadata only: no per-chunk persist/notification.
-                history_for_progress.lock().expect("downloads mutex").update_progress(&state_for_data.entry.borrow().id, total);
+                history_for_progress
+                    .lock()
+                    .expect("downloads mutex")
+                    .update_progress(&state_for_data.entry.borrow().id, total);
             }
-            let payload_too_large = state_for_data.transfer.borrow().as_ref()
+            let payload_too_large = state_for_data
+                .transfer
+                .borrow()
+                .as_ref()
                 .and_then(|transfer| std::fs::symlink_metadata(&transfer.payload).ok())
                 .is_some_and(|metadata| metadata.len() > MAX_BYTES);
             if total > MAX_BYTES || payload_too_large {
-                *state_for_data.reason.borrow_mut() = Some("download exceeds the 1 GiB limit".into());
-                state_for_data.failed.set(true); cancel_native(download,&state_for_data);
+                *state_for_data.reason.borrow_mut() =
+                    Some(crate::i18n::text("download_reason.size").into());
+                state_for_data.failed.set(true);
+                cancel_native(download, &state_for_data);
             }
         });
         let state_for_error = state.clone();
-        download.connect_failed(move |_, _| { state_for_error.failed.set(true); }); // Never log an error containing the raw URI.
-        let history = history.clone(); let terminal = terminal.clone();
+        download.connect_failed(move |_, _| {
+            state_for_error.failed.set(true);
+        }); // Never log an error containing the raw URI.
+        let history = history.clone();
+        let terminal = terminal.clone();
         download.connect_finished(move |download| {
             let _keep_alive = download.clone();
-            if state.finished.replace(true) { return; }
-            if let Some(active) = active_for_finish.upgrade() { active.borrow_mut().remove(&state.entry.borrow().id); }
+            if state.finished.replace(true) {
+                return;
+            }
+            if let Some(active) = active_for_finish.upgrade() {
+                active.borrow_mut().remove(&state.entry.borrow().id);
+            }
             let mut entry = state.entry.borrow().clone();
             let transfer = state.transfer.borrow_mut().take();
             if entry.status == Status::Cancelled || entry.status == Status::Blocked {
-                entry.recovery = None; drop(transfer); store(&history, entry.clone()); terminal(entry); return;
+                entry.recovery = None;
+                drop(transfer);
+                store(&history, entry.clone());
+                terminal(entry);
+                return;
             }
             if state.failed.get() || transfer.is_none() {
                 entry.status = Status::Failed;
-                entry.message = Some(state.reason.borrow().clone().unwrap_or_else(|| "network download failed; destination left untouched".into()));
-                entry.recovery = None; drop(transfer); store(&history, entry.clone()); terminal(entry); return;
+                entry.message = Some(
+                    state
+                        .reason
+                        .borrow()
+                        .clone()
+                        .unwrap_or_else(|| crate::i18n::text("download_reason.network").into()),
+                );
+                entry.recovery = None;
+                drop(transfer);
+                store(&history, entry.clone());
+                terminal(entry);
+                return;
             }
             let mut transfer = transfer.unwrap();
-            let history = history.clone(); let terminal = terminal.clone();
+            let history = history.clone();
+            let terminal = terminal.clone();
             std::thread::spawn(move || {
                 match transfer.publish() {
-                    Ok(path) => { entry.status = Status::Saved; entry.destination = Some(path); entry.recovery = None; }
-                    Err(_) => { entry.status = Status::Failed; entry.recovery = transfer.recovery_path(); entry.message = Some(if entry.recovery.is_some() { "publication failed; destination was not overwritten; private staging copy retained, verify before reuse" } else { "publication failed; destination was not overwritten; no recovery copy is available" }.into()); }
+                    Ok(path) => {
+                        entry.status = Status::Saved;
+                        entry.destination = Some(path);
+                        entry.recovery = None;
+                    }
+                    Err(_) => {
+                        entry.status = Status::Failed;
+                        entry.recovery = transfer.recovery_path();
+                        entry.message = Some(
+                            publication_failure_message_in(
+                                entry.recovery.is_some(),
+                                crate::i18n::active_language(),
+                            )
+                            .into(),
+                        );
+                    }
                 }
-                drop(transfer); store(&history, entry.clone());
+                drop(transfer);
+                store(&history, entry.clone());
                 glib::idle_add_once(move || terminal(entry));
             });
         });

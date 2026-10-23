@@ -279,6 +279,45 @@ pub fn apply_native(
     let prepared = crate::runtime_bundle::import(staged.path(), &verified, &paths.prefix)?;
     control.check()?;
 
+    // Native dictionaries are planned against the imported selected SDK before
+    // any stop/snapshot/commit. Never carry an old patch blindly into a new SDK,
+    // and never enable dictionaries during update for a previously plain server.
+    let running = permit
+        .server()?
+        .context("owned server metadata disappeared")?;
+    let candidate_patch = if running.locale_patch.is_some() {
+        let launch = match running.mode {
+            ServerMode::Child => crate::builtin_locale_planner::LaunchScope::child()?,
+            ServerMode::Systemd => crate::runtime_controller::systemd_launch_scope()?,
+            ServerMode::Attached => {
+                anyhow::bail!("attached runtime cannot plan native dictionaries")
+            }
+        };
+        anyhow::ensure!(
+            same_root(&launch.dsh_home, &paths.home),
+            "native dictionary scope differs from the runtime snapshot scope"
+        );
+        let root = prepared.root();
+        let candidate_runtime = Runtime {
+            node: root.join("runtime/node/bin/node"),
+            dsh: root.join("harness/node_modules/.bin/dsh"),
+            version: String::new(),
+            install_root: Some(root.join("harness")),
+        };
+        let patch = tauri::async_runtime::handle().block_on(
+            crate::builtin_locale_planner::recorded_plan(
+                &candidate_runtime,
+                &permit,
+                &launch,
+                &paths.prefix.join("builtin-locales"),
+                &crate::builtin_locale_ui::preference_path(),
+            ),
+        )?;
+        control.check()?;
+        patch
+    } else {
+        None
+    };
     // 7. build the owned controller (owns the permit).
     let mut controller = build_controller(
         Authority::from_app(app),
@@ -286,7 +325,8 @@ pub fn apply_native(
         old,
         prepared.root().to_path_buf(),
         paths.home.clone(),
-    )?;
+    )?
+    .with_candidate_locale_patch(candidate_patch)?;
 
     // 8. apply with a fresh pre-start revalidate decorator + exact floor record.
     let new_root = prepared.root().to_path_buf();
@@ -438,6 +478,16 @@ struct RevalidateStart<'a, C: Controller> {
 }
 
 impl<C: Controller> Controller for RevalidateStart<'_, C> {
+    fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+        self.inner.locale_patches()
+    }
+    fn restore_locale_patches(
+        &mut self,
+        old: Option<PathBuf>,
+        candidate: Option<PathBuf>,
+    ) -> Result<()> {
+        self.inner.restore_locale_patches(old, candidate)
+    }
     fn ownership(&mut self, old: &Path) -> Result<()> {
         self.inner.ownership(old)
     }
@@ -482,9 +532,21 @@ mod tests {
     use super::*;
 
     struct Fake {
+        recipes: (Option<PathBuf>, Option<PathBuf>),
         starts: Vec<PathBuf>,
     }
     impl Controller for Fake {
+        fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+            self.recipes.clone()
+        }
+        fn restore_locale_patches(
+            &mut self,
+            old: Option<PathBuf>,
+            candidate: Option<PathBuf>,
+        ) -> Result<()> {
+            self.recipes = (old, candidate);
+            Ok(())
+        }
         fn ownership(&mut self, _old: &Path) -> Result<()> {
             Ok(())
         }
@@ -507,6 +569,23 @@ mod tests {
     }
 
     #[test]
+    fn revalidate_decorator_forwards_durable_recipe_capture_and_restore() {
+        let old = Some(PathBuf::from("/private/old/overlay.yml"));
+        let mut inner = Fake {
+            starts: Vec::new(),
+            recipes: (old.clone(), None),
+        };
+        let revalidate = || Ok(());
+        let mut decorated = RevalidateStart {
+            inner: &mut inner,
+            revalidate: &revalidate,
+            new_root: PathBuf::from("/private/new"),
+        };
+        assert_eq!(decorated.locale_patches(), (old.clone(), None));
+        decorated.restore_locale_patches(None, old.clone()).unwrap();
+        assert_eq!(decorated.locale_patches(), (None, old));
+    }
+    #[test]
     fn revalidate_decorator_rechecks_only_the_new_root_and_allows_rollback() {
         let tmp = std::env::temp_dir().join(format!(
             "dsh-managed-runtime-revalidate-{}",
@@ -523,7 +602,10 @@ mod tests {
             calls.set(calls.get() + 1);
             anyhow::bail!("candidate expired");
         };
-        let mut inner = Fake { starts: Vec::new() };
+        let mut inner = Fake {
+            starts: Vec::new(),
+            recipes: (None, None),
+        };
         {
             let mut decorated = RevalidateStart {
                 inner: &mut inner,
@@ -568,6 +650,7 @@ mod tests {
             base_url: base.clone(),
             token: "t".into(),
             mode,
+            locale_patch: None,
             unit: match mode {
                 ServerMode::Systemd => Some("dsh-web.service".into()),
                 _ => None,

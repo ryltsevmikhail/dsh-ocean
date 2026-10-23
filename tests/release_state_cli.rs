@@ -8,6 +8,8 @@ use std::fs;
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{Duration, Utc};
@@ -32,9 +34,13 @@ impl Sandbox {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
+        Self::at_stamp(nanos)
+    }
+    fn at_stamp(nanos: u128) -> Self {
         let root = std::env::temp_dir().join(format!(
-            "dsh-ocean-release-state-{}-{nanos}",
-            std::process::id()
+            "dsh-ocean-release-state-{}-{nanos}-{}",
+            std::process::id(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(root.join("home")).unwrap();
         fs::set_permissions(root.join("home"), fs::Permissions::from_mode(0o700)).unwrap();
@@ -166,6 +172,15 @@ fn describe(output: &Output) -> String {
     )
 }
 
+#[test]
+fn fixture_state_cannot_be_shared_when_clock_stamps_repeat() {
+    let first = Sandbox::at_stamp(7);
+    let second = Sandbox::at_stamp(7);
+    assert_ne!(
+        first.root, second.root,
+        "parallel fixtures must not share state when realtime clocks repeat"
+    );
+}
 #[test]
 fn plain_verification_stays_read_only_and_accept_records_once() {
     let sandbox = Sandbox::new();

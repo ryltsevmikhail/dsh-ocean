@@ -1,0 +1,4 @@
+# Application-owned activation; native profile consent is required.
+- insert:
+    - id: ocean-builtin-locales
+      name: ./lib/index.js

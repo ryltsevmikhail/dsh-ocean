@@ -153,7 +153,7 @@
         <img class="logo" src="./dsh-icon.svg" alt="" />
         <div>
           <h1>DSH Ocean</h1>
-          <p>DeepSeek Harness desktop client</p>
+          <p id="subtitle">DeepSeek Harness desktop client</p>
         </div>
         <div class="spacer"></div>
         <div class="pill"><span id="dot" class="dot"></span><span id="phase">Starting</span></div>
@@ -169,7 +169,7 @@
       </section>
 
       <section class="logwrap">
-        <div class="loghead"><span>Startup log</span><span id="log-count">0 lines</span></div>
+        <div class="loghead"><span id="log-title">Startup log</span><span id="log-count">0 lines</span></div>
         <pre id="log" aria-live="polite"></pre>
       </section>
 
@@ -181,6 +181,7 @@
         <button id="diagnostics" type="button">Save diagnostics</button>
         <button id="folder" class="ghost" type="button">Open diagnostics folder</button>
         <div class="spacer"></div>
+        <button id="language" class="ghost" type="button">Language…</button>
         <button id="quit" class="ghost" type="button">Quit</button>
       </div>
 
@@ -190,6 +191,7 @@
       </footer>
     </main>
 
+    <script src="./i18n.js"></script>
     <script>
       const invoke = (cmd, args = {}) => {
         if (!window.__TAURI_INTERNALS__ || !window.__TAURI_INTERNALS__.invoke) {
@@ -199,6 +201,39 @@
       };
 
       const el = (id) => document.getElementById(id);
+      const localizer = window.OceanI18n.create();
+      const t = (key, fallback, args = {}) => localizer.t(key, args, fallback);
+      let lastState = null;
+      let catalogPending = null;
+      let catalogLoaded = false;
+      function applyStaticText() {
+        document.documentElement.lang = localizer.language;
+        const labels = {
+          subtitle: ['setup.subtitle', 'DeepSeek Harness desktop client'],
+          'log-title': ['setup.log_title', 'Startup log'],
+          recover: ['setup.recover', 'Recover runtime…'], retry: ['setup.retry', 'Retry'],
+          install: ['setup.install', 'Install runtime'],
+          diagnostics: ['tray.diagnostics', 'Save diagnostics'],
+          folder: ['tray.diagnostics-folder', 'Open diagnostics folder'],
+          language: ['tray.language', 'Language…'], quit: ['setup.quit', 'Quit'],
+        };
+        for (const [id, [key, fallback]] of Object.entries(labels)) el(id).textContent = t(key, fallback);
+      }
+      function hydrateCatalog() {
+        if (catalogLoaded || catalogPending) return;
+        catalogPending = invoke('get_native_locale').then(payload => {
+          catalogLoaded = localizer.update(payload);
+          applyStaticText();
+          if (lastState && !document.hidden) render(lastState);
+          else if (!lastState) {
+            setPhase('idle');
+            el('runtime').textContent = t('setup.runtime_detecting', 'runtime: detecting…');
+            el('server').textContent = t('setup.server_none', 'server: —');
+            el('config').textContent = t('setup.config', 'config: {path}', {path:'—'});
+            el('log-count').textContent = t('setup.log_lines', 'Log lines: {count}', {count:0});
+          }
+        }).catch(console.error).finally(() => { catalogPending = null; });
+      }
       let autoStarted = false;
       let lastLogText = null;
       let busy = false;
@@ -208,7 +243,7 @@
       let installing = false;
 
       function setPhase(phase, message) {
-        const labels = { idle: "Waiting", preparing: "Starting", ready: "Ready", failed: "Needs attention" };
+        const labels = { idle: t('setup.phase.idle', 'Waiting'), preparing: t('setup.phase.preparing', 'Starting'), ready: t('setup.phase.ready', 'Ready'), failed: t('setup.phase.failed', 'Needs attention') };
         el("phase").textContent = labels[phase] || phase;
         el("dot").className = "dot " + phase;
         const status = el("status");
@@ -216,30 +251,31 @@
         const title = el("status-title");
         const text = el("status-text");
         if (phase === "preparing") {
-          title.textContent = "Starting DSH…";
-          text.textContent = message || "Preparing the local harness server and authenticating the desktop webview.";
+          title.textContent = t('setup.starting_title', 'Starting DSH…');
+          text.textContent = message || t('setup.preparing_text', 'Preparing the local harness server and authenticating the desktop webview.');
         } else if (phase === "ready") {
-          title.textContent = "Ready";
-          text.textContent = "Opening the DeepSeek Harness workspace…";
+          title.textContent = t('setup.phase.ready', 'Ready');
+          text.textContent = t('setup.ready_text', 'Opening the DeepSeek Harness workspace…');
         } else if (phase === "failed") {
-          title.textContent = "DSH Ocean needs attention";
-          text.textContent = message || "The desktop client could not start the local DSH server.";
+          title.textContent = t('setup.failed_title', 'DSH Ocean needs attention');
+          text.textContent = message || t('setup.failed_text', 'The desktop client could not start the local DSH server.');
         } else {
-          title.textContent = "Connecting to DSH…";
-          text.textContent = "Looking for a running DeepSeek Harness server and its launch token.";
+          title.textContent = t('setup.connecting', 'Connecting to DSH…');
+          text.textContent = t('setup.looking', 'Looking for a running DeepSeek Harness server and its launch token.');
         }
       }
 
       function render(state) {
+        lastState = state;
         setPhase(state.phase, state.message);
         const runtime = state.runtime;
         el("runtime").textContent = runtime
           ? `DSH ${runtime.version} · node ${runtime.node.split("/").pop()}`
-          : "runtime: not installed";
+          : t('setup.runtime_missing', 'runtime: not installed');
         el("server").textContent = state.server
-          ? `server: ${state.server.baseUrl} (${state.server.mode})`
-          : "server: —";
-        el("config").textContent = `config: ${state.configPath}`;
+          ? t('setup.server', 'server: {url} ({mode})', {url: state.server.baseUrl, mode: state.server.mode})
+          : t('setup.server_none', 'server: —');
+        el("config").textContent = t('setup.config', 'config: {path}', {path: state.configPath});
         el("diagnostics-path").textContent = state.diagnosticsPath;
 
         // Compare the text, not its length: the ring buffer is capped, so the
@@ -247,10 +283,12 @@
         const log = (state.logs || []).join("\n");
         if (log !== lastLogText) {
           el("log").textContent = log;
-          el("log-count").textContent = `${(state.logs || []).length} lines`;
+
           el("log").scrollTop = el("log").scrollHeight;
           lastLogText = log;
         }
+
+        el("log-count").textContent = t('setup.log_lines', 'Log lines: {count}', {count: (state.logs || []).length});
 
         const canInstall = Boolean(state.canInstall);
         recoveryRequired = Boolean(state.recoveryRequired);
@@ -258,10 +296,10 @@
         el("recover").classList.toggle("hidden", !recoveryRequired);
         el("recover").disabled = busy || recoveryBlocked;
         if (recoveryRequired) {
-          el("status-title").textContent = "Runtime recovery required";
+          el("status-title").textContent = t('setup.recovery_title', 'Runtime recovery required');
           el("status-text").textContent = state.updating
-            ? "A runtime operation is in progress. Wait for it to finish."
-            : "Choose Recover runtime to review the pending transaction and confirm restoration of the previous runtime. Ordinary startup stays blocked until recovery succeeds. If inspection fails, save diagnostics.";
+            ? t('setup.recovery_busy', 'A runtime operation is in progress. Wait for it to finish.')
+            : t('setup.recovery_text', 'Choose Recover runtime to review the pending transaction and confirm restoration of the previous runtime. Ordinary startup stays blocked until recovery succeeds. If inspection fails, save diagnostics.');
         }
         el("install").classList.toggle("hidden", recoveryRequired || !canInstall || state.phase === "ready" || state.phase === "preparing");
         el("retry").disabled = busy;
@@ -270,8 +308,8 @@
         el("cancel-install").classList.toggle("hidden", !installingNow);
         el("cancel-install").disabled = !installingNow || Boolean(state.cancelRequested);
         el("cancel-install").textContent = state.cancelRequested
-          ? "Cancelling… (may wait for I/O)"
-          : "Cancel install";
+          ? t('setup.cancelling', 'Cancelling… (may wait for I/O)')
+          : t('setup.cancel_install', 'Cancel install');
         // A cancelled install can still leave a retryable state, so keep Retry
         // reachable when no runtime is available even in the idle phase.
         el("retry").classList.toggle(
@@ -298,6 +336,7 @@
       function refresh() {
         stopPolling();
         if (document.hidden) return Promise.resolve();
+        hydrateCatalog();
         // Share the state request, not installer/prepare requests: cancellation
         // and progress must continue updating while those operations await IPC.
         if (refreshPending) return refreshPending;
@@ -306,10 +345,10 @@
             const state = await invoke("get_setup_state");
             render(state);
           } catch (error) {
-            el("phase").textContent = "Error";
+            el("phase").textContent = t('setup.phase.error', 'Error');
             el("dot").className = "dot failed";
             el("status").classList.add("error");
-            el("status-title").textContent = "Desktop IPC unavailable";
+            el("status-title").textContent = t('setup.ipc_missing', 'Desktop IPC unavailable');
             el("status-text").textContent = String(error);
           }
         })().finally(() => {
@@ -371,7 +410,7 @@
         try {
           const accepted = await invoke("cancel_bootstrap");
           if (!accepted) {
-            el("cancel-install").textContent = "Already finished";
+            el("cancel-install").textContent = t('setup.finished', 'Already finished');
           }
         } catch (error) {
           console.error(error);
@@ -386,6 +425,7 @@
       el("cancel-install").addEventListener("click", runCancelInstall);
       el("diagnostics").addEventListener("click", () => invoke("save_diagnostics").catch(console.error));
       el("folder").addEventListener("click", () => invoke("open_diagnostics_folder").catch(console.error));
+      el("language").addEventListener("click", () => invoke("open_language_settings").catch(console.error));
       el("quit").addEventListener("click", () => invoke("quit_app").catch(console.error));
 
       document.addEventListener("visibilitychange", () => {

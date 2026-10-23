@@ -171,20 +171,26 @@ pub fn save_and_show(app: &AppHandle) {
     });
 }
 
+fn saved_text_in(path: &Path, language: crate::i18n::Language) -> String {
+    crate::i18n::render(
+        language,
+        "diagnostics.saved",
+        &[("path", &path.display().to_string())],
+    )
+    .expect("validated diagnostic receipt path")
+}
+
 fn show_result(app: &AppHandle, result: Result<PathBuf>) {
     match result {
         Ok(path) => ui::message(
             app,
-            "Diagnostics saved",
-            &format!(
-                "The diagnostic bundle was written to:\n{}\n\nIt contains versions, service status, storage/runtime counters, the loaded WebKitGTK ABI and the last journal lines with launch tokens redacted. It excludes session contents and unrelated applications’ journals. Review the report before sharing: service logs and plugin metadata may contain private information.",
-                path.display()
-            ),
+            crate::i18n::text("diagnostics.saved_title"),
+            &saved_text_in(&path, crate::i18n::active_language()),
             gtk::MessageType::Info,
         ),
         Err(error) => ui::message(
             app,
-            "Could not save diagnostics",
+            crate::i18n::text("diagnostics.failed_title"),
             &format!("{error:#}"),
             gtk::MessageType::Error,
         ),
@@ -199,6 +205,21 @@ pub fn open_folder() {
 mod tests {
     use super::*;
 
+    #[test]
+    fn diagnostic_receipt_uses_selected_locale_and_keeps_path_literal() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            let text = saved_text_in(Path::new("/private/{version}<b>"), language);
+            assert!(
+                text.contains("/private/{version}<b>")
+                    && text.contains("WebKitGTK")
+                    && text.contains("ABI")
+            );
+            assert!(!text.contains("{path}"));
+            if language == crate::i18n::Language::Ru {
+                assert!(text.to_lowercase().contains("перед"));
+            }
+        }
+    }
     #[test]
     fn diagnostic_worker_gate_is_exclusive_and_released_on_drop() {
         let guard = SaveGuard::acquire().expect("first worker");

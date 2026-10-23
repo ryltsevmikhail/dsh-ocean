@@ -22,23 +22,27 @@ pub const CANCELLED_TEXT: &str =
     "Export cancelled. The partial archive was removed and the snapshot is unchanged.";
 
 pub fn confirmation_text(description: &Description) -> String {
+    confirmation_text_in(description, crate::i18n::active_language())
+}
+pub fn confirmation_text_in(description: &Description, language: crate::i18n::Language) -> String {
     let scope = match description.scope.as_str() {
-        "profile-config" => "configuration",
-        "dsh-data" => "sessions and shared stores",
-        _ => "snapshot",
+        "profile-config" => "export.scope_config",
+        "dsh-data" => "export.scope_data",
+        _ => "export.scope_generic",
     };
-    format!(
-        "Export this {scope} snapshot into one archive?\n\n\
-         Files: {}\n\
-         Bytes: {}\n\n\
-         The snapshot is verified before exporting, the archive is written once and \
-         never overwrites an existing file, and the snapshot itself is not modified. \
-         The export is reproducible: the same snapshot always produces the same bytes.\n\n\
-         The archive is NOT signed. It proves integrity against its own manifest, not \
-         who created it, and it can contain conversation content or credentials, so \
-         store it as privately as the backup folder.",
-        description.files, description.bytes
+    crate::i18n::render(
+        language,
+        "export.confirm",
+        &[
+            (
+                "scope",
+                crate::i18n::message(language, scope).expect("embedded export scope"),
+            ),
+            ("files", &description.files.to_string()),
+            ("bytes", &description.bytes.to_string()),
+        ],
     )
+    .expect("validated export consent fields")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,12 +66,18 @@ pub struct Window {
 
 pub fn build_confirm(parent: Option<&gtk::Window>, body: &str) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some(TITLE),
+        Some(crate::i18n::text("export.title")),
         parent,
         gtk::DialogFlags::MODAL,
         &[
-            ("Cancel", gtk::ResponseType::Cancel),
-            ("Export snapshot", gtk::ResponseType::Accept),
+            (
+                crate::i18n::text("common.cancel"),
+                gtk::ResponseType::Cancel,
+            ),
+            (
+                crate::i18n::text("export.export"),
+                gtk::ResponseType::Accept,
+            ),
         ],
     );
     dialog.set_default_size(640, 380);
@@ -104,12 +114,18 @@ pub fn build_snapshot_picker(
     folder: Option<&Path>,
 ) -> gtk::FileChooserDialog {
     let dialog = gtk::FileChooserDialog::with_buttons(
-        Some("Choose a snapshot to export"),
+        Some(crate::i18n::text("export.snapshot_picker")),
         parent,
         gtk::FileChooserAction::SelectFolder,
         &[
-            ("Cancel", gtk::ResponseType::Cancel),
-            ("Choose snapshot", gtk::ResponseType::Accept),
+            (
+                crate::i18n::text("common.cancel"),
+                gtk::ResponseType::Cancel,
+            ),
+            (
+                crate::i18n::text("export.snapshot_choose"),
+                gtk::ResponseType::Accept,
+            ),
         ],
     );
     dialog.set_modal(true);
@@ -128,12 +144,18 @@ pub fn build_destination_picker(
     folder: Option<&Path>,
 ) -> gtk::FileChooserDialog {
     let dialog = gtk::FileChooserDialog::with_buttons(
-        Some("Save the backup archive"),
+        Some(crate::i18n::text("export.destination_picker")),
         parent,
         gtk::FileChooserAction::Save,
         &[
-            ("Cancel", gtk::ResponseType::Cancel),
-            ("Export here", gtk::ResponseType::Accept),
+            (
+                crate::i18n::text("common.cancel"),
+                gtk::ResponseType::Cancel,
+            ),
+            (
+                crate::i18n::text("export.destination_choose"),
+                gtk::ResponseType::Accept,
+            ),
         ],
     );
     dialog.set_modal(true);
@@ -144,7 +166,7 @@ pub fn build_destination_picker(
         dialog.set_current_folder(folder);
     }
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some("Tar archives"));
+    filter.set_name(Some(crate::i18n::text("export.tar_filter")));
     filter.add_pattern("*.tar");
     dialog.add_filter(filter);
     dialog
@@ -167,13 +189,16 @@ pub struct ProgressWindow {
 
 pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
     let dialog = gtk::Dialog::with_buttons(
-        Some(TITLE),
+        Some(crate::i18n::text("export.title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Cancel export", gtk::ResponseType::Cancel)],
+        &[(
+            crate::i18n::text("export.cancel"),
+            gtk::ResponseType::Cancel,
+        )],
     );
     dialog.set_default_size(520, 160);
-    let label = gtk::Label::new(Some("Verifying the snapshot before exporting…"));
+    let label = gtk::Label::new(Some(crate::i18n::text("export.verifying")));
     label.set_use_markup(false);
     label.set_line_wrap(true);
     label.set_xalign(0.0);
@@ -188,19 +213,39 @@ pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
 }
 
 pub fn outcome_text(outcome: Outcome) -> (&'static str, String) {
-    match outcome {
+    outcome_text_in(outcome, crate::i18n::active_language())
+}
+pub fn outcome_text_in(
+    outcome: Outcome,
+    language: crate::i18n::Language,
+) -> (&'static str, String) {
+    let (title, body) = match outcome {
         Outcome::Exported { files, bytes } => (
-            "Backup exported",
-            format!(
-                "{files} file(s), {bytes} bytes written to the archive you chose.\n\n\
-                 The archive is unsigned: it proves integrity against its own manifest, \
-                 not who created it. Verify it with `dsh-ocean --verify-export` before \
-                 relying on a copy you did not create."
-            ),
+            "export.exported_title",
+            crate::i18n::render(
+                language,
+                "export.exported",
+                &[("files", &files.to_string()), ("bytes", &bytes.to_string())],
+            )
+            .expect("validated export counters"),
         ),
-        Outcome::Cancelled => ("Export cancelled", CANCELLED_TEXT.to_owned()),
-        Outcome::Failed => ("Export failed", FAILURE_TEXT.to_owned()),
-    }
+        Outcome::Cancelled => (
+            "export.cancelled_title",
+            crate::i18n::message(language, "export.cancelled")
+                .expect("embedded cancelled export message")
+                .into(),
+        ),
+        Outcome::Failed => (
+            "export.failed_title",
+            crate::i18n::message(language, "export.failure")
+                .expect("embedded failed export message")
+                .into(),
+        ),
+    };
+    (
+        crate::i18n::message(language, title).expect("embedded export outcome title"),
+        body,
+    )
 }
 
 struct Gate(Arc<AtomicBool>);
@@ -231,11 +276,13 @@ pub fn show(app: &AppHandle) {
         Err(error) => {
             crate::ui::message(
                 app,
-                "Not a supported snapshot",
-                &format!(
-                    "The selected folder is not a complete Ocean snapshot.\n\n{}",
-                    crate::auth::redact(&format!("{error:#}"))
-                ),
+                crate::i18n::text("export.unsupported_title"),
+                &crate::i18n::render(
+                    crate::i18n::active_language(),
+                    "export.unsupported",
+                    &[("error", &crate::auth::redact(&format!("{error:#}")))],
+                )
+                .expect("validated export error context"),
                 gtk::MessageType::Warning,
             );
             return;
@@ -256,8 +303,8 @@ pub fn show(app: &AppHandle) {
         let Some(gate) = begin(&handle.state::<crate::state::AppState>().backup_export) else {
             crate::ui::message(
                 &handle,
-                "Export already running",
-                "Another backup export is already running in this session.",
+                crate::i18n::text("export.busy_title"),
+                crate::i18n::text("export.busy"),
                 gtk::MessageType::Info,
             );
             dialog.close();
@@ -314,9 +361,9 @@ pub fn show(app: &AppHandle) {
             };
             if outcome.is_none() {
                 label.set_text(if cancel_requested {
-                    "Cancelling after the current file…"
+                    crate::i18n::text("export.cancelling")
                 } else {
-                    "Verifying and writing the archive…"
+                    crate::i18n::text("export.writing")
                 });
                 return glib::ControlFlow::Continue;
             }
@@ -407,6 +454,39 @@ mod tests {
         }
     }
 
+    #[test]
+    fn export_scope_and_outcomes_use_selected_language_without_raw_paths() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            for (scope, key) in [
+                ("profile-config", "scope_config"),
+                ("dsh-data", "scope_data"),
+                ("unknown", "scope_generic"),
+            ] {
+                let text = confirmation_text_in(&description(scope, 7, 4096), language);
+                assert!(
+                    text.contains("4096")
+                        && text.contains(
+                            crate::i18n::message(language, &format!("export.{key}")).unwrap()
+                        )
+                );
+                assert!(!text.contains("/home"));
+            }
+            for outcome in [
+                Outcome::Exported {
+                    files: 3,
+                    bytes: 100,
+                },
+                Outcome::Cancelled,
+                Outcome::Failed,
+            ] {
+                let (title, body) = outcome_text_in(outcome, language);
+                assert!(!title.is_empty() && !body.contains("/home"));
+                if matches!(outcome, Outcome::Exported { .. }) {
+                    assert!(body.contains("100") && body.contains("--verify-export"));
+                }
+            }
+        }
+    }
     #[test]
     fn confirmation_names_the_scope_and_states_limits() {
         let text = confirmation_text(&description("dsh-data", 7, 4096));

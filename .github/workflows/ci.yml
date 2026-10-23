@@ -19,6 +19,18 @@ env:
   CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
+  # Preserve the existing protected status name while requiring BOTH native jobs.
+  native-gate:
+    name: test
+    needs: test
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the complete native matrix to succeed
+        env:
+          NATIVE_RESULT: ${{ needs.test.result }}
+        run: test "$NATIVE_RESULT" = success
+
   language-pack:
     uses: ./.github/workflows/language-pack.yml
 
@@ -64,7 +76,11 @@ jobs:
         run: cargo check --locked --all-targets
 
   test:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -140,6 +156,9 @@ jobs:
           python3 -B -m unittest discover -s tests -p 'test_gui_child_fixture.py' -v
           python3 -B -m unittest discover -s tests -p 'test_child_recovery_smoke.py' -v
           python3 -B -m unittest discover -s tests -p 'test_branding.py' -v
+          python3 -B tests/test_native_locale_catalogs.py
+          python3 -B tests/test_embedded_locales.py
+          python3 -B tests/test_ci_native_gate.py
 
       - name: Shell script lint
         run: |
@@ -155,8 +174,34 @@ jobs:
             exit 1
           }
 
+      - name: Check built-in DSH dictionary resources
+        run: node scripts/build-builtin-locales.mjs --check
+
+      - name: Prepare pinned native SDK in a private fixture
+        run: |
+          python3 -B tests/test_ci_sdk_env.py
+          root="$(mktemp -d "$RUNNER_TEMP/ocean-sdk.XXXXXX")"
+          root="$(realpath -- "$root")"
+          python3 -B scripts/ci-sdk-env.py --fixture-root "$root" > "$root/environment"
+          while IFS= read -r assignment; do export "$assignment"; done < "$root/environment"
+          DSH_HOME="$root/dsh-home" DSH_OCEAN_DATA_DIR="$root/ocean-data" \
+            bash scripts/bootstrap-runtime.sh
+          test -f "$DSH_LOCALE_CLIENT_SOURCE"
+          test -f "$DSH_CLIENT_MODULES_SOURCE"
+          "$DSH_OCEAN_SDK_FIXTURE/runtime/node/bin/node" -p 'process.arch'
+          while IFS= read -r assignment; do printf '%s\n' "$assignment" >> "$GITHUB_ENV"; done < "$root/environment"
+
+      - name: Genuine private managed SDK child lifecycle and embedded languages
+        run: |
+          export DSH_OCEAN_TEST_RUNTIME_ROOT="$(readlink -f -- "$DSH_OCEAN_SDK_FIXTURE")"
+          test -d "$DSH_OCEAN_TEST_RUNTIME_ROOT"
+          test ! -L "$DSH_OCEAN_TEST_RUNTIME_ROOT"
+          cargo test --locked --test real_managed_child real_managed_child_ -- --ignored --test-threads=1 --nocapture
+
       - name: Task observer, isolated runtime health and offline signer tests
-        run: node --test tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs tests/runtime_health.mjs tests/publisher_signer.mjs
+        run: |
+          node --test --test-reporter=tap tests/task_observer.mjs tests/release_signer.mjs tests/setup_polling.mjs tests/owned_ui_localization.mjs tests/builtin_locales.mjs tests/builtin_locale_coexistence.mjs tests/builtin_locale_managed_graph.mjs tests/builtin_locale_preflight.mjs tests/builtin_locale_sdk_preflight.mjs tests/builtin_locale_sdk_runtime.mjs tests/runtime_health.mjs tests/publisher_signer.mjs | tee "$RUNNER_TEMP/sdk-node-tests.tap"
+          test "$(sed -n 's/^# skipped //p' "$RUNNER_TEMP/sdk-node-tests.tap")" = 0
         env:
           DSH_OCEAN_TEST_VERIFIER: ${{ github.workspace }}/target/debug/dsh-ocean
 
@@ -167,6 +212,12 @@ jobs:
 
       - name: Private desktop notification bus
         run: timeout --kill-after=5s 45s bash scripts/test-native.sh cargo test --locked --test desktop_notifications -- --ignored --test-threads=1 --nocapture
+
+      - name: Native language chooser and conservative confirmation responses
+        run: timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test localization_ui -- --ignored --test-threads=1 --nocapture
+        env:
+          DSH_OCEAN_TEST_DIALOGS: "1"
+          GDK_BACKEND: x11
 
       - name: Native app launch smoke
         run: |
@@ -195,7 +246,7 @@ jobs:
           GDK_BACKEND: x11
           DSH_OCEAN_TEST_DIALOGS: "1"
         run: |
-          timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui -- --ignored --test-threads=1 --nocapture
+          timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test data_snapshot_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui -- --ignored --test-threads=1 --nocapture
           # Fresh private display/data per run. A failed first run is not retried/ignored.
           for attempt in 1 2; do
             timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test profile_verify_ui -- --ignored --test-threads=1 --nocapture
@@ -235,6 +286,15 @@ jobs:
           run_page_test ui_assets
           run_page_test setup_contract
           run_page_test pairing_contract
+
+      - name: Native controls in every embedded language
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_DIALOGS: "1"
+        run: |
+          for language in en ru es pt-BR de fr ja ko; do
+            DSH_OCEAN_TEST_LANGUAGE="$language" timeout --kill-after=5s 60s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test native_locale_matrix -- --ignored --test-threads=1 --nocapture
+          done
 
       - name: Native WebKit downloads and cross-context cancellation
         env:
@@ -313,6 +373,11 @@ jobs:
           # Independent log cross-check for reviewers; never upload the ELF itself.
           sha256sum target/release/dsh-ocean
 
+      - name: Verify embedded language resources in the exact native ELF
+        run: |
+          python3 -B scripts/check-embedded-locales.py --binary target/release/dsh-ocean \
+            --output "$RUNNER_TEMP/native-license-evidence/embedded-locales.json"
+
       - name: Retain reports and public notice text only (no ELF publication)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -343,14 +408,18 @@ jobs:
         run: python3 -B tests/test_package_install.py --real-smoke
 
       - name: Validate runtime manifest
-        run: jq -e '.schema == 1 and .node.archives["linux-x64"].sha256 and .dsh.version' runtime-manifest.json
+        run: jq -e '.schema == 1 and .node.archives["linux-x64"].sha256 and .node.archives["linux-arm64"].sha256 and .dsh.version' runtime-manifest.json
 
       - name: Bootstrap check
         run: |
-          tmp="$(mktemp -d)"
-          export DSH_NODE_VERSION="$(jq -r '.node.version' runtime-manifest.json)"
-          export DSH_NODE_SHA256="$(jq -r '.node.archives["linux-x64"].sha256' runtime-manifest.json)"
-          export DSH_VERSION="$(jq -r '.dsh.version' runtime-manifest.json)"
-          export DSH_PNPM_VERSION="$(jq -r '.pnpm.version' runtime-manifest.json)"
-          DSH_OCEAN_DATA_DIR="$tmp" bash scripts/bootstrap-runtime.sh --check
-          rm -rf "$tmp"
+          parent="$(realpath -- "$RUNNER_TEMP")"
+          tmp="$(mktemp -d "$parent/ocean-bootstrap-check.XXXXXX")"
+          tmp="$(realpath -- "$tmp")"
+          cleanup() {
+            [[ "$(realpath -- "${tmp:?}")" == "$tmp" && "$tmp" == "${parent:?}"/ocean-bootstrap-check.* && ! -L "$tmp" ]] || return 1
+            rm -rf -- "${tmp:?}"
+          }
+          trap cleanup EXIT
+          python3 -B scripts/ci-sdk-env.py --fixture-root "$tmp" > "$tmp/environment"
+          while IFS= read -r assignment; do export "$assignment"; done < "$tmp/environment"
+          DSH_HOME="$tmp/dsh-home" DSH_OCEAN_DATA_DIR="$tmp/ocean-data" bash scripts/bootstrap-runtime.sh --check

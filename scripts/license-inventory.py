@@ -17,7 +17,7 @@ import time
 
 TARGETS = ('aarch64-unknown-linux-gnu', 'x86_64-unknown-linux-gnu')
 MPL = {'cssparser': '0.37.0', 'cssparser-macros': '0.7.1', 'dtoa-short': '0.3.5', 'option-ext': '0.2.0', 'selectors': '0.38.0'}
-BASE_LICENSE_INPUTS = {'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.txt', 'docs/third-party/inventory.json', 'docs/BINARY_LICENSE_AUDIT.md'}
+BASE_LICENSE_INPUTS = {'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.txt', 'locales/dsh/LICENSE', 'docs/third-party/inventory.json', 'docs/BINARY_LICENSE_AUDIT.md'}
 
 # Exact retained release-toolchain profile; not arbitrary notice paths.
 BASE_LICENSE_INPUTS |= {'docs/toolchain/rust-1.90.0/index.json',

@@ -16,6 +16,8 @@ fn main() {
         .manage(state::AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::get_setup_state,
+            commands::get_native_locale,
+            commands::open_language_settings,
             commands::prepare_service,
             commands::recover_runtime,
             commands::start_bootstrap,
@@ -35,6 +37,21 @@ fn main() {
                 app.handle().exit(0);
                 return Ok(());
             }
+            let language = match dsh_ocean::localization::load(
+                &config::config_dir().join("localization.json"),
+            ) {
+                Ok(preference) => dsh_ocean::i18n::resolve_language(
+                    Some(preference.code()),
+                    std::env::var("LC_ALL").ok().as_deref(),
+                    std::env::var("LC_MESSAGES").ok().as_deref(),
+                    std::env::var("LANG").ok().as_deref(),
+                ),
+                Err(error) => {
+                    eprintln!("dsh-ocean: language preference unavailable; using English: {error}");
+                    dsh_ocean::i18n::Language::En
+                }
+            };
+            let _ = dsh_ocean::i18n::initialize(language);
             dsh_ocean::notification_ui::initialize(app.handle());
             match tray::install(app) {
                 Ok(tray) => app.state::<state::AppState>().set_tray(tray),

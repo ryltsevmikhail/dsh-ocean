@@ -1,6 +1,7 @@
 LICENSE
 NOTICE
 THIRD_PARTY_NOTICES.txt
+locales/dsh/LICENSE
 docs/third-party/inventory.json
 docs/BINARY_LICENSE_AUDIT.md
 docs/third-party/sources/cssparser-0.37.0.crate

@@ -23,63 +23,102 @@ pub fn text_with_data(
     summaries: &[profile_backup::SnapshotSummary],
     data: &[crate::data_backup::DataSummary],
 ) -> String {
-    use std::fmt::Write as _;
+    text_with_data_in(summaries, data, crate::i18n::active_language())
+}
+pub fn text_with_data_in(
+    summaries: &[profile_backup::SnapshotSummary],
+    data: &[crate::data_backup::DataSummary],
+    language: crate::i18n::Language,
+) -> String {
     let mut output = String::new();
     if summaries.is_empty() && data.is_empty() {
         output.push_str(
-            "No configuration backups found.\n\nUse \"Back up web configuration…\" to create one.",
+            crate::i18n::message(language, "backup_history.empty")
+                .expect("embedded empty history message"),
         );
         return output;
     }
     if summaries.is_empty() {
-        output.push_str("No configuration backups found.\n\n");
+        output.push_str(
+            crate::i18n::message(language, "backup_history.no_config")
+                .expect("embedded configuration absence message"),
+        );
     } else {
         let total_bytes: u64 = summaries.iter().map(|item| item.bytes).sum();
-        let _ = writeln!(
-            output,
-            "{} configuration backup(s), {} configuration bytes in total.\n",
-            summaries.len(),
-            total_bytes
+        output.push_str(
+            &crate::i18n::render(
+                language,
+                "backup_history.config_count",
+                &[
+                    ("count", &summaries.len().to_string()),
+                    ("bytes", &total_bytes.to_string()),
+                ],
+            )
+            .expect("validated history configuration counts"),
         );
+        output.push('\n');
         for item in summaries {
             let when = match &item.created_at {
                 Some(time) => time.as_str(),
-                None => "timestamp unavailable",
+                None => crate::i18n::message(language, "backup_history.timestamp_unavailable")
+                    .expect("embedded history timestamp message"),
             };
-            let _ = writeln!(
-            output,
-            "profile:    {}\ntime:       {when}\nfiles:      {}\ndirectories:{}\nbytes:      {}\n",
-            item.profile, item.files, item.directories, item.bytes
-        );
+            output.push_str(
+                &crate::i18n::render(
+                    language,
+                    "backup_history.config_row",
+                    &[
+                        ("profile", &item.profile),
+                        ("created", when),
+                        ("files", &item.files.to_string()),
+                        ("directories", &item.directories.to_string()),
+                        ("bytes", &item.bytes.to_string()),
+                    ],
+                )
+                .expect("validated configuration history row"),
+            );
+            output.push('\n');
         }
     }
 
     if !data.is_empty() {
         let total: u64 = data.iter().map(|item| item.bytes).sum();
-        let _ = writeln!(
-            output,
-            "{} whole-data snapshot(s) (sessions and shared stores), {} bytes in total:\n",
-            data.len(),
-            total
+        output.push_str(
+            &crate::i18n::render(
+                language,
+                "backup_history.data_count",
+                &[
+                    ("count", &data.len().to_string()),
+                    ("bytes", &total.to_string()),
+                ],
+            )
+            .expect("validated whole-data history counts"),
         );
+        output.push('\n');
         for item in data {
             let when = match &item.created_at {
                 Some(time) => time.as_str(),
-                None => "timestamp unavailable",
+                None => crate::i18n::message(language, "backup_history.timestamp_unavailable")
+                    .expect("embedded history timestamp message"),
             };
-            let _ = writeln!(
-                output,
-                "time:       {when}\nfiles:      {}\nbytes:      {}\n",
-                item.files, item.bytes
+            output.push_str(
+                &crate::i18n::render(
+                    language,
+                    "backup_history.data_row",
+                    &[
+                        ("created", when),
+                        ("files", &item.files.to_string()),
+                        ("bytes", &item.bytes.to_string()),
+                    ],
+                )
+                .expect("validated whole-data history row"),
             );
+            output.push('\n');
         }
     }
     output.push_str(
-        "Checksums are not signatures: this list does not prove authenticity, \
-         a frozen snapshot or that other writers were stopped. Profile files can \
-         contain secrets. Listing reads snapshot manifests only.\n\n\
-         Restoring and pruning remain explicit offline CLI operations; nothing \
-         was changed from this window.",
+        crate::i18n::message(language, "backup_history.notice")
+            .expect("embedded history scope notice"),
     );
     output
 }
@@ -105,10 +144,10 @@ pub struct Window {
 
 pub fn build(parent: Option<&gtk::Window>, body: &str) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some(TITLE),
+        Some(crate::i18n::text("backup_history.title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Close", gtk::ResponseType::Close)],
+        &[(crate::i18n::text("common.close"), gtk::ResponseType::Close)],
     );
     dialog.set_default_size(680, 460);
     let label = gtk::Label::new(Some(body));
@@ -136,7 +175,7 @@ pub fn show(app: &AppHandle) {
         .and_then(|window| window.gtk_window().ok());
     let body = match (inventory(), data_inventory()) {
         (Ok(summaries), Ok(data)) => text_with_data(&summaries, &data),
-        _ => FAILURE_TEXT.to_owned(),
+        _ => crate::i18n::text("backup_history.failure").to_owned(),
     };
     let window = build(parent.as_ref().map(|window| window.upcast_ref()), &body);
     window.dialog.show_all();
@@ -162,6 +201,24 @@ mod tests {
         )
     }
 
+    #[test]
+    fn history_uses_selected_locale_for_both_snapshot_kinds_without_exposing_names() {
+        let config = [summary("web", None, 3, 2048)];
+        let data = [data_summary(2, 100, None)];
+        for (language, _) in crate::i18n::LANGUAGES {
+            let body = text_with_data_in(&config, &data, language);
+            assert!(body.contains("2048") && body.contains("100") && body.contains("web"));
+            assert!(body.contains(
+                crate::i18n::message(language, "backup_history.timestamp_unavailable").unwrap()
+            ));
+            assert!(body.contains(crate::i18n::message(language, "backup_history.notice").unwrap()));
+            assert!(!body.contains("data-1-2") && !body.contains("profile-web-1-1"));
+            assert_eq!(
+                text_with_data_in(&[], &[], language),
+                crate::i18n::message(language, "backup_history.empty").unwrap()
+            );
+        }
+    }
     #[test]
     fn text_is_content_free_and_explicitly_non_destructive() {
         let rendered = text(&[

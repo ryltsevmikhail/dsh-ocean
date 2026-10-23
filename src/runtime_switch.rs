@@ -98,6 +98,20 @@ pub struct UnitImage {
 /// stop must reap owned children; stopped must reject unknown writers. Unit methods
 /// must compare exact images and refuse concurrent edits, including manager drop-ins.
 pub trait Controller {
+    fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+        (None, None)
+    }
+    fn restore_locale_patches(
+        &mut self,
+        old: Option<PathBuf>,
+        candidate: Option<PathBuf>,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            old.is_none() && candidate.is_none(),
+            "controller cannot restore native locale launch recipes"
+        );
+        Ok(())
+    }
     fn ownership(&mut self, old: &Path) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
     fn stopped(&mut self) -> Result<()>;
@@ -121,6 +135,25 @@ pub trait Controller {
         Ok(())
     }
 }
+fn valid_locale_patch(path: &Path) -> bool {
+    path.is_absolute()
+        && path.as_os_str().len() <= 4096
+        && path.file_name() == Some(std::ffi::OsStr::new("overlay.yml"))
+        && !path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+}
+fn read_locale_patch<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<PathBuf>, D::Error> {
+    let path = Option::<PathBuf>::deserialize(deserializer)?;
+    if path.as_deref().is_some_and(|p| !valid_locale_patch(p)) {
+        return Err(serde::de::Error::custom(
+            "invalid native locale journal recipe",
+        ));
+    }
+    Ok(path)
+}
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Journal {
@@ -131,6 +164,18 @@ struct Journal {
     new: PathBuf,
     snapshot: Option<PathBuf>,
     unit: Option<UnitImage>,
+    #[serde(
+        default,
+        deserialize_with = "read_locale_patch",
+        skip_serializing_if = "Option::is_none"
+    )]
+    old_locale_patch: Option<PathBuf>,
+    #[serde(
+        default,
+        deserialize_with = "read_locale_patch",
+        skip_serializing_if = "Option::is_none"
+    )]
+    candidate_locale_patch: Option<PathBuf>,
 }
 /// Apply authenticated prepared bytes, retaining Prepared's prefix lock throughout.
 /// Before import, acquire settings -> Runtime release-state transaction, then the
@@ -219,6 +264,17 @@ fn execute(
     anyhow::ensure!(old != new, "candidate is already selected");
     crate::util::check_owned_ancestors(root)?;
     c.ownership(&p.prefix.join(&old))?;
+    let (old_locale_patch, candidate_locale_patch) = c.locale_patches();
+    anyhow::ensure!(
+        [
+            old_locale_patch.as_deref(),
+            candidate_locale_patch.as_deref()
+        ]
+        .into_iter()
+        .flatten()
+        .all(valid_locale_patch),
+        "invalid captured native locale recipe"
+    );
     let mut j = Journal {
         schema: 1,
         home: p.home.clone(),
@@ -227,6 +283,8 @@ fn execute(
         new,
         snapshot: None,
         unit: c.unit()?,
+        old_locale_patch,
+        candidate_locale_patch,
     };
     c.check_unit(&j.unit)?;
     // create_new is the last guard against a concurrent/pending operation.
@@ -316,6 +374,7 @@ pub fn recover(p: &Paths, c: &mut impl Controller) -> Result<()> {
     anyhow::ensure!(j.schema==1&&j.home==p.home&&j.backups==p.backups,"pending runtime journal scope changed; restore original home/backup configuration before recovery");
     target(&j.old)?;
     target(&j.new)?;
+    c.restore_locale_patches(j.old_locale_patch.clone(), j.candidate_locale_patch.clone())?;
     c.ownership(&p.prefix.join(&j.old))?;
     rollback(p, &j, c)
 }
@@ -351,7 +410,63 @@ fn select(p: &Paths, old: &Path, new: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn journal_retains_distinct_launch_recipes_and_defaults_legacy_to_plain() {
+        let mut value = serde_json::json!({"schema":1,"home":"/private/dsh","backups":"/private/backups","old":"generations/gen.old","new":"generations/gen.new","snapshot":null,"unit":null});
+        let legacy: Journal = serde_json::from_value(value.clone()).unwrap();
+        assert!(legacy.old_locale_patch.is_none() && legacy.candidate_locale_patch.is_none());
+        let plain = serde_json::to_value(&legacy).unwrap();
+        assert!(
+            plain.get("old_locale_patch").is_none()
+                && plain.get("candidate_locale_patch").is_none(),
+            "plain journals retain the legacy strict-reader schema"
+        );
+        value["old_locale_patch"] = serde_json::json!("/private/cache/old/overlay.yml");
+        let captured: Journal = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            captured.old_locale_patch,
+            Some(PathBuf::from("/private/cache/old/overlay.yml"))
+        );
+        assert!(captured.candidate_locale_patch.is_none());
+    }
+    #[test]
+    fn pending_recovery_restores_captured_recipes_not_current_controller_state() {
+        let (p, mut c) = fixture();
+        c.recipes = (Some(p.prefix.join("cache/old/overlay.yml")), None);
+        c.bad = true;
+        c.old_start_failure = true;
+        assert!(execute(&p, &p.prefix.join("generations/gen.new"), &mut c, || Ok(())).is_err());
+        let j: Journal = serde_json::from_slice(&fs::read(p.pending()).unwrap()).unwrap();
+        assert_eq!(j.old_locale_patch, c.recipes.0);
+        assert!(j.candidate_locale_patch.is_none());
+        let expected = c.recipes.clone();
+        c.recipes = (None, None);
+        c.old_start_failure = false;
+        recover(&p, &mut c).unwrap();
+        assert_eq!(c.recipes, expected);
+    }
+    #[test]
+    fn journal_refuses_relative_or_parent_escaping_locale_recipes() {
+        for path in [
+            "relative/overlay.yml",
+            "/private/../foreign/overlay.yml",
+            "/private/not-an-overlay.js",
+        ] {
+            let value = serde_json::json!({"schema":1,"home":"/private/dsh","backups":"/private/backups","old":"generations/gen.old","new":"generations/gen.new","snapshot":null,"unit":null,"old_locale_patch":path});
+            assert!(serde_json::from_value::<Journal>(value).is_err());
+        }
+    }
+    #[test]
+    fn invalid_captured_recipe_cannot_stop_or_create_pending_transaction() {
+        let (p, mut c) = fixture();
+        c.recipes = (Some(PathBuf::from("relative/overlay.yml")), None);
+        assert!(execute(&p, &p.prefix.join("generations/gen.new"), &mut c, || Ok(())).is_err());
+        assert!(c.running);
+        assert!(!p.pending().exists());
+        assert_eq!(c.new_starts, 0);
+    }
     struct Fake {
+        recipes: (Option<PathBuf>, Option<PathBuf>),
         p: Paths,
         running: bool,
         bad: bool,
@@ -365,6 +480,17 @@ mod tests {
         old_start_failure: bool,
     }
     impl Controller for Fake {
+        fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+            self.recipes.clone()
+        }
+        fn restore_locale_patches(
+            &mut self,
+            old: Option<PathBuf>,
+            candidate: Option<PathBuf>,
+        ) -> Result<()> {
+            self.recipes = (old, candidate);
+            Ok(())
+        }
         fn ownership(&mut self, _: &Path) -> Result<()> {
             Ok(())
         }
@@ -488,6 +614,7 @@ mod tests {
         )
         .unwrap();
         let c = Fake {
+            recipes: (None, None),
             p: Paths {
                 prefix: p.prefix.clone(),
                 home: p.home.clone(),
@@ -524,6 +651,8 @@ mod tests {
             new: PathBuf::from("generations/gen.new"),
             snapshot: None,
             unit: None,
+            old_locale_patch: None,
+            candidate_locale_patch: None,
         };
         save(&p, &j).unwrap();
         let info = pending_info(&p)

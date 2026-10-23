@@ -3,15 +3,18 @@ use dsh_ocean::navigation::{self, Decision};
 use std::fs;
 use std::os::unix::fs::{symlink, PermissionsExt};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 use url::Url;
 
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
         let root = std::env::temp_dir().join(format!(
-            "dsh-ocean-download-test-{}-{}",
+            "dsh-ocean-download-test-{}-{}-{}",
             std::process::id(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()

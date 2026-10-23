@@ -25,6 +25,33 @@ fn require_window(window: &tauri::WebviewWindow, allowed: &[&str]) -> Result<(),
     }
 }
 
+/// Pure boundary used by the actual IPC command; labels come from Tauri, never arguments.
+pub fn native_locale_snapshot(
+    label: &str,
+    language: crate::i18n::Language,
+) -> Result<serde_json::Value, String> {
+    if !["setup", "remote"].contains(&label) {
+        return Err("native catalogs are only available to owned pages".into());
+    }
+    Ok(serde_json::json!({"language":language.code(),"messages":crate::i18n::messages(language)}))
+}
+pub fn language_settings_allowed(label: &str) -> bool {
+    label == "setup"
+}
+
+#[tauri::command]
+pub fn get_native_locale(window: tauri::WebviewWindow) -> Result<serde_json::Value, String> {
+    native_locale_snapshot(window.label(), crate::i18n::active_language())
+}
+#[tauri::command]
+pub fn open_language_settings(window: tauri::WebviewWindow, app: AppHandle) -> Result<(), String> {
+    if !language_settings_allowed(window.label()) {
+        return Err("language settings are only available to setup".into());
+    }
+    crate::localization_ui::show(&app);
+    Ok(())
+}
+
 #[tauri::command(async)]
 pub fn get_setup_state(window: tauri::WebviewWindow, state: State<'_, AppState>) -> SetupState {
     // Errors are ignored on purpose: a foreign caller gets the plain snapshot,
@@ -97,13 +124,14 @@ pub async fn start_bootstrap(
             if bootstrap::detect().is_some() {
                 // The script can commit before a late signal arrives; report what
                 // is actually on disk instead of claiming a rollback.
-                state.log("Runtime installation was interrupted after a runtime was selected; check the diagnostics log and retry the service start.");
+                state.log(crate::i18n::text("startup.install_interrupted_selected"));
             } else {
-                state.log("Runtime installation was cancelled before a runtime was selected.");
+                state.log(crate::i18n::text("startup.install_cancelled_unselected"));
             }
         }
         Ok(Outcome::Failed) => {
-            app.state::<AppState>().fail("runtime bootstrap failed");
+            app.state::<AppState>()
+                .fail(crate::i18n::text("startup.bootstrap_failed"));
         }
         Err(error) => app.state::<AppState>().fail(format!("{error:#}")),
     }
@@ -121,9 +149,7 @@ pub fn cancel_bootstrap(window: tauri::WebviewWindow, state: State<'_, AppState>
     if !state.request_bootstrap_cancel() {
         return false;
     }
-    state.log(
-        "Cancellation requested; the installer stops at its next safe point, removes its staged runtime and restores the previous selection.",
-    );
+    state.log(crate::i18n::text("startup.cancel_requested"));
     true
 }
 
@@ -174,8 +200,8 @@ pub fn quit_app(window: tauri::WebviewWindow, app: AppHandle) {
 
 async fn run_bootstrap(app: &AppHandle) -> Result<Outcome> {
     let state = app.state::<AppState>();
-    state.log("Installing Node.js and DeepSeek Harness…");
-    state.log("This is a one-time download; progress appears below.");
+    state.log(crate::i18n::text("startup.installing"));
+    state.log(crate::i18n::text("startup.one_time"));
 
     let manifest = bootstrap::manifest().context("read runtime manifest")?;
     let arch = match std::env::consts::ARCH {
@@ -238,18 +264,18 @@ async fn run_bootstrap(app: &AppHandle) -> Result<Outcome> {
     match supervised.outcome() {
         Outcome::Cancelled => {
             if supervised.escalated {
-                state.log("Installer ignored the cooperative stop; it was terminated forcibly. Staged work, an unselected generation or a held runtime lock may remain for inspection.");
+                state.log(crate::i18n::text("startup.forcibly_terminated"));
             } else {
-                state.log("Installer stopped cooperatively; its own traps removed staged work and restored the previous selection where possible.");
+                state.log(crate::i18n::text("startup.cooperatively_stopped"));
             }
-            state.log("Runtime installation cancelled.");
+            state.log(crate::i18n::text("startup.cancelled"));
             Ok(Outcome::Cancelled)
         }
         Outcome::Committed => {
             if bootstrap::detect().is_none() {
                 bail!("runtime bootstrap finished but DSH could not be detected");
             }
-            state.log("Runtime installed; starting DSH…");
+            state.log(crate::i18n::text("startup.installed"));
             Ok(Outcome::Committed)
         }
         Outcome::Failed => {

@@ -9,14 +9,32 @@ use tauri::{AppHandle, Manager};
 
 pub struct Summary {
     profile: String,
-    created: String,
+    created: Option<String>,
     files: usize,
     directories: usize,
     bytes: u64,
 }
 impl Summary {
     pub fn text(&self) -> String {
-        format!("Snapshot structure and checksums passed\n\nProfile: {}\nCreated (metadata, not authenticated): {}\nFiles: {}\nDirectories: {}\nConfiguration bytes: {}\n\nScope: profile configuration only; best-effort snapshot consistency. Global credential/session/storage stores outside this profile are not included; .git and node_modules are excluded. Profile-local files may themselves contain secrets or databases.\n\nChecksums are not signatures or publisher authentication. This is a point-in-time read, not an immutable snapshot or data-schema rollback.\n\nNo restore, snapshot/profile modification, service operation or package installation was performed. Restore remains an explicit offline CLI operation; stop all writers independently. This screen has only Close.",self.profile,self.created,self.files,self.directories,self.bytes)
+        self.text_in(crate::i18n::active_language())
+    }
+    pub fn text_in(&self, language: crate::i18n::Language) -> String {
+        let created = self.created.as_deref().unwrap_or_else(|| {
+            crate::i18n::message(language, "verification.timestamp_unavailable")
+                .expect("embedded timestamp message")
+        });
+        crate::i18n::render(
+            language,
+            "verification.summary",
+            &[
+                ("profile", &self.profile),
+                ("created", created),
+                ("files", &self.files.to_string()),
+                ("directories", &self.directories.to_string()),
+                ("bytes", &self.bytes.to_string()),
+            ],
+        )
+        .expect("validated verification summary placeholders")
     }
 }
 pub fn verify_snapshot(path: &Path) -> anyhow::Result<Summary> {
@@ -31,8 +49,7 @@ fn summary(manifest: crate::profile_backup::Manifest) -> anyhow::Result<Summary>
             .map(|time| time.with_timezone(&chrono::Utc).to_rfc3339())
     } else {
         None
-    }
-    .unwrap_or_else(|| "unavailable (invalid metadata timestamp)".into());
+    };
     let bytes = manifest
         .files
         .iter()
@@ -49,12 +66,18 @@ fn summary(manifest: crate::profile_backup::Manifest) -> anyhow::Result<Summary>
 pub const FAILURE_TEXT:&str="Could not verify the selected configuration snapshot. It may be incomplete, changed, unsupported or unreadable. No snapshot/profile files, services or packages were changed. Raw paths and file contents are not displayed here. The explicit --verify-profile-backup CLI offers local operator diagnostics; do not share them without checking for private metadata.";
 pub fn build_picker(parent: Option<&gtk::Window>, folder: Option<&Path>) -> gtk::FileChooserDialog {
     let dialog = gtk::FileChooserDialog::with_buttons(
-        Some("Verify configuration snapshot"),
+        Some(crate::i18n::text("verification.picker_title")),
         parent,
         gtk::FileChooserAction::SelectFolder,
         &[
-            ("Cancel", gtk::ResponseType::Cancel),
-            ("Verify selected snapshot", gtk::ResponseType::Accept),
+            (
+                crate::i18n::text("common.cancel"),
+                gtk::ResponseType::Cancel,
+            ),
+            (
+                crate::i18n::text("verification.select"),
+                gtk::ResponseType::Accept,
+            ),
         ],
     );
     dialog.set_modal(true);
@@ -81,10 +104,10 @@ pub struct Window {
 }
 pub fn build_summary(parent: Option<&gtk::Window>, summary: &Summary) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some("Configuration snapshot verification"),
+        Some(crate::i18n::text("verification.summary_title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Close", gtk::ResponseType::Close)],
+        &[(crate::i18n::text("common.close"), gtk::ResponseType::Close)],
     );
     dialog.set_default_size(680, 420);
     let label = gtk::Label::new(Some(&summary.text()));
@@ -134,8 +157,47 @@ impl Work {
         self.0.lock().expect("verification mutex").finished
     }
     pub fn progress_text(&self) -> String {
+        self.progress_text_in(crate::i18n::active_language())
+    }
+    pub fn progress_text_in(&self, language: crate::i18n::Language) -> String {
         let state = self.0.lock().expect("verification mutex");
-        format!("Read-only snapshot verification\nStage: {}\nHashed bytes: {}\nChecked files: {}{}\n\n{}\n\nNo restore or service operation is running from this screen. Counts are not success/authenticity confirmation.",state.progress.stage.label(),state.progress.hashed_bytes,state.progress.checked_files,state.progress.total_files.map(|total|format!(" / {total}")).unwrap_or_default(),if state.cancel_requested {"Cancellation requested; waiting for the current filesystem operation/checkpoint. The worker is not forcibly killed."}else{"Checking bounded snapshot structure and checksums. Cancel is cooperative at hash/metadata checkpoints and may wait for an in-flight filesystem operation."})
+        let stage = match state.progress.stage {
+            crate::profile_backup::VerificationStage::Opening => "verification.stage.opening",
+            crate::profile_backup::VerificationStage::Inventory => "verification.stage.inventory",
+            crate::profile_backup::VerificationStage::Hashing => "verification.stage.hashing",
+            crate::profile_backup::VerificationStage::Rechecking => "verification.stage.rechecking",
+        };
+        let notice = if state.cancel_requested {
+            "verification.cancelling"
+        } else {
+            "verification.working"
+        };
+        crate::i18n::render(
+            language,
+            "verification.progress",
+            &[
+                (
+                    "stage",
+                    crate::i18n::message(language, stage).expect("embedded verification stage"),
+                ),
+                ("bytes", &state.progress.hashed_bytes.to_string()),
+                ("files", &state.progress.checked_files.to_string()),
+                (
+                    "total",
+                    &state
+                        .progress
+                        .total_files
+                        .map(|total| format!(" / {total}"))
+                        .unwrap_or_default(),
+                ),
+                (
+                    "notice",
+                    crate::i18n::message(language, notice)
+                        .expect("embedded verification progress notice"),
+                ),
+            ],
+        )
+        .expect("validated verification progress placeholders")
     }
     pub fn take_result(&self) -> Option<Outcome> {
         self.0.lock().expect("verification mutex").result.take()
@@ -175,10 +237,13 @@ impl Work {
 }
 pub fn build_progress(parent: Option<&gtk::Window>, work: Arc<Work>) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some("Checking configuration snapshot"),
+        Some(crate::i18n::text("verification.progress_title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Cancel verification", gtk::ResponseType::Cancel)],
+        &[(
+            crate::i18n::text("verification.cancel"),
+            gtk::ResponseType::Cancel,
+        )],
     );
     dialog.set_default_size(600, 280);
     let label = gtk::Label::new(Some(&work.progress_text()));
@@ -234,8 +299,8 @@ pub fn show(app: &AppHandle) {
     let Some(guard) = Guard::acquire(flag) else {
         crate::ui::message(
             app,
-            "Verification in progress",
-            "Wait for the selected snapshot check to finish. This screen is not running a restore.",
+            crate::i18n::text("verification.busy_title"),
+            crate::i18n::text("verification.busy"),
             gtk::MessageType::Info,
         );
         return;
@@ -272,10 +337,27 @@ pub fn show(app: &AppHandle) {
             return gtk::glib::ControlFlow::Continue;
         };
         dialog.close();
-        match outcome{
-            Outcome::Passed(summary)=>{let parent=owner.get_webview_window("main").and_then(|window|window.gtk_window().ok());let window=build_summary(parent.as_ref().map(|window|window.upcast_ref()),&summary);window.dialog.show_all();},
-            Outcome::Failed=>crate::ui::message(&owner,"Snapshot verification failed",FAILURE_TEXT,gtk::MessageType::Error),
-            Outcome::Cancelled=>crate::ui::message(&owner,"Snapshot verification cancelled","The read-only verification work has finished. Cancellation was requested before result commitment; no successful verification is claimed. No snapshot/profile files, services or packages were changed.",gtk::MessageType::Info),
+        match outcome {
+            Outcome::Passed(summary) => {
+                let parent = owner
+                    .get_webview_window("main")
+                    .and_then(|window| window.gtk_window().ok());
+                let window =
+                    build_summary(parent.as_ref().map(|window| window.upcast_ref()), &summary);
+                window.dialog.show_all();
+            }
+            Outcome::Failed => crate::ui::message(
+                &owner,
+                crate::i18n::text("verification.failed_title"),
+                crate::i18n::text("verification.failure"),
+                gtk::MessageType::Error,
+            ),
+            Outcome::Cancelled => crate::ui::message(
+                &owner,
+                crate::i18n::text("verification.cancelled_title"),
+                crate::i18n::text("verification.cancelled"),
+                gtk::MessageType::Info,
+            ),
         }
         gtk::glib::ControlFlow::Break
     });
@@ -292,11 +374,53 @@ pub fn show(app: &AppHandle) {
 }
 #[cfg(test)]
 #[test]
+fn verification_summary_and_progress_are_localized_without_claiming_restore_or_authenticity() {
+    for (language, _) in crate::i18n::LANGUAGES {
+        let summary = Summary {
+            profile: "web".into(),
+            created: None,
+            files: 4,
+            directories: 2,
+            bytes: 2048,
+        };
+        let body = summary.text_in(language);
+        assert!(body.contains("2048") && body.contains("web"));
+        assert!(body.contains(
+            crate::i18n::message(language, "verification.timestamp_unavailable").unwrap()
+        ));
+        assert!(!body.contains("/home/") && !body.contains("{profile}"));
+        let work = Work::default();
+        for (stage, key) in [
+            (crate::profile_backup::VerificationStage::Opening, "opening"),
+            (
+                crate::profile_backup::VerificationStage::Inventory,
+                "inventory",
+            ),
+            (crate::profile_backup::VerificationStage::Hashing, "hashing"),
+            (
+                crate::profile_backup::VerificationStage::Rechecking,
+                "rechecking",
+            ),
+        ] {
+            work.0.lock().unwrap().progress.stage = stage;
+            let progress = work.progress_text_in(language);
+            assert!(progress.contains(
+                crate::i18n::message(language, &format!("verification.stage.{key}")).unwrap()
+            ));
+        }
+        assert!(work.request_cancel());
+        assert!(work
+            .progress_text_in(language)
+            .contains(crate::i18n::message(language, "verification.cancelling").unwrap()));
+    }
+}
+#[cfg(test)]
+#[test]
 fn cancellation_and_result_commit_are_linearized_without_late_success_or_rewrite() {
     let result = || {
         Ok(Summary {
             profile: "web".into(),
-            created: "test metadata".into(),
+            created: Some("test metadata".into()),
             files: 1,
             directories: 0,
             bytes: 1,
@@ -329,7 +453,7 @@ fn cancellation_and_result_commit_are_linearized_without_late_success_or_rewrite
             ready.wait();
             complete.finish(Ok(Summary {
                 profile: "web".into(),
-                created: "test".into(),
+                created: Some("test".into()),
                 files: 1,
                 directories: 0,
                 bytes: 1,

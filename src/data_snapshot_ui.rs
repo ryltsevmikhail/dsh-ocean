@@ -18,31 +18,34 @@ pub const TITLE: &str = "DSH Ocean data snapshot";
 
 /// Confirmation body: counts and bytes only, never a file name.
 pub fn confirmation_text(summary: &Summary) -> String {
+    confirmation_text_in(summary, crate::i18n::active_language())
+}
+pub fn confirmation_text_in(summary: &Summary, language: crate::i18n::Language) -> String {
     let total = summary.session_bytes + summary.storage_bytes;
-    format!(
-        "Copy sessions and shared stores into a new snapshot?\n\n\
-         Sessions: {} file(s), {} bytes\n\
-         Shared stores: {} file(s), {} bytes\n\
-         Total to copy: {} bytes\n\n\
-         The copies go to the configured backup folder and can be several gigabytes; \
-         make sure that folder has free space. The live data is only read, never moved \
-         or deleted, and DSH may keep writing while the copy runs, so this is a \
-         point-in-time best-effort copy rather than a frozen one.\n\n\
-         Restoring a snapshot is an explicit offline command and is not offered here.",
-        summary.session_files,
-        summary.session_bytes,
-        summary.storage_files,
-        summary.storage_bytes,
-        total
+    crate::i18n::render(
+        language,
+        "data_snapshot.confirm",
+        &[
+            ("session_files", &summary.session_files.to_string()),
+            ("session_bytes", &summary.session_bytes.to_string()),
+            ("storage_files", &summary.storage_files.to_string()),
+            ("storage_bytes", &summary.storage_bytes.to_string()),
+            ("total", &total.to_string()),
+        ],
     )
+    .expect("validated snapshot confirmation counters")
 }
 
 pub fn result_text(files: usize, bytes: u64) -> String {
-    format!(
-        "Snapshot created: {files} file(s), {bytes} bytes.\n\n\
-         Verify it with `dsh-ocean --verify-data-backup <snapshot>`; the snapshot may \
-         contain conversation content, so keep the backup folder private."
+    result_text_in(files, bytes, crate::i18n::active_language())
+}
+pub fn result_text_in(files: usize, bytes: u64, language: crate::i18n::Language) -> String {
+    crate::i18n::render(
+        language,
+        "data_snapshot.result",
+        &[("files", &files.to_string()), ("bytes", &bytes.to_string())],
     )
+    .expect("validated snapshot result counters")
 }
 
 /// Shown in addition to [`result_text`] when the source changed during the copy.
@@ -106,10 +109,13 @@ pub struct ProgressWindow {
 /// Progress dialog with an explicit cancel action; counts only.
 pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
     let dialog = gtk::Dialog::with_buttons(
-        Some(TITLE),
+        Some(crate::i18n::text("data_snapshot.title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Cancel snapshot", gtk::ResponseType::Cancel)],
+        &[(
+            crate::i18n::text("data_snapshot.cancel"),
+            gtk::ResponseType::Cancel,
+        )],
     );
     dialog.set_default_size(520, 180);
     let label = gtk::Label::new(Some(&data_backup_progress_text(&ProgressState::default())));
@@ -134,15 +140,35 @@ pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
 }
 
 fn data_backup_progress_text(state: &ProgressState) -> String {
-    let progress = crate::data_backup::SnapshotProgress {
-        copied_files: state.copied_files,
-        copied_bytes: state.copied_bytes,
-        total_bytes: state.total_bytes,
-    };
-    let mut text = progress.text();
+    data_backup_progress_text_in(state, crate::i18n::active_language())
+}
+fn data_backup_progress_text_in(state: &ProgressState, language: crate::i18n::Language) -> String {
+    let mut text = if state.total_bytes == 0 {
+        crate::i18n::render(
+            language,
+            "data_snapshot.progress_unknown",
+            &[("files", &state.copied_files.to_string())],
+        )
+    } else {
+        let percent = (state.copied_bytes.min(state.total_bytes) * 100)
+            .checked_div(state.total_bytes)
+            .expect("nonzero snapshot total");
+        crate::i18n::render(
+            language,
+            "data_snapshot.progress_known",
+            &[
+                ("copied", &state.copied_bytes.to_string()),
+                ("total", &state.total_bytes.to_string()),
+                ("percent", &percent.to_string()),
+                ("files", &state.copied_files.to_string()),
+            ],
+        )
+    }
+    .expect("validated snapshot progress counters");
     if state.cancel_requested {
         text.push_str(
-            "\n\nCancellation requested; the copy stops after the current file and the staging copy is removed.",
+            crate::i18n::message(language, "data_snapshot.cancelling")
+                .expect("embedded snapshot cancellation notice"),
         );
     }
     text
@@ -151,12 +177,18 @@ fn data_backup_progress_text(state: &ProgressState) -> String {
 /// Confirmation dialog with an explicit Accept button (no default action).
 pub fn build_confirm(parent: Option<&gtk::Window>, body: &str) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some(TITLE),
+        Some(crate::i18n::text("data_snapshot.title")),
         parent,
         gtk::DialogFlags::MODAL,
         &[
-            ("Cancel", gtk::ResponseType::Cancel),
-            ("Create snapshot", gtk::ResponseType::Accept),
+            (
+                crate::i18n::text("common.cancel"),
+                gtk::ResponseType::Cancel,
+            ),
+            (
+                crate::i18n::text("data_snapshot.create"),
+                gtk::ResponseType::Accept,
+            ),
         ],
     );
     dialog.set_default_size(620, 380);
@@ -207,8 +239,8 @@ pub fn show(app: &AppHandle) {
         let Some(gate) = begin(&handle.state::<crate::state::AppState>().data_snapshot) else {
             crate::ui::message(
                 &handle,
-                "Snapshot already running",
-                "A data snapshot is already being created in this session.",
+                crate::i18n::text("data_snapshot.busy_title"),
+                crate::i18n::text("data_snapshot.busy"),
                 gtk::MessageType::Info,
             );
             dialog.close();
@@ -281,11 +313,11 @@ pub fn show(app: &AppHandle) {
                     let mut body = result_text(files, bytes);
                     if !consistent {
                         body.push_str("\n\n");
-                        body.push_str(INCONSISTENT_TEXT);
+                        body.push_str(crate::i18n::text("data_snapshot.inconsistent"));
                     }
                     crate::ui::message(
                         &timer_app,
-                        "Snapshot created",
+                        crate::i18n::text("data_snapshot.created_title"),
                         &body,
                         if consistent {
                             gtk::MessageType::Info
@@ -296,14 +328,14 @@ pub fn show(app: &AppHandle) {
                 }
                 Outcome::Cancelled => crate::ui::message(
                     &timer_app,
-                    "Snapshot cancelled",
-                    CANCELLED_TEXT,
+                    crate::i18n::text("data_snapshot.cancelled_title"),
+                    crate::i18n::text("data_snapshot.cancelled"),
                     gtk::MessageType::Info,
                 ),
                 Outcome::Failed => crate::ui::message(
                     &timer_app,
-                    "Snapshot not created",
-                    FAILURE_TEXT,
+                    crate::i18n::text("data_snapshot.failed_title"),
+                    crate::i18n::text("data_snapshot.failure"),
                     gtk::MessageType::Warning,
                 ),
             }
@@ -395,6 +427,34 @@ mod tests {
         }
     }
 
+    #[test]
+    fn snapshot_dialog_text_uses_selected_locale_and_only_aggregate_counters() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            let confirmation = confirmation_text_in(&summary(3, 1000, 2, 500), language);
+            assert!(
+                confirmation.contains("1000")
+                    && confirmation.contains("500")
+                    && confirmation.contains("1500")
+            );
+            assert!(!confirmation.contains("/home") && !confirmation.contains("session.jsonl"));
+            assert!(result_text_in(4, 2048, language).contains("--verify-data-backup"));
+            let state = ProgressState {
+                copied_files: 3,
+                copied_bytes: 500,
+                total_bytes: 1000,
+                cancel_requested: true,
+                outcome: None,
+            };
+            let progress = data_backup_progress_text_in(&state, language);
+            assert!(
+                progress.contains("50")
+                    && progress.contains("500")
+                    && progress.contains(
+                        crate::i18n::message(language, "data_snapshot.cancelling").unwrap()
+                    )
+            );
+        }
+    }
     #[test]
     fn confirmation_is_count_only_and_warns_about_space_and_freeze() {
         let text = confirmation_text(&summary(3, 1_000, 2, 500));

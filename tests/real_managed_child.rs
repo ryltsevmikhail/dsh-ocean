@@ -278,7 +278,7 @@ fn real_managed_child_lifecycle() {
     if std::env::var(WORKER).as_deref() == Ok("real") {
         tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(real_worker());
+            .block_on(real_worker(false));
         return;
     }
     let _serial = CONTROLLER.lock().unwrap_or_else(|e| e.into_inner());
@@ -296,6 +296,30 @@ fn real_managed_child_lifecycle() {
         controller.adopted, 0,
         "normal stop must not rely on orphan cleanup"
     );
+    controller.success = true;
+}
+
+#[test]
+#[ignore = "requires explicit private runtime; verifies embedded locale overlay boot"]
+fn real_managed_child_builtin_locales() {
+    if std::env::var(WORKER).as_deref() == Ok("real") {
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(real_worker(true));
+        return;
+    }
+    let _serial = CONTROLLER.lock().unwrap_or_else(|e| e.into_inner());
+    let root = runtime_root();
+    let mut controller = Controller::new();
+    controller.spawn("real_managed_child_builtin_locales", Some(&root));
+    let success = controller.wait(Duration::from_secs(210));
+    let clean = controller.cleanup();
+    assert!(clean, "locale worker descendants were not fully reaped");
+    assert!(
+        success,
+        "private embedded-locale worker failed; inspect retained fixture"
+    );
+    assert_eq!(controller.adopted, 0);
     controller.success = true;
 }
 
@@ -456,30 +480,114 @@ async fn stop(child: &mut ManagedChild) {
     );
 }
 
-async fn real_worker() {
+fn authenticated_html(address: SocketAddr, token: &str) -> String {
+    use std::io::{Read, Write};
+    fn get(address: SocketAddr, path: &str, cookie: &str) -> Vec<u8> {
+        assert!(address.ip().is_loopback());
+        let mut stream =
+            std::net::TcpStream::connect_timeout(&address, Duration::from_secs(3)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let request=format!("GET {path} HTTP/1.1\r\nHost: {address}\r\nCookie: {cookie}\r\nConnection: close\r\n\r\n");
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut bytes = Vec::new();
+        stream
+            .take(2 * 1024 * 1024 + 1)
+            .read_to_end(&mut bytes)
+            .unwrap();
+        assert!(bytes.len() <= 2 * 1024 * 1024);
+        bytes
+    }
+    let mut url = url::Url::parse(&format!("http://{address}/")).unwrap();
+    url.query_pairs_mut().append_pair("token", token);
+    let login = get(address, &format!("/?{}", url.query().unwrap()), "");
+    let login = String::from_utf8(login).unwrap();
+    let headers = login.split("\r\n\r\n").next().unwrap();
+    let cookies = headers
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(key, _)| key.eq_ignore_ascii_case("set-cookie"))
+        .map(|(_, value)| value.trim().split(';').next().unwrap().to_owned())
+        .collect::<Vec<_>>()
+        .join("; ");
+    assert!(
+        !cookies.is_empty(),
+        "private login did not issue a session cookie"
+    );
+    let html = get(address, "/", &cookies);
+    String::from_utf8(html).unwrap()
+}
+
+async fn real_worker(builtin_locales: bool) {
     let root = runtime_root();
     let fixture = assert_worker_isolation();
     let marker = fixture.join("dsh/lifecycle-marker");
     fs::write(&marker, b"survives restart").unwrap();
     let path = format!("{}:/usr/bin:/bin", root.join("runtime/node/bin").display());
-    let args = [
-        "--profile",
-        "web",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "0",
-        "--no-open",
-    ];
+    let patch = if builtin_locales {
+        let runtime = dsh_ocean::bootstrap::Runtime {
+            node: root.join("runtime/node/bin/node"),
+            dsh: root.join("harness/node_modules/.bin/dsh"),
+            version: String::new(),
+            install_root: Some(root.join("harness")),
+        };
+        let scope = dsh_ocean::builtin_locale_planner::LaunchScope::child().unwrap();
+        let (_, version) = dsh_ocean::builtin_locale_planner::selected_sdk(&runtime).unwrap();
+        let consent = fixture.join("config/native-language-approval.json");
+        let approval = dsh_ocean::builtin_locale_consent::Scope::new(
+            &scope.dsh_home.join("profiles/web"),
+            &version,
+        )
+        .unwrap();
+        dsh_ocean::builtin_locale_consent::record(&consent, &approval, true).unwrap();
+        let lifecycle = dsh_ocean::runtime_lifecycle::Lifecycle::<
+            dsh_ocean::service::Server,
+            tokio::process::Child,
+        >::new(|_| {});
+        let permit = lifecycle
+            .try_begin(dsh_ocean::runtime_lifecycle::Operation::Update)
+            .unwrap();
+        Some(
+            dsh_ocean::builtin_locale_planner::recorded_plan(
+                &runtime,
+                &permit,
+                &scope,
+                &fixture.join("cache/builtin-locales"),
+                &consent,
+            )
+            .await
+            .unwrap()
+            .expect("approved fresh private SDK must receive embedded locales"),
+        )
+    } else {
+        None
+    };
+    let args = dsh_ocean::service::managed_arguments(patch.as_deref()).unwrap();
+    let args = args.iter().map(String::as_str).collect::<Vec<_>>();
     let node = root.join("runtime/node/bin/node");
     let dsh = root.join("harness/node_modules/.bin/dsh");
+    let log_path = fixture.join("private-runtime-output");
+    let log: managed_child::Log = Arc::new(move |line| {
+        use std::io::Write;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .mode(0o600)
+            .open(&log_path)
+            .unwrap();
+        writeln!(file, "{line}").unwrap();
+    });
     let mut first = managed_child::start(
         &node,
         &dsh,
         &args,
         &path,
         Duration::from_secs(75),
-        Arc::new(|_| {}),
+        log.clone(),
     )
     .await
     .expect("first managed start");
@@ -488,6 +596,27 @@ async fn real_worker() {
     assert!(!first.token.is_empty());
     assert_eq!(status(address, None), 401);
     assert_eq!(status(address, Some(&first.token)), 303);
+    if builtin_locales {
+        let html = authenticated_html(address, &first.token);
+        assert!(
+            html.contains("@dsh-ocean/builtin-locales"),
+            "native locale package absent from served boot graph"
+        );
+        // Stock SDK starts from an empty generated root and composes argv
+        // overlays in memory. Later Loader writeback may persist rows, but the
+        // language feature must not manually write them into this file.
+        assert!(
+            fs::read_to_string(fixture.join("dsh/profiles/web/cordis.yml"))
+                .unwrap()
+                .ends_with("[]\n")
+        );
+        assert!(
+            !fs::read_to_string(fixture.join("dsh/profiles/web/package.json"))
+                .unwrap()
+                .contains("@dsh-ocean/"),
+            "native dictionaries must not become an installed profile dependency"
+        );
+    }
     stop(&mut first).await;
     let mut second = managed_child::start(
         &node,
@@ -495,7 +624,7 @@ async fn real_worker() {
         &args,
         &path,
         Duration::from_secs(75),
-        Arc::new(|_| {}),
+        log.clone(),
     )
     .await
     .expect("second managed start");
@@ -509,6 +638,17 @@ async fn real_worker() {
     assert_eq!(status(address, None), 401);
     assert_eq!(status(address, Some(&first.token)), 401);
     assert_eq!(status(address, Some(&second.token)), 303);
+    if builtin_locales {
+        assert!(authenticated_html(address, &second.token).contains("@dsh-ocean/builtin-locales"));
+    }
     assert!(fs::read(&marker).is_ok_and(|bytes| bytes == b"survives restart"));
     stop(&mut second).await;
+    if let Some(patch) = patch {
+        use std::os::unix::fs::PermissionsExt;
+        let tree = patch.parent().unwrap();
+        assert!(tree.is_absolute() && tree.starts_with(fixture.join("cache/builtin-locales")));
+        // Only this test's own sealed tree, after both workers were reaped.
+        fs::set_permissions(tree, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(tree.join("lib"), fs::Permissions::from_mode(0o700)).unwrap();
+    }
 }

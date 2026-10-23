@@ -80,6 +80,7 @@ fn server(base: Url, mode: ServerMode) -> Server {
         base_url: base,
         token: "pre-switch-token".into(),
         mode,
+        locale_patch: None,
         unit: match mode {
             ServerMode::Systemd => Some("dsh-web.service".into()),
             _ => None,
@@ -232,7 +233,7 @@ cmd="$2"
 case "$cmd" in
   show)
     if [[ "$*" == *--property=FragmentPath* ]]; then
-      if [ "${MOCK_BAD_FRAGMENT:-0}" = 1 ]; then echo /wrong/unit.service; else echo "$DSH_OCEAN_UNIT_PATH"; fi
+      if [ "${MOCK_BAD_FRAGMENT:-0}" = 1 ]; then echo /wrong/unit.service; elif [ -f "$DSH_OCEAN_UNIT_PATH" ]; then echo "$DSH_OCEAN_UNIT_PATH"; else echo; fi
     elif [[ "$*" == *--property=DropInPaths* ]]; then
       if [ "${MOCK_DROP_IN:-0}" = 1 ]; then echo "$DSH_OCEAN_UNIT_PATH.d/custom.conf"; fi
     elif [[ "$*" == *--property=ActiveState* ]]; then
@@ -260,6 +261,7 @@ case "$cmd" in
     echo "start" >> "$FIXTURE/actions"
     touch "$FIXTURE/active"
     if [ "${MOCK_START_FAIL:-0}" = 1 ]; then exit 1; fi ;;
+  enable) echo "enable" >> "$FIXTURE/actions" ;;
   daemon-reload)
     echo "reload" >> "$FIXTURE/actions"
     if [ "${MOCK_RELOAD_FAIL:-0}" = 1 ]; then exit 1; fi ;;
@@ -335,12 +337,188 @@ fn systemd_case() {
     )
     .unwrap();
     let old = generation_runtime(&old_root);
-    let old_unit = dsh_ocean::systemd::render_unit(&old, &base);
+    let old_unit = if case == "recover-locale-health" {
+        dsh_ocean::systemd::render_unit_with_patch(
+            &old,
+            &base,
+            &root.join("saved-resource/overlay.yml"),
+        )
+        .unwrap()
+    } else {
+        dsh_ocean::systemd::render_unit(&old, &base)
+    };
 
     // The service starts active.
     fs::write(root.join("active"), b"").unwrap();
 
     match case.as_str() {
+        "cold-locale-refusal"
+        | "cold-locale-active"
+        | "cold-locale-corrupt"
+        | "cold-locale-pending" => {
+            let bytes = if case == "cold-locale-corrupt" {
+                b"custom unit".to_vec()
+            } else {
+                old_unit.as_bytes().to_vec()
+            };
+            fs::write(&unit_path, &bytes).unwrap();
+            if case != "cold-locale-active" {
+                dsh_ocean::systemd::stop().unwrap();
+            }
+            if case == "cold-locale-pending" {
+                fs::write(prefix.join(".runtime-pending.json"), "pending").unwrap();
+            }
+            let patch = root.join("known-resource/overlay.yml");
+            assert!(dsh_ocean::systemd::ensure_unit_for_launch(
+                &old,
+                &base,
+                Some(&patch),
+                Some(&patch)
+            )
+            .is_err());
+            assert_eq!(fs::read(&unit_path).unwrap(), bytes);
+            let actions = fs::read_to_string(root.join("actions")).unwrap_or_default();
+            assert!(!actions
+                .lines()
+                .any(|line| matches!(line, "reload" | "enable" | "start")));
+        }
+        "cold-locale-retained" => {
+            use sha2::{Digest, Sha256};
+            let cache = prefix.join("builtin-locales");
+            let current = dsh_ocean::builtin_locale_cache::materialize(&cache).unwrap();
+            let license = current.join("LICENSE");
+            fs::set_permissions(&license, fs::Permissions::from_mode(0o600)).unwrap();
+            let mut bytes = fs::read(&license).unwrap();
+            bytes.push(b'\n');
+            fs::write(&license, bytes).unwrap();
+            fs::set_permissions(&license, fs::Permissions::from_mode(0o400)).unwrap();
+            let mut digest = Sha256::new();
+            for resource in dsh_ocean::builtin_locales::resources() {
+                let bytes = fs::read(current.join(resource.path)).unwrap();
+                digest.update((resource.path.len() as u64).to_be_bytes());
+                digest.update(resource.path.as_bytes());
+                digest.update((bytes.len() as u64).to_be_bytes());
+                digest.update(bytes);
+            }
+            let old_tree = cache.join(
+                digest
+                    .finalize()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>(),
+            );
+            assert_eq!(
+                current.canonicalize().unwrap().parent(),
+                Some(cache.canonicalize().unwrap().as_path())
+            );
+            assert_eq!(old_tree.parent(), Some(cache.as_path()));
+            assert!(!old_tree.exists());
+            fs::rename(&current, &old_tree).unwrap();
+            let previous = old_tree.join("overlay.yml");
+            let old_bytes =
+                dsh_ocean::systemd::render_unit_with_patch(&old, &base, &previous).unwrap();
+            fs::write(&unit_path, &old_bytes).unwrap();
+            dsh_ocean::systemd::stop().unwrap();
+            let desired = current.join("overlay.yml");
+            let result = (|| -> anyhow::Result<()> {
+                dsh_ocean::systemd::prove_cold_launch(&old, &base, Some(&desired))?;
+                let new_tree = dsh_ocean::builtin_locale_cache::materialize(&cache)?;
+                assert_eq!(new_tree, current);
+                dsh_ocean::systemd::ensure_unit_for_launch(
+                    &old,
+                    &base,
+                    Some(&desired),
+                    Some(&desired),
+                )?;
+                assert_eq!(
+                    fs::read(&unit_path)?,
+                    dsh_ocean::systemd::render_unit_with_patch(&old, &base, &desired)?.as_bytes()
+                );
+                dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, None, Some(&desired))?;
+                assert_eq!(fs::read(&unit_path)?, old_unit.as_bytes());
+                assert!(old_tree.exists());
+                Ok(())
+            })();
+            // Make only this fixture's sealed directories removable even on RED.
+            for tree in [&old_tree, &current] {
+                if tree.exists() {
+                    fs::set_permissions(tree.join("lib"), fs::Permissions::from_mode(0o700))
+                        .unwrap();
+                    fs::set_permissions(tree, fs::Permissions::from_mode(0o700)).unwrap();
+                }
+            }
+            result.unwrap();
+        }
+        "cold-locale-missing" => {
+            dsh_ocean::systemd::stop().unwrap();
+            assert!(!unit_path.exists());
+            let patch = root.join("known-resource/overlay.yml");
+            dsh_ocean::systemd::prove_cold_launch(&old, &base, Some(&patch)).unwrap();
+            assert!(!unit_path.exists());
+            dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, Some(&patch), Some(&patch))
+                .unwrap();
+            assert_eq!(
+                fs::read(&unit_path).unwrap(),
+                dsh_ocean::systemd::render_unit_with_patch(&old, &base, &patch)
+                    .unwrap()
+                    .as_bytes()
+            );
+        }
+        "cold-locale" => {
+            let launch = dsh_ocean::runtime_controller::systemd_launch_scope().unwrap();
+            assert_eq!(launch.cwd, account_home());
+            assert_eq!(launch.dsh_home, account_home().join(".dsh"));
+            fs::write(&unit_path, &old_unit).unwrap();
+            dsh_ocean::systemd::stop().unwrap();
+            let patch = root.join("known-resource/overlay.yml");
+            dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, Some(&patch), Some(&patch))
+                .unwrap();
+            assert_eq!(
+                fs::read(&unit_path).unwrap(),
+                dsh_ocean::systemd::render_unit_with_patch(&old, &base, &patch)
+                    .unwrap()
+                    .as_bytes()
+            );
+            dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, None, Some(&patch)).unwrap();
+            assert_eq!(fs::read(&unit_path).unwrap(), old_unit.as_bytes());
+            dsh_ocean::systemd::start().unwrap();
+            assert!(dsh_ocean::systemd::ensure_unit_for_launch(
+                &old,
+                &base,
+                Some(&patch),
+                Some(&patch)
+            )
+            .is_err());
+            assert_eq!(fs::read(&unit_path).unwrap(), old_unit.as_bytes());
+        }
+        "locale-unit" | "locale-change" => {
+            let patch = root.join("old-resource/overlay.yml");
+            let captured = dsh_ocean::systemd::render_unit_with_patch(&old, &base, &patch).unwrap();
+            fs::write(&unit_path, &captured).unwrap();
+            let state = AppState::default();
+            let permit = state.begin_update().unwrap();
+            let mut launched = server(base.clone(), ServerMode::Systemd);
+            launched.locale_patch = Some(patch.clone());
+            permit.publish_server(launched).unwrap();
+            let mut c =
+                OwnedController::headless(permit, old.clone(), candidate.clone(), expected_home())
+                    .unwrap();
+            if case == "locale-change" {
+                c = c.with_candidate_locale_patch(None).unwrap();
+            }
+            c.ownership(&old_root).unwrap();
+            let image = c.unit().unwrap().unwrap();
+            assert_eq!(image.before, captured.as_bytes());
+            assert_eq!(
+                String::from_utf8_lossy(&image.after).contains(patch.to_str().unwrap()),
+                case != "locale-change"
+            );
+            c.switch_unit(&Some(image.clone()), true).unwrap();
+            c.start(&candidate).unwrap();
+            c.switch_unit(&Some(image), false).unwrap();
+            c.start(&old_root).unwrap();
+            assert_eq!(fs::read(&unit_path).unwrap(), captured.as_bytes());
+        }
         "legacy-unit" | "unsafe-umask-unit" => {
             let legacy = old_unit.replace("UMask=0077\n", "");
             let captured = if case == "legacy-unit" {
@@ -385,11 +563,11 @@ fn systemd_case() {
                 );
             }
         }
-        "health-delayed-journal" | "recover-health-delayed-journal" => {
+        "health-delayed-journal" | "recover-health-delayed-journal" | "recover-locale-health" => {
             fs::write(&unit_path, &old_unit).unwrap();
             let state = AppState::default();
             let permit = state.begin_update().unwrap();
-            let mut c = if case == "recover-health-delayed-journal" {
+            let mut c = if case.starts_with("recover-") {
                 assert!(permit.server().unwrap().is_none());
                 OwnedController::headless_recover(
                     permit,
@@ -413,6 +591,10 @@ fn systemd_case() {
                 OwnedController::headless(permit, old.clone(), candidate.clone(), expected_home())
                     .unwrap()
             };
+            if case == "recover-locale-health" {
+                c.restore_locale_patches(Some(root.join("saved-resource/overlay.yml")), None)
+                    .unwrap();
+            }
             c.ownership(&old_root).unwrap();
             c.stop().unwrap();
             c.stopped().unwrap();
@@ -420,6 +602,12 @@ fn systemd_case() {
             c.health()
                 .expect("must await a fresh authenticated journal token, not just systemctl start");
             assert_eq!(c.permit().server().unwrap().unwrap().token, "good-token");
+            if case == "recover-locale-health" {
+                assert_eq!(
+                    c.permit().server().unwrap().unwrap().locale_patch,
+                    Some(root.join("saved-resource/overlay.yml"))
+                );
+            }
             c.stop().unwrap();
             c.stopped().unwrap();
         }
@@ -800,6 +988,68 @@ fn systemd_ownership_unit_switch_and_start_roundtrip() {
 }
 
 #[test]
+fn systemd_patch_recipe_keeps_exact_before_image_through_candidate_and_rollback() {
+    let f = SysFixture::new();
+    let output = f.command("locale-unit").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn systemd_plain_candidate_preserves_exact_patched_rollback_unit() {
+    let f = SysFixture::new();
+    let output = f.command("locale-change").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn cold_systemd_native_recipe_updates_only_exact_inactive_owned_unit() {
+    let f = SysFixture::new();
+    let output = f.command("cold-locale").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn cold_native_systemd_refusals_leave_unit_bytes_and_service_actions_untouched() {
+    for flag in [
+        "MOCK_DROP_IN",
+        "MOCK_BAD_FRAGMENT",
+        "MOCK_IS_ACTIVE_UNKNOWN",
+        "MOCK_IS_ACTIVE_FAILED",
+    ] {
+        let f = SysFixture::new();
+        let output = f
+            .command("cold-locale-refusal")
+            .env(flag, "1")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}: {}", flag, describe(&output));
+    }
+    for case in [
+        "cold-locale-active",
+        "cold-locale-corrupt",
+        "cold-locale-pending",
+    ] {
+        let f = SysFixture::new();
+        let output = f.command(case).output().unwrap();
+        assert!(output.status.success(), "{}", describe(&output));
+    }
+}
+
+#[test]
+fn cold_native_systemd_proves_missing_slot_before_creation() {
+    let f = SysFixture::new();
+    let output = f.command("cold-locale-missing").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn cold_native_systemd_recognizes_verified_retained_content_identity() {
+    let f = SysFixture::new();
+    let output = f.command("cold-locale-retained").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
 fn systemd_refuses_external_edit() {
     let f = SysFixture::new();
     let output = f.command("external-edit").output().unwrap();
@@ -822,7 +1072,11 @@ fn systemd_stop_precedes_the_inactive_proof() {
 
 #[test]
 fn systemd_waits_for_delayed_token_in_apply_and_fresh_recovery() {
-    for case in ["health-delayed-journal", "recover-health-delayed-journal"] {
+    for case in [
+        "health-delayed-journal",
+        "recover-health-delayed-journal",
+        "recover-locale-health",
+    ] {
         let gate = TokenGate::spawn("good-token");
         let f = SysFixture::new();
         let output = f
@@ -1090,19 +1344,18 @@ fn child_case() {
     let old_node = old_root.join("runtime/node/bin/node");
     let old_dsh = old_root.join("harness/node_modules/.bin/dsh");
     let log: dsh_ocean::managed_child::Log = std::sync::Arc::new(|_| {});
+    let recipe = if case.starts_with("recipe-") {
+        Some(root.join("old-resource/overlay.yml"))
+    } else {
+        None
+    };
+    let launch_args = dsh_ocean::service::managed_arguments(recipe.as_deref()).unwrap();
+    let launch_args = launch_args.iter().map(String::as_str).collect::<Vec<_>>();
     let started = tauri::async_runtime::handle()
         .block_on(dsh_ocean::managed_child::start(
             &old_node,
             &old_dsh,
-            &[
-                "--profile",
-                "web",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                "0",
-                "--no-open",
-            ],
+            &launch_args,
             "/usr/bin:/bin",
             Duration::from_secs(10),
             log,
@@ -1110,11 +1363,62 @@ fn child_case() {
         .expect("old managed child starts");
     let base = started.base_url.clone();
     let child_pid = started.child.id().unwrap();
-    permit
-        .publish_child(server(base, ServerMode::Child), started.child)
-        .unwrap();
+    let mut launched = server(base, ServerMode::Child);
+    launched.locale_patch = recipe.clone();
+    permit.publish_child(launched, started.child).unwrap();
 
     match case.as_str() {
+        "recipe-roundtrip" | "recipe-change" | "recipe-recovery" => {
+            let mut c = OwnedController::headless(
+                permit,
+                old.clone(),
+                candidate.clone(),
+                root.join("home/.dsh"),
+            )
+            .unwrap();
+            if case != "recipe-roundtrip" {
+                c = c.with_candidate_locale_patch(None).unwrap();
+            }
+            c.ownership(&old_root).unwrap();
+            c.stop().unwrap();
+            c.stopped().unwrap();
+            fs::write(&marker, "").unwrap();
+            c.start(&candidate).unwrap();
+            let expected = if case != "recipe-roundtrip" {
+                None
+            } else {
+                recipe.clone()
+            };
+            assert_eq!(c.permit().server().unwrap().unwrap().locale_patch, expected);
+            assert_eq!(
+                fs::read_to_string(&marker)
+                    .unwrap()
+                    .contains(recipe.as_ref().unwrap().to_str().unwrap()),
+                expected.is_some()
+            );
+            if case == "recipe-recovery" {
+                drop(c);
+                let permit = state.begin_update().unwrap();
+                c = OwnedController::headless_recover(
+                    permit,
+                    old_root.clone(),
+                    candidate.clone(),
+                    root.join("home/.dsh"),
+                    None,
+                )
+                .unwrap();
+                c.restore_locale_patches(recipe.clone(), None).unwrap();
+                c.ownership(&old_root).unwrap();
+            }
+            c.stop().unwrap();
+            c.stopped().unwrap();
+            fs::write(&marker, "").unwrap();
+            c.start(&old_root).unwrap();
+            assert_eq!(c.permit().server().unwrap().unwrap().locale_patch, recipe);
+            assert!(fs::read_to_string(&marker)
+                .unwrap()
+                .contains(recipe.as_ref().unwrap().to_str().unwrap()));
+        }
         "stop-reaps" => {
             let mut c = OwnedController::headless(
                 permit,
@@ -1248,7 +1552,7 @@ impl ChildFixture {
             executable(
                 &dsh_dir.join("dsh"),
                 &format!(
-                    "#!/bin/bash\nprintf '%s\\n' \"$0\" >> \"$DSH_OCEAN_MARKER\"\nprintf 'dsh web: http://127.0.0.1:%s/?token=%s\\n' \"$DSH_OCEAN_PORT\" \"{token}\"\nexec sleep 30\n"
+                    "#!/bin/bash\nprintf '%s\\n' \"$0\" \"$@\" >> \"$DSH_OCEAN_MARKER\"\nprintf 'dsh web: http://127.0.0.1:%s/?token=%s\\n' \"$DSH_OCEAN_PORT\" \"{token}\"\nexec sleep 30\n"
                 ),
             );
         }
@@ -1277,6 +1581,27 @@ impl Drop for ChildFixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+
+#[test]
+fn child_candidate_and_rollback_retain_captured_launch_patch() {
+    let f = ChildFixture::new();
+    let output = f.command("recipe-roundtrip", None).output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn plain_candidate_does_not_replace_captured_patched_rollback_recipe() {
+    let f = ChildFixture::new();
+    let output = f.command("recipe-change", None).output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn same_session_child_recovery_uses_saved_old_recipe_not_current_plain_candidate() {
+    let f = ChildFixture::new();
+    let output = f.command("recipe-recovery", None).output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
 }
 
 #[test]

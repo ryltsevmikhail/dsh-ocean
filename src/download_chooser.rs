@@ -9,18 +9,31 @@ pub fn build(
     source: &str,
     folder: Option<&Path>,
 ) -> gtk::FileChooserDialog {
+    build_for(crate::i18n::active_language(), parent, name, source, folder)
+}
+pub fn build_for(
+    language: crate::i18n::Language,
+    parent: Option<&gtk::Window>,
+    name: &str,
+    source: &str,
+    folder: Option<&Path>,
+) -> gtk::FileChooserDialog {
+    let tr = |key| crate::i18n::message(language, key).expect("validated download message");
     let origin = url::Url::parse(source)
         .ok()
         .filter(|url| matches!(url.scheme(), "http" | "https"))
         .map(|url| url.origin().ascii_serialization())
-        .unwrap_or_else(|| "the current DSH server".into());
+        .unwrap_or_else(|| tr("downloads.origin").into());
     let dialog = gtk::FileChooserDialog::with_buttons(
-        Some(&format!("Save download from {origin}")),
+        Some(
+            &crate::i18n::render(language, "downloads.save_title", &[("origin", &origin)])
+                .expect("validated download message"),
+        ),
         parent,
         gtk::FileChooserAction::Save,
         &[
-            ("Cancel", gtk::ResponseType::Cancel),
-            ("Save new file", gtk::ResponseType::Accept),
+            (tr("common.cancel"), gtk::ResponseType::Cancel),
+            (tr("downloads.save_new"), gtk::ResponseType::Accept),
         ],
     );
     dialog.set_modal(true);
@@ -28,9 +41,8 @@ pub fn build(
     dialog.set_local_only(true);
     dialog.set_current_name(&crate::downloads::suggested_name(name));
     dialog.set_do_overwrite_confirmation(false);
-    let hint = gtk::Label::new(Some(
-        "Existing files are never overwritten. Choose a new filename.",
-    ));
+    let hint = gtk::Label::new(Some(tr("downloads.no_overwrite")));
+    hint.set_use_markup(false);
     hint.show();
     dialog.set_extra_widget(&hint);
     if let Some(folder) = folder.filter(|path| path.is_dir()) {
@@ -48,8 +60,8 @@ pub fn run(dialog: &gtk::FileChooserDialog) -> Option<PathBuf> {
         };
         let warning = match std::fs::symlink_metadata(&path) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => break Some(path),
-            Ok(_) => "This filename already exists. Choose a new filename.",
-            Err(_) => "Cannot check this filename. Choose a new location.",
+            Ok(_) => crate::i18n::text("downloads.exists"),
+            Err(_) => crate::i18n::text("downloads.cannot_check"),
         };
         if let Some(label) = dialog
             .extra_widget()

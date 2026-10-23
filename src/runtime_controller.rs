@@ -34,6 +34,9 @@ pub struct OwnedController {
     base: Url,
     old: Runtime,
     candidate: PathBuf,
+    old_locale_patch: Option<PathBuf>,
+    candidate_locale_patch: Option<PathBuf>,
+    active_locale_patch: Option<PathBuf>,
     expected_home: PathBuf,
     old_root: Option<PathBuf>,
     old_unit: Option<Vec<u8>>,
@@ -131,7 +134,19 @@ fn resolve_manager_dsh_home(env: &systemd::ManagerEnvironment, home: &Path) -> R
 /// never shell-evaluated). Anything that cannot be proven — a query failure,
 /// timeout, oversized block, or a quoted/duplicate/relative/empty value — is
 /// refused (fail closed) instead of silently snapshotting the wrong environment.
-fn validate_systemd_scope(expected_home: &Path) -> Result<()> {
+pub fn systemd_launch_scope() -> Result<crate::builtin_locale_planner::LaunchScope> {
+    anyhow::ensure!(
+        std::env::var_os("DSH_HOME").is_none(),
+        "client DSH_HOME override cannot authorize the user manager profile"
+    );
+    let environment = systemd::show_environment()?;
+    let home = resolve_manager_home(&environment)?;
+    let dsh_home = resolve_manager_dsh_home(&environment, &home)?;
+    let cwd = config::account_home()
+        .context("resolve passwd working directory used by the managed unit")?;
+    crate::builtin_locale_planner::LaunchScope::checked(home, Some(dsh_home.into_os_string()), cwd)
+}
+pub(crate) fn validate_systemd_scope(expected_home: &Path) -> Result<()> {
     // Round1 strict refusal preserved: a client DSH_HOME override makes the
     // snapshot scope ambiguous and is refused before any manager query.
     if std::env::var_os("DSH_HOME").is_some() {
@@ -180,6 +195,28 @@ fn generation_runtime(root: &Path) -> Runtime {
 }
 
 impl OwnedController {
+    /// Set an already admitted candidate recipe before ownership/stop begins.
+    /// The captured old recipe is immutable, including when candidate is plain.
+    pub fn with_candidate_locale_patch(mut self, patch: Option<PathBuf>) -> Result<Self> {
+        self.permit.ensure_open()?;
+        anyhow::ensure!(
+            !self.recovery && self.old_root.is_none(),
+            "candidate locale recipe must be planned before the switch"
+        );
+        service::managed_arguments(patch.as_deref())?;
+        self.candidate_locale_patch = patch;
+        Ok(self)
+    }
+    fn locale_patch_for_root(&self, root: &Path) -> Result<Option<PathBuf>> {
+        let root = canonical(root)?;
+        if root == canonical(&self.candidate)? {
+            Ok(self.candidate_locale_patch.clone())
+        } else if Some(root.as_path()) == self.old_root.as_deref() {
+            Ok(self.old_locale_patch.clone())
+        } else {
+            anyhow::bail!("unknown runtime root requested to start")
+        }
+    }
     /// Production constructor: keeps `app` for the final window reload and runs
     /// on a dedicated blocking worker, never the GTK/Tokio core thread.
     ///
@@ -271,6 +308,9 @@ impl OwnedController {
                 handle: tauri::async_runtime::handle(),
                 permit,
                 mode: ServerMode::Systemd,
+                old_locale_patch: None,
+                candidate_locale_patch: None,
+                active_locale_patch: None,
                 base,
                 old,
                 candidate,
@@ -351,6 +391,9 @@ impl OwnedController {
             handle: tauri::async_runtime::handle(),
             permit,
             mode: server.mode,
+            old_locale_patch: server.locale_patch.clone(),
+            candidate_locale_patch: server.locale_patch.clone(),
+            active_locale_patch: server.locale_patch.clone(),
             base,
             old,
             candidate,
@@ -438,7 +481,12 @@ impl OwnedController {
             return Ok(());
         }
         anyhow::ensure!(
-            systemd::is_generated_unit(&self.old, &self.base, &on_disk),
+            systemd::matches_launch_unit(
+                &self.old,
+                &self.base,
+                self.old_locale_patch.as_deref(),
+                &on_disk
+            ),
             "the managed unit differs from the exact generated unit; automatic switch refused"
         );
         self.verify_provenance()?;
@@ -463,6 +511,28 @@ impl OwnedController {
 }
 
 impl Controller for OwnedController {
+    fn locale_patches(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+        (
+            self.old_locale_patch.clone(),
+            self.candidate_locale_patch.clone(),
+        )
+    }
+    fn restore_locale_patches(
+        &mut self,
+        old: Option<PathBuf>,
+        candidate: Option<PathBuf>,
+    ) -> Result<()> {
+        self.permit.ensure_open()?;
+        anyhow::ensure!(
+            self.recovery && self.old_root.is_none(),
+            "locale journal recipes must precede recovery ownership"
+        );
+        service::managed_arguments(old.as_deref())?;
+        service::managed_arguments(candidate.as_deref())?;
+        self.old_locale_patch = old;
+        self.candidate_locale_patch = candidate;
+        Ok(())
+    }
     fn ownership(&mut self, old: &Path) -> Result<()> {
         let root = canonical(&generation_root(&self.old)?)?;
         let old = canonical(old)?;
@@ -534,7 +604,8 @@ impl Controller for OwnedController {
     }
 
     fn start(&mut self, root: &Path) -> Result<()> {
-        match self.mode {
+        let patch = self.locale_patch_for_root(root)?;
+        let result = match self.mode {
             ServerMode::Systemd => {
                 // Recheck the manager-env scope immediately before activation:
                 // the manager environment that the freshly started service will
@@ -560,11 +631,19 @@ impl Controller for OwnedController {
                     None => std::sync::Arc::new(|_| {}),
                 };
                 self.handle
-                    .block_on(service::spawn_managed_logged(&runtime, &self.permit, log))?;
+                    .block_on(service::spawn_managed_logged_with_patch(
+                        &runtime,
+                        &self.permit,
+                        log,
+                        patch.as_deref(),
+                    ))?;
                 Ok(())
             }
             ServerMode::Attached => unreachable!("attached refused at construction"),
-        }
+        };
+        result?;
+        self.active_locale_patch = patch;
+        Ok(())
     }
 
     fn health(&mut self) -> Result<()> {
@@ -583,6 +662,7 @@ impl Controller for OwnedController {
                     token,
                     mode: ServerMode::Systemd,
                     unit: Some(self.unit_name.clone()),
+                    locale_patch: self.active_locale_patch.clone(),
                 })?;
                 Ok(())
             }
@@ -615,8 +695,12 @@ impl Controller for OwnedController {
                     .old_unit
                     .clone()
                     .context("owned unit image not captured")?;
-                let after = systemd::render_unit(&generation_runtime(&self.candidate), &self.base)
-                    .into_bytes();
+                let candidate = generation_runtime(&self.candidate);
+                let after = match self.candidate_locale_patch.as_deref() {
+                    Some(patch) => systemd::render_unit_with_patch(&candidate, &self.base, patch)?,
+                    None => systemd::render_unit(&candidate, &self.base),
+                }
+                .into_bytes();
                 self.new_unit = Some(after.clone());
                 Ok(Some(UnitImage { before, after }))
             }
@@ -671,6 +755,7 @@ mod tests {
             token: "test-token".into(),
             mode: ServerMode::Child,
             unit: None,
+            locale_patch: None,
         }
     }
 

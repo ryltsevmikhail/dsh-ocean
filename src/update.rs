@@ -34,8 +34,8 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
             Ok(None) if recovery_only => {
                 show_message(
                     &app,
-                    "Runtime recovery",
-                    "No runtime recovery is pending. Retry the normal startup if needed.",
+                    crate::i18n::text("recovery.title"),
+                    crate::i18n::text("recovery.no_pending"),
                     gtk::MessageType::Info,
                 );
                 return;
@@ -44,7 +44,7 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
             Err(error) => {
                 show_message(
                     &app,
-                    "Runtime recovery inspection failed",
+                    crate::i18n::text("recovery.inspection_failed_title"),
                     &format!("{error:#}"),
                     gtk::MessageType::Error,
                 );
@@ -54,8 +54,8 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
         let Some(runtime) = bootstrap::detect() else {
             show_message(
                 &app,
-                "DSH update check",
-                "DeepSeek Harness was not found; install it in the setup window first.",
+                crate::i18n::text("runtime_ui.check_title"),
+                crate::i18n::text("runtime_ui.not_found"),
                 gtk::MessageType::Error,
             );
             return;
@@ -65,8 +65,13 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
             Err(error) => {
                 show_message(
                     &app,
-                    "DSH update check",
-                    &format!("invalid installed DSH version: {error}"),
+                    crate::i18n::text("runtime_ui.check_title"),
+                    &crate::i18n::render(
+                        crate::i18n::active_language(),
+                        "runtime_ui.invalid_version",
+                        &[("error", &error.to_string())],
+                    )
+                    .expect("validated invalid runtime version diagnostic"),
                     gtk::MessageType::Error,
                 );
                 return;
@@ -79,7 +84,7 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
             Err(error) => {
                 show_message(
                     &app,
-                    "Update busy",
+                    crate::i18n::text("runtime_ui.busy_title"),
                     &error.to_string(),
                     gtk::MessageType::Warning,
                 );
@@ -103,7 +108,7 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
                 drop(operation);
                 show_message(
                     &app,
-                    "DSH update check failed",
+                    crate::i18n::text("runtime_ui.check_failed_title"),
                     &auth::redact(&format!("{error:#}")),
                     gtk::MessageType::Error,
                 );
@@ -113,11 +118,25 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
 }
 
 fn describe_check(runtime: &Runtime, check: &Check) -> String {
-    let summary = &check.summary;
+    describe_check_in(
+        &runtime.version,
+        &check.summary,
+        &check.source,
+        crate::i18n::active_language(),
+    )
+}
+fn describe_check_in(
+    installed: &str,
+    summary: &serde_json::Value,
+    source: &managed_runtime::SourceSummary,
+    language: crate::i18n::Language,
+) -> String {
+    let unknown = crate::i18n::message(language, "runtime_ui.unknown")
+        .expect("embedded unknown runtime metadata label");
     let release = summary
         .get("release")
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown");
+        .unwrap_or(unknown);
     let sequence = summary
         .get("sequence")
         .and_then(serde_json::Value::as_u64)
@@ -125,16 +144,33 @@ fn describe_check(runtime: &Runtime, check: &Check) -> String {
     let fingerprint = summary
         .get("keyFingerprint")
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown");
-    format!(
-        "Installed:  {}\nChannel:    {}\nUpdate:     {} (sequence {})\nPublic key: {}\nSource:     {}\n\nThis downloads the signed runtime bundle, verifies it, stops the local server, takes a full private (unencrypted) backup of your DSH home — credentials, configuration, plugins and sessions — and activates the new runtime. The server and its WebSocket clients will restart. Close all other DSH CLI/TUI writers first.",
-        runtime.version,
-        check.source.channel,
-        release,
-        sequence,
-        fingerprint,
-        check.source.manifest_url,
+        .unwrap_or(unknown);
+    crate::i18n::render(
+        language,
+        "runtime_ui.description",
+        &[
+            ("installed", installed),
+            ("channel", &source.channel),
+            ("release", release),
+            ("sequence", &sequence.to_string()),
+            ("fingerprint", fingerprint),
+            ("source", &source.manifest_url),
+        ],
     )
+    .expect("validated signed runtime offer metadata")
+}
+fn apply_block_guidance_in(
+    block: managed_runtime::ApplyBlock,
+    language: crate::i18n::Language,
+) -> &'static str {
+    let key = match block {
+        managed_runtime::ApplyBlock::External => "external",
+        managed_runtime::ApplyBlock::Attached => "attached",
+        managed_runtime::ApplyBlock::Remote => "remote",
+        managed_runtime::ApplyBlock::NoServer => "no_server",
+    };
+    crate::i18n::message(language, &format!("runtime_ui.block.{key}"))
+        .expect("embedded check-only ownership guidance")
 }
 
 fn present_update(app: &AppHandle, runtime: Runtime, check: Check) {
@@ -145,10 +181,13 @@ fn present_update(app: &AppHandle, runtime: Runtime, check: Check) {
     if let Some(block) = managed_runtime::apply_block(&runtime, server.as_ref()) {
         let mut body = describe_check(&runtime, &check);
         body.push_str("\n\n");
-        body.push_str(block.guidance());
+        body.push_str(apply_block_guidance_in(
+            block,
+            crate::i18n::active_language(),
+        ));
         ui::message(
             app,
-            "DSH update available",
+            crate::i18n::text("runtime_ui.available_title"),
             &body,
             gtk::MessageType::Warning,
         );
@@ -156,26 +195,48 @@ fn present_update(app: &AppHandle, runtime: Runtime, check: Check) {
     }
     match check.status {
         managed_runtime::Status::Current => {
-            let body = format!(
-                "Installed:  {}\nChannel:    {}\n\nYou are on the latest DSH for this channel.",
-                runtime.version, check.source.channel
+            let body = crate::i18n::render(
+                crate::i18n::active_language(),
+                "runtime_ui.current",
+                &[
+                    ("installed", &runtime.version),
+                    ("channel", &check.source.channel),
+                ],
+            )
+            .expect("validated current runtime metadata");
+            ui::message(
+                app,
+                crate::i18n::text("runtime_ui.updates_title"),
+                &body,
+                gtk::MessageType::Info,
             );
-            ui::message(app, "DSH updates", &body, gtk::MessageType::Info);
         }
         managed_runtime::Status::Available => {
             let release = check
                 .summary
                 .get("release")
                 .and_then(serde_json::Value::as_str)
-                .unwrap_or("unknown")
+                .unwrap_or(crate::i18n::text("runtime_ui.unknown"))
                 .to_owned();
             let mut body = describe_check(&runtime, &check);
-            body.push_str(&format!("\n\nUpdate to {release} now?"));
+            body.push_str(
+                &crate::i18n::render(
+                    crate::i18n::active_language(),
+                    "runtime_ui.question",
+                    &[("release", &release)],
+                )
+                .expect("validated explicit runtime apply question"),
+            );
             let app_for_update = app.clone();
             let candidate = check.candidate;
-            ui::confirm(app, "DSH update available", &body, move || {
-                perform_apply(app_for_update, runtime, candidate);
-            });
+            ui::confirm(
+                app,
+                crate::i18n::text("runtime_ui.available_title"),
+                &body,
+                move || {
+                    perform_apply(app_for_update, runtime, candidate);
+                },
+            );
         }
     }
 }
@@ -187,7 +248,7 @@ fn perform_apply(app: AppHandle, runtime: Runtime, candidate: Candidate) {
         Err(error) => {
             show_message(
                 &app,
-                "Runtime busy",
+                crate::i18n::text("recovery.runtime_busy_title"),
                 &error.to_string(),
                 gtk::MessageType::Warning,
             );
@@ -199,7 +260,7 @@ fn perform_apply(app: AppHandle, runtime: Runtime, candidate: Candidate) {
         Err(error) => {
             show_message(
                 &app,
-                "Update busy",
+                crate::i18n::text("runtime_ui.busy_title"),
                 &error.to_string(),
                 gtk::MessageType::Warning,
             );
@@ -228,8 +289,8 @@ fn present_apply_outcome(app: &AppHandle, cancelled: bool, result: anyhow::Resul
     if cancelled {
         show_message(
             app,
-            "Update cancelled",
-            "No runtime was activated.",
+            crate::i18n::text("runtime_ui.cancelled_title"),
+            crate::i18n::text("runtime_ui.cancelled"),
             gtk::MessageType::Info,
         );
         return;
@@ -237,23 +298,30 @@ fn present_apply_outcome(app: &AppHandle, cancelled: bool, result: anyhow::Resul
     match result {
         Ok(ApplyOutcome::Applied { release }) => show_message(
             app,
-            "DSH updated",
-            &format!("DeepSeek Harness {release} is now active."),
+            crate::i18n::text("runtime_ui.applied_title"),
+            &crate::i18n::render(
+                crate::i18n::active_language(),
+                "runtime_ui.applied",
+                &[("release", &release)],
+            )
+            .expect("validated applied runtime release"),
             gtk::MessageType::Info,
         ),
         Ok(ApplyOutcome::RolledBack { error }) => show_message(
             app,
-            "DSH update not committed",
-            &format!(
-                "The previous runtime was restored.\n\n{}",
-                auth::redact(&error)
-            ),
+            crate::i18n::text("runtime_ui.rollback_title"),
+            &crate::i18n::render(
+                crate::i18n::active_language(),
+                "runtime_ui.rollback",
+                &[("error", &auth::redact(&error))],
+            )
+            .expect("validated rollback diagnostic"),
             gtk::MessageType::Error,
         ),
         Ok(ApplyOutcome::PendingRecovery { error }) => present_pending(app, &auth::redact(&error)),
         Err(error) => show_message(
             app,
-            "DSH update failed",
+            crate::i18n::text("runtime_ui.failed_title"),
             &auth::redact(&format!("{error:#}")),
             gtk::MessageType::Error,
         ),
@@ -261,30 +329,48 @@ fn present_apply_outcome(app: &AppHandle, cancelled: bool, result: anyhow::Resul
 }
 
 fn present_recovery(app: &AppHandle, info: &crate::runtime_switch::PendingInfo) {
-    let snapshot = if info.has_snapshot {
-        "A full private home backup snapshot is available for rollback."
+    let snapshot = crate::i18n::text(if info.has_snapshot {
+        "recovery.snapshot_available"
     } else {
-        "No snapshot was captured before activation."
-    };
-    let body = format!(
-        "A runtime switch is pending and ordinary start/restart stays blocked until recovery succeeds.\n\nOld generation: {}\nNew generation: {}\n{snapshot}\n\nRecover the previous runtime now?",
-        info.old.display(),
-        info.new.display()
-    );
-    let app_for_recover = app.clone();
-    ui::confirm(app, "Runtime recovery required", &body, move || {
-        perform_recover(app_for_recover);
+        "recovery.snapshot_missing"
     });
+    let body = crate::i18n::render(
+        crate::i18n::active_language(),
+        "recovery.confirmation",
+        &[
+            ("old", &info.old.display().to_string()),
+            ("new", &info.new.display().to_string()),
+            ("snapshot", snapshot),
+        ],
+    )
+    .expect("validated explicit recovery confirmation");
+    let app_for_recover = app.clone();
+    ui::confirm(
+        app,
+        crate::i18n::text("recovery.required_title"),
+        &body,
+        move || {
+            perform_recover(app_for_recover);
+        },
+    );
 }
 
 fn present_pending(app: &AppHandle, error: &str) {
-    let body = format!(
-        "The runtime switch did not complete and the previous runtime could not be restored automatically. Ordinary start/restart stays blocked until recovery succeeds.\n\n{error}\n\nRecover the previous runtime now?"
-    );
+    let body = crate::i18n::render(
+        crate::i18n::active_language(),
+        "recovery.pending_confirmation",
+        &[("error", error)],
+    )
+    .expect("validated blocked recovery confirmation");
     let app_for_recover = app.clone();
-    ui::confirm(app, "Runtime recovery required", &body, move || {
-        perform_recover(app_for_recover);
-    });
+    ui::confirm(
+        app,
+        crate::i18n::text("recovery.required_title"),
+        &body,
+        move || {
+            perform_recover(app_for_recover);
+        },
+    );
 }
 
 fn perform_recover(app: AppHandle) {
@@ -294,7 +380,7 @@ fn perform_recover(app: AppHandle) {
         Err(error) => {
             show_message(
                 &app,
-                "Runtime busy",
+                crate::i18n::text("recovery.runtime_busy_title"),
                 &error.to_string(),
                 gtk::MessageType::Warning,
             );
@@ -306,7 +392,7 @@ fn perform_recover(app: AppHandle) {
         Err(error) => {
             show_message(
                 &app,
-                "Recovery busy",
+                crate::i18n::text("recovery.busy_title"),
                 &error.to_string(),
                 gtk::MessageType::Warning,
             );
@@ -344,10 +430,18 @@ fn recover_outcome_message(
     cancelled: bool,
     result: &anyhow::Result<RecoverOutcome>,
 ) -> (&'static str, String, gtk::MessageType) {
+    recover_outcome_message_in(cancelled, result, crate::i18n::active_language())
+}
+fn recover_outcome_message_in(
+    cancelled: bool,
+    result: &anyhow::Result<RecoverOutcome>,
+    language: crate::i18n::Language,
+) -> (&'static str, String, gtk::MessageType) {
+    let message = |key| crate::i18n::message(language, key).expect("embedded recovery message");
     if cancelled {
         return (
-            "Recovery cancelled",
-            "The pending transaction was retained.".to_owned(),
+            message("recovery.cancelled_title"),
+            message("recovery.cancelled").into(),
             gtk::MessageType::Warning,
         );
     }
@@ -355,29 +449,30 @@ fn recover_outcome_message(
         Ok(RecoverOutcome::Recovered {
             refresh_error: None,
         }) => (
-            "Runtime recovered",
-            "The previous runtime was restored and is serving again.".to_owned(),
+            message("recovery.recovered_title"),
+            message("recovery.recovered").into(),
             gtk::MessageType::Info,
         ),
         Ok(RecoverOutcome::Recovered {
             refresh_error: Some(error),
         }) => (
-            "Runtime recovered",
-            format!(
-                "The previous runtime was restored and is serving again.\n\n\
-                 The window refresh to the restored runtime failed: {}\n\
-                 Recovery is complete and the pending transaction was cleared; \
-                 start or restart DSH normally.",
-                auth::redact(error)
-            ),
+            message("recovery.recovered_title"),
+            crate::i18n::render(
+                language,
+                "recovery.refresh_warning",
+                &[("error", &auth::redact(error))],
+            )
+            .expect("validated recovered window warning"),
             gtk::MessageType::Warning,
         ),
         Err(error) => (
-            "Recovery incomplete",
-            format!(
-                "The pending transaction was retained; ordinary start/restart stays blocked.\n\n{}",
-                auth::redact(&format!("{error:#}"))
-            ),
+            message("recovery.incomplete_title"),
+            crate::i18n::render(
+                language,
+                "recovery.incomplete",
+                &[("error", &auth::redact(&format!("{error:#}")))],
+            )
+            .expect("validated pending recovery diagnostic"),
             gtk::MessageType::Error,
         ),
     }
@@ -393,6 +488,64 @@ fn show_message(app: &AppHandle, title: &'static str, body: &str, kind: gtk::Mes
 mod tests {
     use super::*;
 
+    #[test]
+    fn runtime_offer_is_localized_without_reparsing_summary_or_changing_apply_blocks() {
+        let source = managed_runtime::SourceSummary {
+            channel: "next".into(),
+            manifest_url: "https://example.invalid/{release}".into(),
+            signature_url: "https://example.invalid/signature".into(),
+        };
+        let summary = serde_json::json!({"release":"<b>{installed}</b>","sequence":31,"keyFingerprint":"synthetic-fingerprint"});
+        for (language, _) in crate::i18n::LANGUAGES {
+            let body = describe_check_in("0.2.0", &summary, &source, language);
+            assert!(
+                body.contains("<b>{installed}</b>")
+                    && body.contains("https://example.invalid/{release}")
+                    && body.contains("31")
+                    && body.contains("synthetic-fingerprint")
+            );
+            for (block, key) in [
+                (managed_runtime::ApplyBlock::External, "external"),
+                (managed_runtime::ApplyBlock::Attached, "attached"),
+                (managed_runtime::ApplyBlock::Remote, "remote"),
+                (managed_runtime::ApplyBlock::NoServer, "no_server"),
+            ] {
+                assert_eq!(
+                    apply_block_guidance_in(block, language),
+                    crate::i18n::message(language, &format!("runtime_ui.block.{key}")).unwrap()
+                );
+            }
+        }
+    }
+    #[test]
+    fn recovery_truth_and_redaction_are_preserved_in_every_language() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            let result = Ok(RecoverOutcome::Recovered {
+                refresh_error: Some("http://127.0.0.1/?token=synthetic-private".into()),
+            });
+            let (title, body, kind) = recover_outcome_message_in(false, &result, language);
+            assert_eq!(
+                title,
+                crate::i18n::message(language, "recovery.recovered_title").unwrap()
+            );
+            assert!(
+                matches!(kind, gtk::MessageType::Warning) && !body.contains("synthetic-private")
+            );
+            let (_, body, kind) =
+                recover_outcome_message_in(false, &Err(anyhow::anyhow!("failure")), language);
+            assert!(matches!(kind, gtk::MessageType::Error));
+            assert!(body.contains(
+                &crate::i18n::render(language, "recovery.incomplete", &[("error", "failure")])
+                    .unwrap()
+            ));
+            let (_, body, kind) = recover_outcome_message_in(true, &result, language);
+            assert!(matches!(kind, gtk::MessageType::Warning));
+            assert_eq!(
+                body,
+                crate::i18n::message(language, "recovery.cancelled").unwrap()
+            );
+        }
+    }
     #[test]
     fn recover_outcome_message_never_claims_pending_after_recovery() {
         // A completed recovery with a failed window refresh is a warning that
