@@ -42,6 +42,11 @@ empty/error states and authenticity/offline-operation notices. Configuration-bac
 creation localizes its update-busy warning, destination receipt and result headings;
 existing update guards, private storage creation and redacted technical errors are
 unchanged. No restore, prune or deletion action is added to the history window.
+Whole-data snapshot consent, aggregate copy progress and terminal notices are also
+localized. The existing explicit-accept requirement, single-run gate, cooperative
+cancellation and staging cleanup flow remain unchanged. A private native GTK test
+checks that confirmation has no default acceptance and uses plain-text labels;
+it constructs synthetic counters only and does not start a snapshot worker.
 Other native panels and status summaries are still being localized.
 
 ## Harness resource tree

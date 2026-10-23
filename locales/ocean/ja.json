@@ -172,5 +172,21 @@
   "backup.saved_title": "プロファイル設定をバックアップしました",
   "backup.saved": "アクセスを制限して保存しました:\n{path}\n\n対象範囲: Web プロファイルの設定のみ。グローバル認証情報、セッション、node_modules は含まれません。プロファイルファイル自体に機密情報が含まれる場合があります。\n\n稼働中のスナップショットはベストエフォートであり、保証はありません。一貫性を高めるには、他の書き込みプロセスを停止してください。復元にはオフラインの CLI コマンドが必要で、置き換えられたプロファイルは保持されます。",
   "backup.saved_log": "Web プロファイル設定のスナップショットを {path} に保存しました",
-  "backup.failed_title": "プロファイルのバックアップに失敗しました"
+  "backup.failed_title": "プロファイルのバックアップに失敗しました",
+  "data_snapshot.title": "DSH Ocean データスナップショット",
+  "data_snapshot.confirm": "セッションと共有ストアを新しいスナップショットにコピーしますか？\n\nセッション: {session_files} ファイル、{session_bytes} バイト\n共有ストア: {storage_files} ファイル、{storage_bytes} バイト\nコピーする合計: {total} バイト\n\nコピーは設定済みのバックアップフォルダーに保存され、数ギガバイトになる場合があります。そのフォルダーに十分な空き容量があることを確認してください。稼働中のデータは読み取りのみで、移動も削除もされません。コピー中も DSH が書き込みを続ける可能性があるため、これは可能な範囲で取得する一時点のコピーであり、変更を停止した状態のコピーではありません。\n\nスナップショットの復元は、DSH を停止したオフライン状態で明示的なコマンドを実行して行うもので、ここでは提供されません。",
+  "data_snapshot.result": "スナップショットを作成しました: {files} ファイル、{bytes} バイト。\n\n`dsh-ocean --verify-data-backup <snapshot>` で検証してください。スナップショットには会話内容が含まれる可能性があるため、バックアップフォルダーを非公開にしてください。",
+  "data_snapshot.inconsistent": "注意: コピー中にセッションまたはストアが変更されたため、これは可能な範囲で取得した一時点のコピーです。変更を停止した状態のスナップショットを取得するには、DSH に書き込むプロセスを停止してください。",
+  "data_snapshot.failure": "スナップショットを作成できませんでした。既存のスナップショットと稼働中のデータは変更されていません。",
+  "data_snapshot.cancelled": "スナップショットの作成をキャンセルしました。稼働中のデータは変更されていません。未完成の一時コピーは削除されました。",
+  "data_snapshot.cancel": "スナップショットをキャンセル",
+  "data_snapshot.create": "スナップショットを作成",
+  "data_snapshot.busy_title": "スナップショットを実行中",
+  "data_snapshot.busy": "このセッションでは、すでにデータスナップショットを作成中です。",
+  "data_snapshot.created_title": "スナップショットを作成しました",
+  "data_snapshot.cancelled_title": "スナップショットをキャンセルしました",
+  "data_snapshot.failed_title": "スナップショットは作成されませんでした",
+  "data_snapshot.progress_unknown": "コピー中: {files} ファイル",
+  "data_snapshot.progress_known": "{total} バイト中 {copied} バイトをコピー中 ({percent}%)、{files} ファイル",
+  "data_snapshot.cancelling": "\n\nキャンセルを要求しました。現在のファイルのコピー後に停止し、一時コピーを削除します。"
 }

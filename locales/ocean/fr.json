@@ -172,5 +172,21 @@
   "backup.saved_title": "Configuration du profil sauvegardée",
   "backup.saved": "Enregistré avec un accès privé dans :\n{path}\n\nPérimètre : configuration du profil web uniquement. Les identifiants globaux, les sessions et node_modules sont exclus. Les fichiers de profil eux-mêmes peuvent contenir des secrets.\n\nUn instantané à chaud est réalisé au mieux, sans garantie ; arrêtez les autres processus d’écriture pour une meilleure cohérence. La restauration nécessite la commande CLI hors ligne et conserve le profil remplacé.",
   "backup.saved_log": "Instantané de la configuration du profil web enregistré dans {path}",
-  "backup.failed_title": "Échec de la sauvegarde du profil"
+  "backup.failed_title": "Échec de la sauvegarde du profil",
+  "data_snapshot.title": "Instantané des données DSH Ocean",
+  "data_snapshot.confirm": "Copier les sessions et les espaces de stockage partagés dans un nouvel instantané ?\n\nSessions : {session_files} fichier(s), {session_bytes} octets\nEspaces de stockage partagés : {storage_files} fichier(s), {storage_bytes} octets\nTotal à copier : {total} octets\n\nLes copies sont placées dans le dossier de sauvegarde configuré et peuvent occuper plusieurs gigaoctets ; assurez-vous que ce dossier dispose de suffisamment d’espace libre. Les données en cours d’utilisation sont uniquement lues, jamais déplacées ni supprimées, et DSH peut continuer à écrire pendant la copie : il s’agit donc d’une copie ponctuelle réalisée au mieux, et non d’une copie figée.\n\nLa restauration d’un instantané nécessite une commande explicite hors ligne, avec DSH arrêté, et n’est pas proposée ici.",
+  "data_snapshot.result": "Instantané créé : {files} fichier(s), {bytes} octets.\n\nVérifiez-le avec `dsh-ocean --verify-data-backup <snapshot>` ; l’instantané peut contenir des conversations, veillez donc à garder le dossier de sauvegarde privé.",
+  "data_snapshot.inconsistent": "Remarque : des sessions ou des espaces de stockage ont changé pendant la copie ; il s’agit donc d’une copie ponctuelle réalisée au mieux. Arrêtez les processus qui écrivent les données DSH pour obtenir un instantané figé.",
+  "data_snapshot.failure": "L’instantané n’a pas pu être créé. Les instantanés existants et les données en cours d’utilisation n’ont pas été modifiés.",
+  "data_snapshot.cancelled": "L’instantané a été annulé. Les données en cours d’utilisation n’ont pas été modifiées ; la copie intermédiaire incomplète a été supprimée.",
+  "data_snapshot.cancel": "Annuler l’instantané",
+  "data_snapshot.create": "Créer un instantané",
+  "data_snapshot.busy_title": "Instantané déjà en cours",
+  "data_snapshot.busy": "Un instantané des données est déjà en cours de création dans cette session.",
+  "data_snapshot.created_title": "Instantané créé",
+  "data_snapshot.cancelled_title": "Instantané annulé",
+  "data_snapshot.failed_title": "Instantané non créé",
+  "data_snapshot.progress_unknown": "Copie : {files} fichier(s)",
+  "data_snapshot.progress_known": "Copie de {copied} sur {total} octets ({percent} %), {files} fichier(s)",
+  "data_snapshot.cancelling": "\n\nAnnulation demandée ; la copie s’arrêtera après le fichier en cours et la copie intermédiaire sera supprimée."
 }
