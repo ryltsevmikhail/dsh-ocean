@@ -382,6 +382,73 @@ fn systemd_case() {
                 .lines()
                 .any(|line| matches!(line, "reload" | "enable" | "start")));
         }
+        "cold-locale-retained" => {
+            use sha2::{Digest, Sha256};
+            let cache = prefix.join("builtin-locales");
+            let current = dsh_ocean::builtin_locale_cache::materialize(&cache).unwrap();
+            let license = current.join("LICENSE");
+            fs::set_permissions(&license, fs::Permissions::from_mode(0o600)).unwrap();
+            let mut bytes = fs::read(&license).unwrap();
+            bytes.push(b'\n');
+            fs::write(&license, bytes).unwrap();
+            fs::set_permissions(&license, fs::Permissions::from_mode(0o400)).unwrap();
+            let mut digest = Sha256::new();
+            for resource in dsh_ocean::builtin_locales::resources() {
+                let bytes = fs::read(current.join(resource.path)).unwrap();
+                digest.update((resource.path.len() as u64).to_be_bytes());
+                digest.update(resource.path.as_bytes());
+                digest.update((bytes.len() as u64).to_be_bytes());
+                digest.update(bytes);
+            }
+            let old_tree = cache.join(
+                digest
+                    .finalize()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>(),
+            );
+            assert_eq!(
+                current.canonicalize().unwrap().parent(),
+                Some(cache.canonicalize().unwrap().as_path())
+            );
+            assert_eq!(old_tree.parent(), Some(cache.as_path()));
+            assert!(!old_tree.exists());
+            fs::rename(&current, &old_tree).unwrap();
+            let previous = old_tree.join("overlay.yml");
+            let old_bytes =
+                dsh_ocean::systemd::render_unit_with_patch(&old, &base, &previous).unwrap();
+            fs::write(&unit_path, &old_bytes).unwrap();
+            dsh_ocean::systemd::stop().unwrap();
+            let desired = current.join("overlay.yml");
+            let result = (|| -> anyhow::Result<()> {
+                dsh_ocean::systemd::prove_cold_launch(&old, &base, Some(&desired))?;
+                let new_tree = dsh_ocean::builtin_locale_cache::materialize(&cache)?;
+                assert_eq!(new_tree, current);
+                dsh_ocean::systemd::ensure_unit_for_launch(
+                    &old,
+                    &base,
+                    Some(&desired),
+                    Some(&desired),
+                )?;
+                assert_eq!(
+                    fs::read(&unit_path)?,
+                    dsh_ocean::systemd::render_unit_with_patch(&old, &base, &desired)?.as_bytes()
+                );
+                dsh_ocean::systemd::ensure_unit_for_launch(&old, &base, None, Some(&desired))?;
+                assert_eq!(fs::read(&unit_path)?, old_unit.as_bytes());
+                assert!(old_tree.exists());
+                Ok(())
+            })();
+            // Make only this fixture's sealed directories removable even on RED.
+            for tree in [&old_tree, &current] {
+                if tree.exists() {
+                    fs::set_permissions(tree.join("lib"), fs::Permissions::from_mode(0o700))
+                        .unwrap();
+                    fs::set_permissions(tree, fs::Permissions::from_mode(0o700)).unwrap();
+                }
+            }
+            result.unwrap();
+        }
         "cold-locale-missing" => {
             dsh_ocean::systemd::stop().unwrap();
             assert!(!unit_path.exists());
@@ -972,6 +1039,13 @@ fn cold_native_systemd_refusals_leave_unit_bytes_and_service_actions_untouched()
 fn cold_native_systemd_proves_missing_slot_before_creation() {
     let f = SysFixture::new();
     let output = f.command("cold-locale-missing").output().unwrap();
+    assert!(output.status.success(), "{}", describe(&output));
+}
+
+#[test]
+fn cold_native_systemd_recognizes_verified_retained_content_identity() {
+    let f = SysFixture::new();
+    let output = f.command("cold-locale-retained").output().unwrap();
     assert!(output.status.success(), "{}", describe(&output));
 }
 

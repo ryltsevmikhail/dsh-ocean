@@ -138,11 +138,19 @@ and the actual SDK LocaleRuntime/ClientModuleSystem with an explicit Loader doub
 Arbitrary out-of-band module loads absent from the host graph are not prospectively
 coordinated; no unsupported loader interception or order-sensitive override is used.
 
+Cold systemd migration also recognizes an exact generated unit referring to a
+retained schema-one cache. A bounded, read-only lookup validates only the matching
+candidate: private owned parent, sealed exact seven-file inventory, no links,
+bounded sizes, native package identity and the original length-prefixed SHA-256
+content identity matching its directory name. This is local cache integrity, not
+a signature or authority to execute old code. Cold launch still selects only the
+currently approved compiled overlay or plain arguments; retained bytes are never
+repaired, overwritten or substituted for a journal's captured rollback recipe.
+Unknown or corrupt older paths remain refused before unit mutation.
+
 Remaining validation includes real Tauri-window and user-manager integration,
-ARM64 native runs, retained-cache/inter-version compatibility, and the complete
-current packaging/license report. Cold systemd
-migration currently recognizes the plain template and this build's exact native
-cache path; unknown older paths remain refused, not rewritten or executed.
+ARM64 native runs, cross-binary recovery/native packaging and the complete current
+packaging/license report.
 
 **Release/native integration validation is not complete.** The implemented
 activation callers and component tests do not by themselves prove release ELF

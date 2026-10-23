@@ -40,7 +40,7 @@ fn names(dir: &File, maximum: usize) -> Result<Vec<String>> {
     names.sort();
     Ok(names)
 }
-fn verify(root: &File, id: &str) -> Result<()> {
+fn sealed_tree(root: &File, id: &str) -> Result<File> {
     let tree = fs_at::open_at(root, id, true)?;
     sealed_directory(&tree)?;
     anyhow::ensure!(
@@ -61,6 +61,10 @@ fn verify(root: &File, id: &str) -> Result<()> {
         names(&lib, 2)? == ["client.js", "index.js"],
         "unexpected built-in client entries"
     );
+    Ok(tree)
+}
+fn verify(root: &File, id: &str) -> Result<()> {
+    let tree = sealed_tree(root, id)?;
     for resource in builtin_locales::resources() {
         let file = fs_at::file_at(&tree, resource.path)?;
         let metadata = file.metadata()?;
@@ -79,6 +83,94 @@ fn verify(root: &File, id: &str) -> Result<()> {
         );
     }
     Ok(())
+}
+/// Read-only recognition of a previously emitted private schema-one cache. A
+/// content digest is local cache integrity, not a signature or permission to
+/// execute old code. Callers may use it only with an exact owned unit template.
+pub fn find_retained_overlay(
+    cache_root: &Path,
+    matches: impl Fn(&Path) -> bool,
+) -> Result<Option<PathBuf>> {
+    use sha2::{Digest, Sha256};
+    anyhow::ensure!(
+        cache_root.is_absolute()
+            && !cache_root
+                .components()
+                .any(|c| matches!(c, Component::ParentDir)),
+        "absolute retained cache root required"
+    );
+    crate::util::check_owned_ancestors(cache_root)?;
+    let root = match fs_at::open_dir(cache_root) {
+        Ok(root) => root,
+        Err(error) if missing(&error) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let metadata = root.metadata()?;
+    anyhow::ensure!(
+        own(&metadata) && metadata.mode() & 0o077 == 0,
+        "private owned retained cache root required"
+    );
+    for id in names(&root, 128)? {
+        if id.len() != 64
+            || !id
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            continue;
+        }
+        let overlay = cache_root.join(&id).join("overlay.yml");
+        if !matches(&overlay) {
+            continue;
+        }
+        let tree = sealed_tree(&root, &id)?;
+        let mut digest = Sha256::new();
+        let mut total = 0u64;
+        for resource in builtin_locales::resources() {
+            let file = fs_at::file_at(&tree, resource.path)?;
+            let metadata = file.metadata()?;
+            anyhow::ensure!(
+                metadata.is_file()
+                    && own(&metadata)
+                    && metadata.nlink() == 1
+                    && metadata.mode() & 0o222 == 0
+                    && metadata.len() <= 8 * 1024 * 1024,
+                "unsafe retained resource file"
+            );
+            total = total
+                .checked_add(metadata.len())
+                .context("retained resource size overflow")?;
+            anyhow::ensure!(
+                total <= 16 * 1024 * 1024,
+                "retained resource tree too large"
+            );
+            let mut bytes = Vec::new();
+            file.take(metadata.len() + 1).read_to_end(&mut bytes)?;
+            anyhow::ensure!(
+                bytes.len() as u64 == metadata.len(),
+                "retained resource changed while reading"
+            );
+            if resource.path == "package.json" {
+                let package: serde_json::Value = serde_json::from_slice(&bytes)?;
+                anyhow::ensure!(
+                    package.get("name").and_then(|name| name.as_str())
+                        == Some("@dsh-ocean/builtin-locales"),
+                    "retained package is not an Ocean native resource"
+                );
+            }
+            digest.update((resource.path.len() as u64).to_be_bytes());
+            digest.update(resource.path.as_bytes());
+            digest.update((bytes.len() as u64).to_be_bytes());
+            digest.update(bytes);
+        }
+        let actual = digest
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        anyhow::ensure!(actual == id, "retained resource content identity differs");
+        return Ok(Some(overlay));
+    }
+    Ok(None)
 }
 fn cleanup(root: &File, stage: &File, name: &str) {
     // Delete only the same staging inode we created, under the pinned root FD.

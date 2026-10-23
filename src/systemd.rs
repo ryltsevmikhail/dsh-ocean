@@ -372,14 +372,24 @@ fn cold_launch_before(
             fragment == path,
             "unit manager fragment differs from the managed unit file"
         );
+        let known = matches_launch_unit(runtime, base, None, bytes)
+            || previous_patch
+                .is_some_and(|previous| matches_launch_unit(runtime, base, Some(previous), bytes));
+        let retained = if !known {
+            match previous_patch.and_then(Path::parent).and_then(Path::parent) {
+                Some(cache) => {
+                    crate::builtin_locale_cache::find_retained_overlay(cache, |candidate| {
+                        matches_launch_unit(runtime, base, Some(candidate), bytes)
+                    })?
+                    .is_some()
+                }
+                None => false,
+            }
+        } else {
+            false
+        };
         anyhow::ensure!(
-            matches_launch_unit(runtime, base, None, bytes)
-                || previous_patch.is_some_and(|previous| matches_launch_unit(
-                    runtime,
-                    base,
-                    Some(previous),
-                    bytes
-                )),
+            known || retained,
             "existing unit is not the exact known generated launch recipe"
         );
     } else {

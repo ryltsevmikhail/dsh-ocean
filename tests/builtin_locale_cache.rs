@@ -47,6 +47,141 @@ impl Drop for Fixture {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
+fn older_tree(cache: &Path) -> PathBuf {
+    use sha2::{Digest, Sha256};
+    let current = materialize(cache).unwrap();
+    let license = current.join("LICENSE");
+    fs::set_permissions(&license, fs::Permissions::from_mode(0o600)).unwrap();
+    let mut text = fs::read(&license).unwrap();
+    text.push(b'\n');
+    fs::write(&license, text).unwrap();
+    fs::set_permissions(&license, fs::Permissions::from_mode(0o400)).unwrap();
+    let mut digest = Sha256::new();
+    for resource in resources() {
+        let bytes = fs::read(current.join(resource.path)).unwrap();
+        digest.update((resource.path.len() as u64).to_be_bytes());
+        digest.update(resource.path.as_bytes());
+        digest.update((bytes.len() as u64).to_be_bytes());
+        digest.update(bytes);
+    }
+    let id = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let old = cache.join(id);
+    assert_eq!(
+        current.canonicalize().unwrap().parent(),
+        Some(cache.canonicalize().unwrap().as_path())
+    );
+    assert_eq!(old.parent(), Some(cache));
+    assert!(!old.exists());
+    fs::rename(current, &old).unwrap();
+    old
+}
+#[test]
+fn recognizes_exact_retained_private_content_without_substituting_current_resources() {
+    let f = Fixture::new();
+    let cache = f.0.join("cache");
+    let old = older_tree(&cache);
+    let overlay = old.join("overlay.yml");
+    let before = fs::metadata(old.join("LICENSE"))
+        .unwrap()
+        .modified()
+        .unwrap();
+    assert_eq!(
+        dsh_ocean::builtin_locale_cache::find_retained_overlay(&cache, |candidate| candidate
+            == overlay)
+        .unwrap(),
+        Some(overlay.clone())
+    );
+    let current = materialize(&cache).unwrap();
+    assert_ne!(old, current);
+    assert_eq!(fs::read_dir(&cache).unwrap().count(), 2);
+    assert_eq!(
+        fs::metadata(old.join("LICENSE"))
+            .unwrap()
+            .modified()
+            .unwrap(),
+        before
+    );
+    assert_eq!(
+        dsh_ocean::builtin_locale_cache::find_retained_overlay(&cache, |candidate| candidate
+            == overlay)
+        .unwrap(),
+        Some(overlay)
+    );
+}
+#[test]
+fn retained_match_refuses_changed_content_without_repair() {
+    let f = Fixture::new();
+    let cache = f.0.join("cache");
+    let old = older_tree(&cache);
+    fs::set_permissions(old.join("LICENSE"), fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(old.join("LICENSE"), b"tampered").unwrap();
+    fs::set_permissions(old.join("LICENSE"), fs::Permissions::from_mode(0o400)).unwrap();
+    assert!(dsh_ocean::builtin_locale_cache::find_retained_overlay(&cache, |_| true).is_err());
+    assert_eq!(fs::read(old.join("LICENSE")).unwrap(), b"tampered");
+}
+#[test]
+fn retained_match_refuses_writable_hardlinked_and_symlinked_resources() {
+    for kind in ["writable", "hardlink", "symlink"] {
+        let f = Fixture::new();
+        let cache = f.0.join("cache");
+        let old = older_tree(&cache);
+        match kind {
+            "writable" => {
+                fs::set_permissions(old.join("lib"), fs::Permissions::from_mode(0o700)).unwrap()
+            }
+            "hardlink" => fs::hard_link(old.join("LICENSE"), f.0.join("linked-license")).unwrap(),
+            "symlink" => {
+                fs::set_permissions(&old, fs::Permissions::from_mode(0o700)).unwrap();
+                let source = old.join("LICENSE");
+                let moved = f.0.join("license-target");
+                assert!(source.is_absolute() && source.parent() == Some(old.as_path()));
+                assert_eq!(moved.parent(), Some(f.0.as_path()));
+                assert!(!moved.exists());
+                fs::rename(&source, &moved).unwrap();
+                symlink(&moved, &source).unwrap();
+                fs::set_permissions(&old, fs::Permissions::from_mode(0o500)).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            dsh_ocean::builtin_locale_cache::find_retained_overlay(&cache, |_| true).is_err(),
+            "{kind}"
+        );
+    }
+}
+#[test]
+fn retained_lookup_is_read_only_and_ignores_unmatched_candidate_bytes() {
+    let f = Fixture::new();
+    let missing = f.0.join("absent");
+    assert!(
+        dsh_ocean::builtin_locale_cache::find_retained_overlay(&missing, |_| true)
+            .unwrap()
+            .is_none()
+    );
+    assert!(!missing.exists());
+    let cache = f.0.join("cache");
+    let old = older_tree(&cache);
+    fs::set_permissions(old.join("LICENSE"), fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(
+        dsh_ocean::builtin_locale_cache::find_retained_overlay(&cache, |_| false)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        fs::metadata(old.join("LICENSE"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    fs::set_permissions(&cache, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(dsh_ocean::builtin_locale_cache::find_retained_overlay(&cache, |_| true).is_err());
+}
 #[test]
 fn publishes_exact_embedded_tree_and_reuses_it_without_rewriting() {
     let f = Fixture::new();
