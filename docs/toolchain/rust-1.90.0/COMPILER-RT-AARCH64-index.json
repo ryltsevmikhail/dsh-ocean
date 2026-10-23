@@ -1,0 +1,76 @@
+{
+  "llvmCommit": "e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51",
+  "files": [
+    {
+      "path": "compiler-rt/LICENSE.TXT",
+      "size": 16708,
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/LICENSE.TXT"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/aarch64/lse.S",
+      "size": 5778,
+      "sha256": "5fd4c206fae16dd1ffac0de729df51d02c5ba1b697188963f443cf2454b044da",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/aarch64/lse.S"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/assembly.h",
+      "size": 11260,
+      "sha256": "6df282fd90712301929b34969287b9e8a73120fcc04a24e88f3dead0974515e5",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/assembly.h"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/AArch64CPUFeatures.inc",
+      "size": 2924,
+      "sha256": "3a01c2a21686ebe0d6450df4e13f24415d02f816a765d91ff01193ed97288cbf",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/AArch64CPUFeatures.inc"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/aarch64.c",
+      "size": 2892,
+      "sha256": "391602b889d67462490c6d1d33cc5d1af6ab59d08de13eadd8c89dec03623c3d",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/aarch64.c"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/aarch64.h",
+      "size": 676,
+      "sha256": "3d70c063606bf5fdbcd2602231b5a4cd51342bd6f1081d7c577ff5789707d89b",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/aarch64.h"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/aarch64/fmv/getauxval.inc",
+      "size": 702,
+      "sha256": "5cb9a77eb22feb6188387ac31c94c0b4754ca8e030288f3e040ee2b05213119a",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/aarch64/fmv/getauxval.inc"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/aarch64/fmv/mrs.inc",
+      "size": 3329,
+      "sha256": "b8d02a41f9d625e4fa02e428c5b1b35f0407d61d676b72cda5f8337921c5888a",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/aarch64/fmv/mrs.inc"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/aarch64/hwcap.inc",
+      "size": 3640,
+      "sha256": "b6366fe823b4a867753ab359623b284c9479c95aa07f932a87f07e76de52956b",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/aarch64/hwcap.inc"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/aarch64/lse_atomics/getauxval.inc",
+      "size": 195,
+      "sha256": "0fad0dacab3557d9e5cc0f09b044a44f3035cd0ca793427fa4c15dbc52fade52",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/aarch64/lse_atomics/getauxval.inc"
+    },
+    {
+      "path": "compiler-rt/lib/builtins/cpu_model/cpu_model.h",
+      "size": 1782,
+      "sha256": "4b374f7dcba5cbb9520b621ab596dc691af356772fc019246ab419f4c1c0f77c",
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/lib/builtins/cpu_model/cpu_model.h"
+    }
+  ],
+  "rustBuildScript": {
+    "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/library/compiler-builtins/compiler-builtins/build.rs",
+    "sha256": "fe54b5a931e2ce1581f4ee9c7d821470822b78088b191812fa2bf6c354cf8644"
+  },
+  "scope": "Unmodified source/header/fragment/license copies for observed ARM compiler-builtins CPU-model and 31 LSE wrapper objects, packed locally with normalized metadata. Not an official upstream source archive or binary-identical reconstruction. Distribution-build system headers cannot be determined from the application link map."
+}

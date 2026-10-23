@@ -5,6 +5,18 @@ This complements the Cargo source inventory; it does not replace it or certify
 all statically linked, indirect native, plugin/dlopen or AppImage components.
 No binary release, live installation or runtime/profile operation is performed.
 
+## Release-specific Rust 1.90 profile
+
+The older 1.99.1 research below is not relabeled as release evidence. The
+[scoped portable release review](RELEASE_NATIVE_REVIEW.md) now retains exact
+1.90.0 distribution notices (including the complete compiler-wide document),
+source/credits and provenance in the installed license payload. Native release
+jobs check the actual sysroot, capture a fresh link map/ABI/system-origin report,
+and bind every shipped tar member to the observed build. Public report-only
+artifacts may be retained during dry runs; no binaries or keys are uploaded by
+that evidence step. These concrete retention/binding fixes do not set owner
+clearance or prove universal distro/dlopen compatibility.
+
 ## Why another evidence layer is necessary
 
 The application's Cargo.lock does not fully inventory Rust std, compiler-builtins,

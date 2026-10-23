@@ -9,6 +9,13 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+- Retain exact Rust 1.90 standard-library/compiler-runtime notice and source
+  payloads through package extraction and initial installation, rather than only
+  temporary CI reports. Native release checks now bind the actual tar's ELF and
+  every shipped document to the observed build, with per-architecture link/ABI/
+  system-origin evidence and isolated release-ELF launch/close/restore smoke.
+  These checks do not grant owner/native/license clearance or publish a release.
+
 - Add non-executing, SHA-256-bound ELF/toolchain observation reports and pinned
   compiler-source license evidence. CI retains only reports and public candidate
   notices, not binaries. Direct dependency names/current compiler observations

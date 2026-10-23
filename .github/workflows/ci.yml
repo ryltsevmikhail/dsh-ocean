@@ -111,6 +111,8 @@ jobs:
       - name: Verify toolchain source profile and artifact collector controls
         run: |
           python3 -B scripts/check-toolchain-source-evidence.py
+          python3 -B scripts/check-release-toolchain.py
+          python3 -B -m unittest discover -s tests -p 'test_release_*.py' -v
           python3 -B -m unittest discover -s tests -p 'test_toolchain_*.py' -v
           python3 -B -m unittest discover -s tests -p 'test_artifact_license_evidence.py' -v
 

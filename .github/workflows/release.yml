@@ -76,7 +76,7 @@ jobs:
       - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev pkg-config patchelf build-essential python3 jq
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev pkg-config patchelf build-essential python3 jq xvfb x11-utils xauth dbus-x11
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # pinned action, exact compiler below
         with:
           toolchain: 1.90.0
@@ -115,6 +115,10 @@ jobs:
             # A source version mismatch is a refusal, not a renamed old binary.
             actual="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["package"]["version"])')"
             test "$actual" = "$RELEASE"
+            python3 -B scripts/check-release-toolchain.py --sysroot "$(rustc --print sysroot)" --target "$ARCH-unknown-linux-gnu"
+            # Separate fresh release target: map the actual final ELF's link inputs.
+            export CARGO_TARGET_DIR="$RUNNER_TEMP/release-native-target"
+            export RUSTFLAGS="-C linker=/usr/bin/gcc -C link-arg=-fuse-ld=bfd -C link-arg=-Wl,-Map=$RUNNER_TEMP/release-native.map"
             python3 -B scripts/package-tar.py --output-dir "$out/native"
             original="$out/native/dsh-ocean-$RELEASE-linux-$ARCH.tar.gz"
             canonical="$out/native/dsh-ocean-$RELEASE-$ARCH.tar.gz"
@@ -146,6 +150,39 @@ jobs:
           else
             "$verifier" --apply-release "${args[@]}" --kind tar.gz --prefix "$RUNNER_TEMP/checked-shell" --confirm-apply yes
           fi
+      - name: Exercise actual GTK backup and verification dialogs with release compiler
+        if: ${{ inputs.product == 'shell' }}
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_DIALOGS: "1"
+        run: |
+          # Build ignored native fixtures first; the timed run is the real dialog
+          # exercise, not a timeout spent compiling. Separate debug target keeps
+          # the release link map/ELF untouched.
+          cargo test --locked --no-run --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui
+          timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui -- --ignored --test-threads=1 --nocapture
+      - name: Exercise exact release ELF and bind native evidence to actual tar
+        if: ${{ inputs.product == 'shell' }}
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          binary="$RUNNER_TEMP/release-native-target/release/dsh-ocean"
+          bash scripts/test-native.sh xvfb-run -a bash scripts/smoke-app-launch.sh "$binary"
+          python3 -B scripts/release-native-evidence.py --archive "${{ steps.package.outputs.archive }}" --binary "$binary" --link-map "$RUNNER_TEMP/release-native.map" --target "$ARCH-unknown-linux-gnu" --source-commit "$GITHUB_SHA" --output-dir "$RUNNER_TEMP/native-release-evidence"
+          # Installer receives the same already-bound canonical tar, not a rebuilt
+          # default-linker package. Fresh private HOME, forbidden service helpers.
+          python3 -B tests/test_package_install.py --real-archive "${{ steps.package.outputs.archive }}"
+      - name: Retain public native evidence only (including dry-run, never ELF/keys)
+        if: ${{ inputs.product == 'shell' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-shell-native-evidence-${{ matrix.target }}
+          path: |
+            ${{ runner.temp }}/native-release-evidence/report.json
+            ${{ runner.temp }}/native-release-evidence/link-map.txt
+          retention-days: 14
+          if-no-files-found: error
       - name: Collect candidate bytes only for an explicitly requested draft
         if: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -187,6 +224,13 @@ jobs:
           SEQUENCE="$(jq -r '.sequence' "$RUNNER_TEMP/release-plan.json")"
           for target in linux-x86_64 linux-aarch64; do
             gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "release-$PRODUCT-$target" --dir "$RUNNER_TEMP/final-$target"
+            if [ "$PRODUCT" = shell ]; then
+              gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "release-shell-native-evidence-$target" --dir "$RUNNER_TEMP/final-evidence-$target"
+              archive="$(jq -er '.url | split("/") | last' "$RUNNER_TEMP/final-$target/artifact.json")"
+              python3 -c 'import hashlib,json,sys; r=json.load(open(sys.argv[1])); assert r["sourceCommit"]==sys.argv[3] and r["archive"]["archiveSha256"]==hashlib.sha256(open(sys.argv[2],"rb").read()).hexdigest()' "$RUNNER_TEMP/final-evidence-$target/report.json" "$RUNNER_TEMP/final-$target/$archive" "$GITHUB_SHA"
+              cp "$RUNNER_TEMP/final-evidence-$target/report.json" "$RUNNER_TEMP/native-evidence-$target.json"
+              cp "$RUNNER_TEMP/final-evidence-$target/link-map.txt" "$RUNNER_TEMP/native-link-map-$target.txt"
+            fi
           done
           python3 -B scripts/release-artifacts.py manifest --product "$PRODUCT" --channel "$CHANNEL" --release "$RELEASE" --sequence "$SEQUENCE" --artifact "$RUNNER_TEMP/final-linux-x86_64/artifact.json" --artifact "$RUNNER_TEMP/final-linux-aarch64/artifact.json" > "$RUNNER_TEMP/manifest.json"
           cargo build --locked --bin dsh-ocean
@@ -254,6 +298,9 @@ jobs:
           for target in linux-x86_64 linux-aarch64; do
             file="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["url"].rsplit("/",1)[1])' "$RUNNER_TEMP/final-$target/artifact.json")"
             assets+=("$RUNNER_TEMP/final-$target/$file")
+            if [ "$PRODUCT" = shell ]; then
+              assets+=("$RUNNER_TEMP/native-evidence-$target.json" "$RUNNER_TEMP/native-link-map-$target.txt")
+            fi
           done
           if [ "$PRODUCT" = shell ]; then
             python3 -B scripts/package-language-pack.py --verify "$RUNNER_TEMP/final-language-pack"

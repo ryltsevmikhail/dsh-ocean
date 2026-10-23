@@ -72,6 +72,14 @@ observed compiler context and public notice candidates as report-only artifacts.
 These companions are not installed license payloads or build attestations, and do
 not clear any of the coverage/redistribution gates below.
 
+The [release-specific review](RELEASE_NATIVE_REVIEW.md) corrects a concrete
+retention gap: exact Rust 1.90 full/library copyright, offered license texts,
+compiler-builtins/libm terms, unchanged std source and pinned compiler-rt credits
+now accompany the package and are retained by initial installation. Native
+release reports bind that payload and observed linker inputs to each actual tar
+ELF. This is distinct from the older report-only 1.99.1 research; it does not turn
+arbitrary compiler builds or source graphs into legal clearance.
+
 ## Not yet cleared by this inventory
 
 Before a binary release, the maintainer must record evidence for the **exact

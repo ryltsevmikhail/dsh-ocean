@@ -1,0 +1,278 @@
+{
+  "schema": 1,
+  "rustcVersion": "1.90.0",
+  "rustcCommit": "1159e78c4747b02ef996e55082b704c09b970588",
+  "targets": [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu"
+  ],
+  "officialManifestSha256": "489c19f20d331765ab2835661eb546de90f6446a107a8db83045e7371e45cae2",
+  "compilerArchives": {
+    "x86_64-unknown-linux-gnu": "48c2a42de9e92fcae8c24568f5fe40d5734696a6f80e83cc6d46eef1a78f13c9",
+    "aarch64-unknown-linux-gnu": "4e1a9987a11d7d91f0d5afbf5333feb62f44172e4a31f33ce7246549003217f2"
+  },
+  "files": [
+    {
+      "path": "COPYRIGHT-library.html",
+      "sha256": "025c0dd1236493fcd5b6386b68453852e6528722bd5f8dce5949e94d225e7a60",
+      "size": 360726,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/COPYRIGHT-library.html"
+    },
+    {
+      "path": "COPYRIGHT.html",
+      "sha256": "8b835bd1b8f3f53135dfdd1539bbaa8006e2a3e1c74fde0b9aa95e9d8ef2d55c",
+      "size": 12368099,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/COPYRIGHT.html"
+    },
+    {
+      "path": "licenses/Apache-2.0.txt",
+      "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+      "size": 10280,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/Apache-2.0.txt"
+    },
+    {
+      "path": "licenses/BSD-2-Clause.txt",
+      "sha256": "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df",
+      "size": 1267,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/BSD-2-Clause.txt"
+    },
+    {
+      "path": "licenses/CC-BY-SA-4.0.txt",
+      "sha256": "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2",
+      "size": 20137,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/CC-BY-SA-4.0.txt"
+    },
+    {
+      "path": "licenses/GCC-exception-3.1.txt",
+      "sha256": "a3966c9410ef94a1efbfa9ec04e9c1994026a70623fbf0885ce36737bfba3b54",
+      "size": 3320,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/GCC-exception-3.1.txt"
+    },
+    {
+      "path": "licenses/GPL-2.0-only.txt",
+      "sha256": "54b212ba1f97f6948fa5486239ab505dd820b02e50cbfd296b4062c8609a70af",
+      "size": 17642,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/GPL-2.0-only.txt"
+    },
+    {
+      "path": "licenses/GPL-3.0-or-later.txt",
+      "sha256": "05315fce6c35f79b8a35454828995fa26336f235895ac64557abc028f4ffcea2",
+      "size": 34795,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/GPL-3.0-or-later.txt"
+    },
+    {
+      "path": "licenses/ISC.txt",
+      "sha256": "0ff61769b238634e042ab759dddfd104a8e69d091e3600ae3410e401a6164381",
+      "size": 730,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/ISC.txt"
+    },
+    {
+      "path": "licenses/LLVM-exception.txt",
+      "sha256": "e34c58338bd89d43e709e226610d8f32b3e3c47f4ad9a99a8dc1d4ac7842488e",
+      "size": 919,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/LLVM-exception.txt"
+    },
+    {
+      "path": "licenses/MIT.txt",
+      "sha256": "b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0",
+      "size": 1078,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/MIT.txt"
+    },
+    {
+      "path": "licenses/NCSA.txt",
+      "sha256": "39cb0234065c92b9e6cee3830cbb52b1aa289aa8fe9ba2e66730fec5cf05c630",
+      "size": 1676,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/NCSA.txt"
+    },
+    {
+      "path": "licenses/OFL-1.1.txt",
+      "sha256": "8eea8287e5876b539670cadb82e99f9a7afddec6f6730811be1daf25d2e9bcfd",
+      "size": 4016,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/OFL-1.1.txt"
+    },
+    {
+      "path": "licenses/Unicode-3.0.txt",
+      "sha256": "f5062c9a188d81dfe66b56db4182dcf9e4b17c0d9b0d311a8e20b3a1b075c443",
+      "size": 1995,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rustc-1.90.0-x86_64-unknown-linux-gnu.tar.xz",
+      "member": "rustc-1.90.0-x86_64-unknown-linux-gnu/rustc/share/doc/rust/licenses/Unicode-3.0.txt"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "sha256": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+      "size": 1068,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/LICENSE-MIT"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+      "size": 9723,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/LICENSE-APACHE"
+    },
+    {
+      "path": "LICENSE-COMPILER-BUILTINS",
+      "sha256": "ab6eec6caf0fa5775e411c7a8bc6a45c4ef2956b0980b157ab74fc5cd62a928b",
+      "size": 15078,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/library/compiler-builtins/LICENSE.txt"
+    },
+    {
+      "path": "LICENSE-COMPILER-BUILTINS-LIBM",
+      "sha256": "3823dda7cf046602f4b4e77ec8e227863dc4736037cc85bb33d9f19febe16bb7",
+      "size": 14088,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/library/compiler-builtins/libm/LICENSE.txt"
+    },
+    {
+      "path": "SOURCE-COMPILER-BUILTINS-Cargo.toml",
+      "sha256": "2709708df4bef5ebb471d78ba241ad69799103a6443defff7be207597469441d",
+      "size": 1942,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/library/compiler-builtins/compiler-builtins/Cargo.toml"
+    },
+    {
+      "path": "SOURCE-UNWIND-Cargo.toml",
+      "sha256": "c1665b754ce0cc2105c900089d600c90bcdf87a3cc25bee5f06219e452915357",
+      "size": 1153,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/library/unwind/Cargo.toml"
+    },
+    {
+      "path": "SOURCE-UNWIND-lib.rs",
+      "sha256": "faad4d571c74ca4dd8c42bf6342020b4e4a218aa77afe7e121acd2729a913fc5",
+      "size": 6458,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/library/unwind/src/lib.rs"
+    },
+    {
+      "path": "COPYRIGHT-guide.txt",
+      "sha256": "172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af",
+      "size": 1571,
+      "source": "https://raw.githubusercontent.com/rust-lang/rust/1159e78c4747b02ef996e55082b704c09b970588/COPYRIGHT"
+    },
+    {
+      "path": "rust-src-1.90.0.tar.xz",
+      "sha256": "cde088d57064d151b2236f4619aea4a8207e0709eb3035ddc6617d609ab7d453",
+      "size": 3473408,
+      "source": "https://static.rust-lang.org/dist/2025-09-18/rust-src-1.90.0.tar.xz"
+    },
+    {
+      "path": "COMPILER-RT-CREDITS.TXT",
+      "sha256": "a9901f47a089da41e4690682d00ce4cedaa2baf41fedbe79beee366d43ac2461",
+      "size": 1049,
+      "source": "https://raw.githubusercontent.com/rust-lang/llvm-project/e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51/compiler-rt/CREDITS.TXT"
+    },
+    {
+      "path": "GNU-glibc-source.dsc",
+      "size": 9387,
+      "sha256": "1b73a89e0910eb3e5920cde639ac7eb606256d8ee809688ff9b5912b67002711",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39-0ubuntu8.9.dsc"
+    },
+    {
+      "path": "GNU-glibc-copyright",
+      "size": 26462,
+      "sha256": "d3c95b56fa33e28b57860580f0baf4e4f4de2a268a2b80f1d031a5191bade265",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39-0ubuntu8.9.debian.tar.xz",
+      "sourceArchiveMember": "debian/copyright"
+    },
+    {
+      "path": "GNU-gcc-13-source.dsc",
+      "size": 39540,
+      "sha256": "86b4012c312ac13e3e092877719a62a5b5dbab082ae7e9680780a25c6a13ddc6",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1.dsc"
+    },
+    {
+      "path": "GNU-gcc-13-copyright",
+      "size": 69100,
+      "sha256": "08c6f3dee4c19aa1e57eb7d4ad45829b2e99656313bd07fa0922e2553f500be5",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1.debian.tar.xz",
+      "sourceArchiveMember": "debian/copyright"
+    },
+    {
+      "path": "GNU-glibc-x86_64-start.S",
+      "size": 4431,
+      "sha256": "740cdc597fa8ae1f9cba6b410afba1567a87798875dba03b568b28ee9d0b10a2",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/x86_64/start.S"
+    },
+    {
+      "path": "GNU-glibc-x86_64-crti.S",
+      "size": 2805,
+      "sha256": "4c631e070152e1e31084c54a688cbf911a99057ba89a83e40860d8bd15af7e87",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/x86_64/crti.S"
+    },
+    {
+      "path": "GNU-glibc-x86_64-crtn.S",
+      "size": 1971,
+      "sha256": "89c62a403ff48916a7a69c6e0a0a7d47ca87e1651a5977276f2d8a2311463afd",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/x86_64/crtn.S"
+    },
+    {
+      "path": "GNU-glibc-aarch64-start.S",
+      "size": 3747,
+      "sha256": "41b722594bd7aeaefe7dd07ae1f696bb373ce57af8e46cff6a1de186737fc557",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/aarch64/start.S"
+    },
+    {
+      "path": "GNU-glibc-aarch64-crti.S",
+      "size": 3033,
+      "sha256": "95d327fddd197566251b8057eaea2ff63525ccb2bcd9cb23a96835c4be8a41eb",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/aarch64/crti.S"
+    },
+    {
+      "path": "GNU-glibc-aarch64-crtn.S",
+      "size": 2094,
+      "sha256": "63ecdd181a23a1c5f0ed6a6b642786d77d120f8813f7be1e05dbe74ed5ea31bf",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/sysdeps/aarch64/crtn.S"
+    },
+    {
+      "path": "GNU-glibc-COPYING.LIB",
+      "size": 26530,
+      "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+      "source": "https://security.ubuntu.com/ubuntu/pool/main/g/glibc/glibc_2.39.orig.tar.xz",
+      "sourceArchiveMember": "glibc-2.39/COPYING.LIB"
+    },
+    {
+      "path": "GNU-gcc-crtstuff.c",
+      "size": 26399,
+      "sha256": "aae037dc5d57342cfad14bbd951fd68527a0521d3196f6909cbfe7f03540818b",
+      "source": "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-13.3.0/libgcc/crtstuff.c"
+    },
+    {
+      "path": "COMPILER-RT-AARCH64-source.tar.gz",
+      "size": 13222,
+      "sha256": "082d17c5f6017f47e46aa86c21c194a34cd4836e754bac387a4b331220adf70f",
+      "source": "Immutable LLVM file copies; see COMPILER-RT-AARCH64-index.json"
+    },
+    {
+      "path": "COMPILER-RT-AARCH64-index.json",
+      "size": 4501,
+      "sha256": "0d89d5a444450720441dcb5d8dc0d0f4584f0626093959440b3ac9d7a78bc3f5",
+      "source": "Immutable LLVM file copies; see COMPILER-RT-AARCH64-index.json"
+    }
+  ],
+  "scope": "Conservative exact-distribution/source notices, not a claim that all compiler-wide components are linked. Full COPYRIGHT retained without truncation because library-only HTML omits some distributed std dependencies. Release evidence must bind compiler and final tar ELF; other compiler builds are not covered by this profile.",
+  "llvmCommit": "e8a2ffcf322f45b8dce82c65ab27a3e2430a6b51",
+  "sourceArchiveScope": "Unchanged official std/compiler-builtins/libm source with per-file notices; compiler-rt is not in rust-src, so exact LLVM gitlink credits retained separately.",
+  "nativeStartupSources": {
+    "glibc": "2.39-0ubuntu8.9",
+    "gcc-13": "13.3.0-6ubuntu2~24.04.1",
+    "glibcOrigSha256": "f77bd47cf8170c57365ae7bf86696c118adb3b120d3259c64c502d3dc1e2d926",
+    "glibcDebianSha256": "d6114f2302896a3c8612453e1bf1d0e61603e3029ba4a7c246fbb1ab4c48d2b0",
+    "gccDebianSha256": "5523658f272ad6d15a83b6e26d178fbd5cb7709ec7ce2ca52b0c843e19c228e3",
+    "note": "Actual selected startup objects, not LOAD-only archive membership. glibc source preserves unlimited linked-program exception. GCC release-tag source is corroborative, exact Ubuntu source-package copyright is retained. No PGP verification claimed."
+  }
+}

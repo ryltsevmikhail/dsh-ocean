@@ -18,6 +18,47 @@ import time
 TARGETS = ('aarch64-unknown-linux-gnu', 'x86_64-unknown-linux-gnu')
 MPL = {'cssparser': '0.37.0', 'cssparser-macros': '0.7.1', 'dtoa-short': '0.3.5', 'option-ext': '0.2.0', 'selectors': '0.38.0'}
 BASE_LICENSE_INPUTS = {'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.txt', 'docs/third-party/inventory.json', 'docs/BINARY_LICENSE_AUDIT.md'}
+
+# Exact retained release-toolchain profile; not arbitrary notice paths.
+BASE_LICENSE_INPUTS |= {'docs/toolchain/rust-1.90.0/index.json',
+    'docs/toolchain/rust-1.90.0/COPYRIGHT-library.html',
+    'docs/toolchain/rust-1.90.0/COPYRIGHT.html',
+    'docs/toolchain/rust-1.90.0/licenses/Apache-2.0.txt',
+    'docs/toolchain/rust-1.90.0/licenses/BSD-2-Clause.txt',
+    'docs/toolchain/rust-1.90.0/licenses/CC-BY-SA-4.0.txt',
+    'docs/toolchain/rust-1.90.0/licenses/GCC-exception-3.1.txt',
+    'docs/toolchain/rust-1.90.0/licenses/GPL-2.0-only.txt',
+    'docs/toolchain/rust-1.90.0/licenses/GPL-3.0-or-later.txt',
+    'docs/toolchain/rust-1.90.0/licenses/ISC.txt',
+    'docs/toolchain/rust-1.90.0/licenses/LLVM-exception.txt',
+    'docs/toolchain/rust-1.90.0/licenses/MIT.txt',
+    'docs/toolchain/rust-1.90.0/licenses/NCSA.txt',
+    'docs/toolchain/rust-1.90.0/licenses/OFL-1.1.txt',
+    'docs/toolchain/rust-1.90.0/licenses/Unicode-3.0.txt',
+    'docs/toolchain/rust-1.90.0/LICENSE-MIT',
+    'docs/toolchain/rust-1.90.0/LICENSE-APACHE',
+    'docs/toolchain/rust-1.90.0/LICENSE-COMPILER-BUILTINS',
+    'docs/toolchain/rust-1.90.0/LICENSE-COMPILER-BUILTINS-LIBM',
+    'docs/toolchain/rust-1.90.0/SOURCE-COMPILER-BUILTINS-Cargo.toml',
+    'docs/toolchain/rust-1.90.0/SOURCE-UNWIND-Cargo.toml',
+    'docs/toolchain/rust-1.90.0/SOURCE-UNWIND-lib.rs',
+    'docs/toolchain/rust-1.90.0/COPYRIGHT-guide.txt',
+    'docs/toolchain/rust-1.90.0/rust-src-1.90.0.tar.xz',
+    'docs/toolchain/rust-1.90.0/COMPILER-RT-CREDITS.TXT',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-source.dsc',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-copyright',
+    'docs/toolchain/rust-1.90.0/GNU-gcc-13-source.dsc',
+    'docs/toolchain/rust-1.90.0/GNU-gcc-13-copyright',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-start.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-crti.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-x86_64-crtn.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-start.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-crti.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-aarch64-crtn.S',
+    'docs/toolchain/rust-1.90.0/GNU-glibc-COPYING.LIB',
+    'docs/toolchain/rust-1.90.0/GNU-gcc-crtstuff.c',
+    'docs/toolchain/rust-1.90.0/COMPILER-RT-AARCH64-source.tar.gz',
+    'docs/toolchain/rust-1.90.0/COMPILER-RT-AARCH64-index.json'}
 # SHA-256 of the provenance blob in the asserted, immutable public 86bb883ae6979427a50bb7bca528abc668588e3d tree.
 GLIB_PROVENANCE_SHA256 = '9768d4c48c8efab1c3f6d51fe35a9f22c7da69e40dfbf4415449cd9faed86179'
 GLIB_PATCHED_SHA256 = 'a0f5ee8acb8faa089bcdfbc9a57372609fce7654026ccef7d9a224d05a654ccc'
