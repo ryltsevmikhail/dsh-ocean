@@ -330,5 +330,13 @@
   "diagnostics.saved": "Le paquet de diagnostic a été enregistré à cet emplacement :\n{path}\n\nIl contient les versions, l’état du service, les compteurs de stockage et d’exécution, l’ABI WebKitGTK chargée et les dernières lignes du journal dont les jetons de lancement ont été masqués. Il exclut le contenu des sessions et les journaux des applications sans rapport avec DSH. Examinez le rapport avant de le partager : les journaux du service et les métadonnées des extensions peuvent contenir des informations privées.",
   "diagnostics.failed_title": "Impossible d’enregistrer les données de diagnostic",
   "tray.pairing_failed": "Impossible d’ouvrir l’appairage",
-  "tray.restart_failed": "Impossible de redémarrer DSH"
+  "tray.restart_failed": "Impossible de redémarrer DSH",
+  "download_reason.cancelled": "annulé par l’utilisateur ; le fichier de destination n’a pas été modifié",
+  "download_reason.blocked": "téléchargement bloqué : origine, limite de téléchargements simultanés ou boîte de dialogue d’enregistrement déjà ouverte",
+  "download_reason.refused": "le serveur a refusé le téléchargement",
+  "download_reason.size": "le téléchargement dépasse la limite de 1 Gio",
+  "download_reason.staging": "impossible de préparer le fichier temporaire du téléchargement : choisissez un nouveau nom de fichier dans un répertoire accessible en écriture ; les fichiers existants ne sont jamais écrasés",
+  "download_reason.network": "échec du téléchargement réseau ; le fichier de destination n’a pas été modifié",
+  "download_reason.retained": "échec de l’enregistrement atomique du fichier de destination ; le fichier de destination n’a pas été écrasé ; la copie temporaire privée a été conservée, vérifiez-la avant de la réutiliser",
+  "download_reason.no_recovery": "échec de l’enregistrement atomique du fichier de destination ; le fichier de destination n’a pas été écrasé ; aucune copie de récupération n’est disponible"
 }

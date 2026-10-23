@@ -330,5 +330,13 @@
   "diagnostics.saved": "El paquete de diagnóstico se ha guardado en:\n{path}\n\nContiene las versiones, el estado del servicio, los contadores de almacenamiento y del entorno de ejecución, la ABI de WebKitGTK cargada y las últimas líneas del registro con los tokens de inicio ocultados. No incluye el contenido de las sesiones ni los registros de aplicaciones ajenas. Revise el informe antes de compartirlo: los registros del servicio y los metadatos de los complementos pueden contener información privada.",
   "diagnostics.failed_title": "No se pudo guardar el diagnóstico",
   "tray.pairing_failed": "No se pudo abrir el emparejamiento",
-  "tray.restart_failed": "No se pudo reiniciar DSH"
+  "tray.restart_failed": "No se pudo reiniciar DSH",
+  "download_reason.cancelled": "cancelado por el usuario; el archivo de destino no se ha modificado",
+  "download_reason.blocked": "descarga bloqueada: origen, límite de descargas simultáneas o diálogo de guardado ya abierto",
+  "download_reason.refused": "el servidor ha rechazado la descarga",
+  "download_reason.size": "la descarga supera el límite de 1 GiB",
+  "download_reason.staging": "no se puede preparar el archivo temporal de descarga: elige un nombre de archivo nuevo en un directorio con permisos de escritura; los archivos existentes nunca se sobrescriben",
+  "download_reason.network": "ha fallado la descarga por la red; el archivo de destino no se ha modificado",
+  "download_reason.retained": "ha fallado el guardado atómico del archivo de destino; el archivo de destino no se ha sobrescrito; se conserva una copia temporal privada, verifícala antes de reutilizarla",
+  "download_reason.no_recovery": "ha fallado el guardado atómico del archivo de destino; el archivo de destino no se ha sobrescrito; no hay ninguna copia de recuperación disponible"
 }

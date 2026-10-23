@@ -330,5 +330,13 @@
   "diagnostics.saved": "O pacote de diagnóstico foi salvo em:\n{path}\n\nEle contém as versões, o estado do serviço, os contadores de armazenamento e do ambiente de execução, a ABI do WebKitGTK carregada e as últimas linhas do registro com os tokens de inicialização ocultados. Ele não inclui o conteúdo das sessões nem os registros de outros aplicativos sem relação com o DSH. Revise o relatório antes de compartilhá-lo: os registros do serviço e os metadados dos plugins podem conter informações privadas.",
   "diagnostics.failed_title": "Não foi possível salvar o diagnóstico",
   "tray.pairing_failed": "Não foi possível abrir o pareamento",
-  "tray.restart_failed": "Não foi possível reiniciar o DSH"
+  "tray.restart_failed": "Não foi possível reiniciar o DSH",
+  "download_reason.cancelled": "cancelado pelo usuário; o arquivo de destino não foi alterado",
+  "download_reason.blocked": "download bloqueado: origem, limite de downloads simultâneos ou caixa de diálogo de salvamento já aberta",
+  "download_reason.refused": "o servidor recusou o download",
+  "download_reason.size": "o download excede o limite de 1 GiB",
+  "download_reason.staging": "não foi possível preparar o arquivo temporário do download: escolha um novo nome de arquivo em um diretório com permissão de escrita; arquivos existentes nunca são sobrescritos",
+  "download_reason.network": "falha no download pela rede; o arquivo de destino não foi alterado",
+  "download_reason.retained": "falha ao salvar atomicamente o arquivo de destino; o arquivo de destino não foi sobrescrito; a cópia temporária privada foi mantida, verifique-a antes de reutilizá-la",
+  "download_reason.no_recovery": "falha ao salvar atomicamente o arquivo de destino; o arquivo de destino não foi sobrescrito; nenhuma cópia de recuperação está disponível"
 }

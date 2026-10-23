@@ -330,5 +330,13 @@
   "diagnostics.saved": "Das Diagnosepaket wurde hier gespeichert:\n{path}\n\nEs enthält Versionen, den Dienststatus, Speicher- und Laufzeitzähler, die geladene WebKitGTK-ABI sowie die letzten Journalzeilen mit unkenntlich gemachten Start-Tokens. Sitzungsinhalte und Journale nicht zugehöriger Anwendungen sind nicht enthalten. Prüfen Sie den Bericht vor der Weitergabe: Dienstprotokolle und Plugin-Metadaten können private Informationen enthalten.",
   "diagnostics.failed_title": "Diagnosedaten konnten nicht gespeichert werden",
   "tray.pairing_failed": "Kopplung konnte nicht geöffnet werden",
-  "tray.restart_failed": "DSH konnte nicht neu gestartet werden"
+  "tray.restart_failed": "DSH konnte nicht neu gestartet werden",
+  "download_reason.cancelled": "vom Benutzer abgebrochen; die Zieldatei wurde nicht verändert",
+  "download_reason.blocked": "Download blockiert: Herkunft, Höchstzahl gleichzeitiger Downloads oder bereits geöffneter Speicherdialog",
+  "download_reason.refused": "der Server hat den Download abgelehnt",
+  "download_reason.size": "der Download überschreitet die Grenze von 1 GiB",
+  "download_reason.staging": "die temporäre Downloaddatei kann nicht vorbereitet werden: Wählen Sie einen neuen Dateinamen in einem beschreibbaren Verzeichnis; vorhandene Dateien werden niemals überschrieben",
+  "download_reason.network": "Netzwerkdownload fehlgeschlagen; die Zieldatei wurde nicht verändert",
+  "download_reason.retained": "atomares Speichern der Zieldatei fehlgeschlagen; die Zieldatei wurde nicht überschrieben; die private temporäre Kopie wurde aufbewahrt, prüfen Sie sie vor der erneuten Verwendung",
+  "download_reason.no_recovery": "atomares Speichern der Zieldatei fehlgeschlagen; die Zieldatei wurde nicht überschrieben; es ist keine Wiederherstellungskopie verfügbar"
 }

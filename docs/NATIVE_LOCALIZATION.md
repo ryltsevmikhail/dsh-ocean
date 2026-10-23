@@ -74,8 +74,11 @@ are localized too. Attached/external/remote/no-server guidance remains check-onl
 unencrypted full-home backup, credential-content and server/WebSocket restart
 warnings are retained. Diagnostic-save receipts and tray pairing/restart error
 headings are localized, retaining the warning to review logs/plugin metadata before
-sharing. Technical backend details remain literal data. Remaining startup/status
-log captions and fixed download-reason messages are under coverage review.
+sharing. Technical backend details remain literal data. Fixed download reasons are
+localized when a record is created, including distinct retained-staging/no-recovery
+publication failures; existing persisted records retain their original message text.
+Typed transfer status, origin/size/concurrency checks and no-overwrite publication
+are unchanged. Startup/status log captions remain under coverage review.
 
 ## Harness resource tree
 
