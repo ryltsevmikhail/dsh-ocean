@@ -225,6 +225,13 @@
           catalogLoaded = localizer.update(payload);
           applyStaticText();
           if (lastState && !document.hidden) render(lastState);
+          else if (!lastState) {
+            setPhase('idle');
+            el('runtime').textContent = t('setup.runtime_detecting', 'runtime: detecting…');
+            el('server').textContent = t('setup.server_none', 'server: —');
+            el('config').textContent = t('setup.config', 'config: {path}', {path:'—'});
+            el('log-count').textContent = t('setup.log_lines', 'Log lines: {count}', {count:0});
+          }
         }).catch(console.error).finally(() => { catalogPending = null; });
       }
       let autoStarted = false;

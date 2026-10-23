@@ -50,6 +50,14 @@ function fixture(hidden = false, locale = 'en') {
   };
 }
 
+test('catalog hydration localizes initial placeholders even while native state detection is pending', async()=>{
+ const f=fixture(false,'ru');await settle();
+ assert.equal(f.requests.length,1);
+ assert.equal(f.elements.get('runtime').textContent,'runtime: определение…');
+ assert.equal(f.elements.get('log-count').textContent,'Строк журнала: 0');
+ assert.equal(f.elements.get('server').textContent,'сервер: —');
+});
+
 test('Russian setup keeps recovery gates and renders native catalog text without HTML interpretation', async()=>{
  const f=fixture(false,'ru');
  Object.assign(f.state,{phase:'failed',recoveryRequired:true,updating:true,message:'<img src=x onerror=alert(1)>'});
