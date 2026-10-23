@@ -1,6 +1,26 @@
 use dsh_ocean::i18n::{message, render, resolve_language, Language};
 
 #[test]
+fn every_native_tray_action_has_all_shipped_translations_without_changing_ids() {
+    use dsh_ocean::tray::Action;
+    for action in Action::ALL {
+        let key = format!("tray.{}", action.id());
+        assert_eq!(message(Language::En, &key), Some(action.label()), "{key}");
+        for code in ["ru", "es", "pt-BR", "de", "fr", "ja", "ko"] {
+            assert!(
+                message(Language::from_locale(code).unwrap(), &key).is_some(),
+                "{key}/{code}"
+            );
+        }
+        assert_eq!(Action::from_id(action.id()), Some(action));
+    }
+    assert!(
+        Action::from_id("language").is_some(),
+        "native language chooser missing"
+    );
+}
+
+#[test]
 fn locale_resolution_is_pure_and_respects_posix_precedence_and_fallback() {
     assert_eq!(
         resolve_language(None, None, None, Some("ru_RU.UTF-8")),

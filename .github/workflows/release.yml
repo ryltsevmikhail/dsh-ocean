@@ -160,8 +160,8 @@ jobs:
           # Build ignored native fixtures first; the timed run is the real dialog
           # exercise, not a timeout spent compiling. Separate debug target keeps
           # the release link map/ELF untouched.
-          cargo test --locked --no-run --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui
-          timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui -- --ignored --test-threads=1 --nocapture
+          cargo test --locked --no-run --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui --test localization_ui
+          timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test download_chooser --test download_history --test download_progress_ui --test storage_ui --test backup_export_ui --test plugins_ui --test shell_status --test profile_verify_ui --test profile_history_ui --test localization_ui -- --ignored --test-threads=1 --nocapture
       - name: Exercise exact release ELF and bind native evidence to actual tar
         if: ${{ inputs.product == 'shell' }}
         env:

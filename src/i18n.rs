@@ -16,6 +16,31 @@ pub enum Language {
     Ko,
 }
 
+static ACTIVE_LANGUAGE: OnceLock<Language> = OnceLock::new();
+
+/// GUI startup sets a single snapshot before constructing any native controls.
+/// Settings changes are persisted for the next start, not partially applied.
+pub fn initialize(language: Language) -> Result<(), Language> {
+    ACTIVE_LANGUAGE.set(language)
+}
+pub fn active_language() -> Language {
+    ACTIVE_LANGUAGE.get().copied().unwrap_or(Language::En)
+}
+pub fn text(key: &'static str) -> &'static str {
+    message(active_language(), key).unwrap_or(key)
+}
+
+pub const LANGUAGES: [(Language, &str); 8] = [
+    (Language::En, "English"),
+    (Language::Ru, "Русский"),
+    (Language::Es, "Español"),
+    (Language::PtBr, "Português (Brasil)"),
+    (Language::De, "Deutsch"),
+    (Language::Fr, "Français"),
+    (Language::Ja, "日本語"),
+    (Language::Ko, "한국어"),
+];
+
 impl Language {
     pub fn code(self) -> &'static str {
         match self {

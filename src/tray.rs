@@ -34,13 +34,14 @@ pub enum Action {
     ProfileBackups,
     Downloads,
     Notifications,
+    Language,
     Quit,
 }
 
 impl Action {
     /// Menu order, matching the visual grouping (separators are added by the
     /// caller and are not actions).
-    pub const ALL: [Action; 19] = [
+    pub const ALL: [Action; 20] = [
         Action::Show,
         Action::Restart,
         Action::Updates,
@@ -59,6 +60,7 @@ impl Action {
         Action::ProfileBackups,
         Action::Downloads,
         Action::Notifications,
+        Action::Language,
         Action::Quit,
     ];
 
@@ -82,6 +84,7 @@ impl Action {
             Action::ProfileBackups => "profile-backups",
             Action::Downloads => "downloads",
             Action::Notifications => "notifications",
+            Action::Language => "language",
             Action::Quit => "quit",
         }
     }
@@ -106,8 +109,14 @@ impl Action {
             Action::ProfileBackups => "Open profile backups",
             Action::Downloads => "Downloads…",
             Action::Notifications => "Desktop notifications",
+            Action::Language => "Language…",
             Action::Quit => "Quit DSH Ocean",
         }
+    }
+
+    pub fn label_for(self, language: crate::i18n::Language) -> &'static str {
+        crate::i18n::message(language, &format!("tray.{}", self.id()))
+            .unwrap_or_else(|| self.label())
     }
 
     pub fn from_id(id: &str) -> Option<Self> {
@@ -117,7 +126,13 @@ impl Action {
 
 pub fn install(app: &tauri::App) -> tauri::Result<TrayIcon> {
     let item = |action: Action| -> tauri::Result<MenuItem<tauri::Wry>> {
-        MenuItem::with_id(app, action.id(), action.label(), true, None::<&str>)
+        MenuItem::with_id(
+            app,
+            action.id(),
+            action.label_for(crate::i18n::active_language()),
+            true,
+            None::<&str>,
+        )
     };
     let show = item(Action::Show)?;
     let restart = item(Action::Restart)?;
@@ -140,11 +155,12 @@ pub fn install(app: &tauri::App) -> tauri::Result<TrayIcon> {
     let notices = CheckMenuItem::with_id(
         app,
         Action::Notifications.id(),
-        Action::Notifications.label(),
+        Action::Notifications.label_for(crate::i18n::active_language()),
         true,
         app.state::<AppState>().notifier.enabled(),
         None::<&str>,
     )?;
+    let language = item(Action::Language)?;
     let separator_two = PredefinedMenuItem::separator(app)?;
     let quit = item(Action::Quit)?;
 
@@ -170,6 +186,7 @@ pub fn install(app: &tauri::App) -> tauri::Result<TrayIcon> {
             &backups,
             &downloads,
             &notices,
+            &language,
             &separator_two,
             &quit,
         ],
@@ -201,6 +218,7 @@ pub fn install(app: &tauri::App) -> tauri::Result<TrayIcon> {
             };
             match action {
                 Action::Show => windows::show_main_or_setup(app),
+                Action::Language => crate::localization_ui::show(app),
                 Action::Notifications => {
                     let requested = notices.is_checked().unwrap_or(false);
                     let enabled = crate::notification_ui::toggle(app, requested);
@@ -335,6 +353,7 @@ mod tests {
                 | Action::ProfileBackups
                 | Action::Downloads
                 | Action::Notifications
+                | Action::Language
                 | Action::Quit => {}
             }
             assert!(seen.insert(action.id()), "{} listed twice", action.id());

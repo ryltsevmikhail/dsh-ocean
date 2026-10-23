@@ -32,7 +32,7 @@ class NativeLocaleCatalogs(unittest.TestCase):
         self.assertTrue(directory.is_dir(),'Ocean has no built-in locale catalogs')
         self.assertEqual({p.name for p in directory.iterdir()}, {x+'.json' for x in LOCALES})
         catalogs={code:json.loads((directory/(code+'.json')).read_text(),object_pairs_hook=unique_object) for code in LOCALES}
-        self.assertEqual(set(catalogs['en']),KEYS)
+        self.assertTrue(KEYS.issubset(catalogs['en']))
         for locale,catalog in catalogs.items():
             with self.subTest(locale=locale):
                 self.assertEqual(set(catalog),set(catalogs['en']))

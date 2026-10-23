@@ -169,6 +169,12 @@ jobs:
       - name: Private desktop notification bus
         run: timeout --kill-after=5s 45s bash scripts/test-native.sh cargo test --locked --test desktop_notifications -- --ignored --test-threads=1 --nocapture
 
+      - name: Native language chooser and conservative confirmation responses
+        run: timeout --kill-after=5s 40s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test localization_ui -- --ignored --test-threads=1 --nocapture
+        env:
+          DSH_OCEAN_TEST_DIALOGS: "1"
+          GDK_BACKEND: x11
+
       - name: Native app launch smoke
         run: |
           cargo build --locked --bin dsh-ocean
