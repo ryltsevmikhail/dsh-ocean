@@ -181,6 +181,183 @@ fn changed_text_in(receipt: &serde_json::Value, language: crate::i18n::Language)
     .expect("validated disk-only transaction receipt")
 }
 
+#[cfg(test)]
+#[test]
+fn selected_locale_trust_and_destination_reports_do_not_infer_owned_or_authenticated_state() {
+    let feed = crate::update_settings::Feed {
+        manifest_url: "https://example.invalid/manifest".into(),
+        signature_url: "https://example.invalid/signature".into(),
+        minimum_sequence: 1,
+    };
+    let key = ed25519_dalek::SigningKey::from_bytes(&[47; 32]);
+    let source = crate::update_settings::Source {
+        key: crate::release_feed::PublicKeyDocument {
+            version: 1,
+            key_id: "synthetic-report-key".into(),
+            public_key_hex: crate::release_feed::hex(key.verifying_key().as_bytes()),
+        },
+        stable: feed.clone(),
+        next: feed,
+    };
+    let configured = Settings {
+        shell: Some(source.clone()),
+        ..Settings::default()
+    };
+    let fingerprint = source.trust().unwrap().fingerprint();
+    let mut invalid = configured.clone();
+    invalid.shell.as_mut().unwrap().key.public_key_hex = "invalid".into();
+    let status = managed_shell::Status {
+        prefix: "/private/{bytes}<b>".into(),
+        enrolled: false,
+        installation: None,
+        installation_error: None,
+        pending_recovery: true,
+        launcher: "/private/launcher".into(),
+    };
+    for (language, _) in crate::i18n::LANGUAGES {
+        assert_eq!(
+            trust_text_in(None, language),
+            crate::i18n::message(language, "shell_report.trust_unavailable").unwrap()
+        );
+        let valid_report = trust_text_in(Some(&configured), language);
+        assert!(
+            valid_report.contains("synthetic-report-key") && valid_report.contains(&fingerprint)
+        );
+        let invalid_report = trust_text_in(Some(&invalid), language);
+        assert!(
+            !invalid_report.contains(&fingerprint)
+                && !invalid_report.contains("synthetic-report-key")
+        );
+        let settings = Settings::default();
+        let trust = trust_text_in(Some(&settings), language);
+        assert!(
+            trust.contains("--configure-updates")
+                && trust
+                    .contains(crate::i18n::message(language, "shell_report.shell_source").unwrap())
+        );
+        let destination = destination_text_in(Some(&status), language);
+        assert!(
+            destination.contains("/private/{bytes}<b>")
+                && destination
+                    .contains(crate::i18n::message(language, "shell_report.not_enrolled").unwrap())
+                && destination
+                    .contains(crate::i18n::message(language, "shell_report.recovery").unwrap())
+        );
+        assert_eq!(
+            destination_text_in(None, language),
+            crate::i18n::message(language, "shell_report.unavailable").unwrap()
+        );
+    }
+}
+
+fn trust_text_in(settings: Option<&Settings>, language: crate::i18n::Language) -> String {
+    let Some(settings) = settings else {
+        return crate::i18n::message(language, "shell_report.trust_unavailable")
+            .expect("embedded unavailable trust warning")
+            .into();
+    };
+    let source_text = |product, title_key| {
+        let title =
+            crate::i18n::message(language, title_key).expect("embedded signed source title");
+        match settings.source(product) {
+            Ok(source) => match source.trust() {
+                Ok(key) => crate::i18n::render(
+                    language,
+                    "shell_report.trust_valid",
+                    &[
+                        ("title", title),
+                        ("id", key.id()),
+                        ("fingerprint", &key.fingerprint()),
+                    ],
+                )
+                .expect("validated public trust fields"),
+                Err(_) => {
+                    crate::i18n::render(language, "shell_report.trust_invalid", &[("title", title)])
+                        .expect("validated invalid trust title")
+                }
+            },
+            Err(_) => crate::i18n::render(
+                language,
+                "shell_report.trust_unconfigured",
+                &[("title", title)],
+            )
+            .expect("validated missing trust title"),
+        }
+    };
+    crate::i18n::render(
+        language,
+        "shell_report.trust",
+        &[
+            (
+                "shell",
+                &source_text(Product::Shell, "shell_report.shell_source"),
+            ),
+            (
+                "core",
+                &source_text(Product::Runtime, "shell_report.core_source"),
+            ),
+        ],
+    )
+    .expect("validated independently provisioned trust report")
+}
+fn destination_text_in(
+    destination: Option<&managed_shell::Status>,
+    language: crate::i18n::Language,
+) -> String {
+    let Some(destination) = destination else {
+        return crate::i18n::message(language, "shell_report.unavailable")
+            .expect("embedded unavailable destination message")
+            .into();
+    };
+    let current = destination
+        .installation
+        .as_ref()
+        .and_then(|installation| installation.current.as_ref())
+        .map(|current| format!("{} ({})", current.release, kind_name(current.kind)))
+        .unwrap_or_else(|| {
+            crate::i18n::message(language, "shell_report.none")
+                .expect("embedded empty selection message")
+                .into()
+        });
+    let detail = destination
+        .installation_error
+        .as_deref()
+        .unwrap_or_else(|| {
+            crate::i18n::message(
+                language,
+                if destination.pending_recovery {
+                    "shell_report.recovery"
+                } else {
+                    "shell_report.unchanged"
+                },
+            )
+            .expect("embedded local transaction status")
+        });
+    crate::i18n::render(
+        language,
+        "shell_report.destination",
+        &[
+            (
+                "enrolled",
+                crate::i18n::message(
+                    language,
+                    if destination.enrolled {
+                        "shell_report.enrolled"
+                    } else {
+                        "shell_report.not_enrolled"
+                    },
+                )
+                .expect("embedded enrollment state"),
+            ),
+            ("prefix", &destination.prefix.display().to_string()),
+            ("current", &current),
+            ("detail", detail),
+            ("launcher", &destination.launcher.display().to_string()),
+        ],
+    )
+    .expect("validated local destination report")
+}
+
 fn discard_cache(cached: Option<Arc<managed_shell::CachedArtifact>>) {
     if let Some(cached) = cached {
         std::thread::spawn(move || drop(cached));
@@ -328,47 +505,35 @@ fn render(widgets: &Widgets, model: &Model, registry: &native_updates::Registry)
         combo.set_active_id(Some(kind_name(model.kind)));
     }
     if let Some(trust) = widgets.trust.upgrade() {
-        trust.set_text(&match &model.settings {
-            Some(settings)=>{
-                let source_text=|product,title:&str|match settings.source(product){
-                    Ok(source)=>match source.trust(){Ok(key)=>format!("{title}: {}\nPublic-key fingerprint: {}",key.id(),key.fingerprint()),Err(_)=>format!("{title}: invalid local trust")},
-                    Err(_)=>format!("{title}: not configured"),
-                };
-                format!("{}\n{}\nNo key is fetched from a feed. Provision public trust with --configure-updates and an independently confirmed fingerprint; current endpoint details are available with --update-settings.",source_text(Product::Shell,"Shell signed source"),source_text(Product::Runtime,"Core signed source"))
-            },
-            None=>"Updater trust is not configured or local configuration could not be read. Ask the owner/distribution to provision independently authenticated public trust. Advanced: dsh-ocean --configure-updates CONFIG --confirm-shell-key SHA256 (runtime root is separate). No key is discovered from a feed.".into(),
-        });
+        trust.set_text(&trust_text_in(
+            model.settings.as_ref(),
+            crate::i18n::active_language(),
+        ));
     }
     if let Some(status) = widgets.status.upgrade() {
-        let destination = match destination {
-            Some(destination) => format!(
-                "Destination: {}\n{}\nSelected on disk: {}\n{}\nManaged launcher: {}",
-                if destination.enrolled {
-                    "enrolled"
-                } else {
-                    "not enrolled"
-                },
-                destination.prefix.display(),
-                current
-                    .map(|current| format!("{} ({})", current.release, kind_name(current.kind)))
-                    .unwrap_or_else(|| "none".into()),
-                destination.installation_error.as_deref().unwrap_or(
-                    if destination.pending_recovery {
-                        "Interrupted transaction: explicit recovery required"
-                    } else {
-                        "Original installation and running process are unchanged"
-                    }
-                ),
-                destination.launcher.display()
-            ),
-            None => "Destination: unavailable / loading".into(),
-        };
+        let destination = destination_text_in(destination, crate::i18n::active_language());
         let candidate = model
             .candidate
             .as_ref()
             .map(|candidate| {
-                let verified=candidate.verified();let manifest=verified.manifest();let artifact=verified.artifact();
-                format!("\nAuthenticated candidate: {} — {} / sequence {}\n{} · {:?} · {} bytes\nExpires: {}\nArtifact SHA-256: {}",manifest.release,channel_name(manifest.channel),manifest.sequence,kind_name(artifact.kind),artifact.target,artifact.size,manifest.expires_at,artifact.sha256)
+                let verified = candidate.verified();
+                let manifest = verified.manifest();
+                let artifact = verified.artifact();
+                crate::i18n::render(
+                    crate::i18n::active_language(),
+                    "shell_report.candidate",
+                    &[
+                        ("release", &manifest.release),
+                        ("channel", channel_name(manifest.channel)),
+                        ("sequence", &manifest.sequence.to_string()),
+                        ("kind", kind_name(artifact.kind)),
+                        ("target", &format!("{:?}", artifact.target)),
+                        ("bytes", &artifact.size.to_string()),
+                        ("expires", &manifest.expires_at),
+                        ("sha256", &artifact.sha256),
+                    ],
+                )
+                .expect("validated authenticated candidate report")
             })
             .unwrap_or_default();
         status.set_text(&format!("{destination}{candidate}\n\n{}", model.message));

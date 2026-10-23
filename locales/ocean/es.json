@@ -252,5 +252,20 @@
   "shell_status.result_changed": "Transacción local completada; la selección solo cambió en disco. El cliente, el núcleo y el perfil en ejecución no han cambiado. {launcher}\nSalga de este cliente mediante su acción Salir y después abra DSH Ocean (managed) desde el menú de aplicaciones. Cerrar en la bandeja no equivale a salir.",
   "shell_status.launcher_error": "El lanzador requiere la atención del operador: {error}",
   "shell_status.result_failed": "La acción de actualización falló: {error}",
-  "shell_status.worker_failed": "el proceso de trabajo nativo terminó; actualice el estado local e inspeccione la recuperación pendiente"
+  "shell_status.worker_failed": "el proceso de trabajo nativo terminó; actualice el estado local e inspeccione la recuperación pendiente",
+  "shell_report.trust_valid": "{title}: {id}\nHuella de la clave pública: {fingerprint}",
+  "shell_report.trust_invalid": "{title}: confianza local no válida",
+  "shell_report.trust_unconfigured": "{title}: sin configurar",
+  "shell_report.shell_source": "Fuente de actualizaciones firmadas de la interfaz",
+  "shell_report.core_source": "Fuente firmada del núcleo",
+  "shell_report.trust": "{shell}\n{core}\nNo se obtiene ninguna clave de un canal de actualizaciones. Configure la confianza en claves públicas con --configure-updates y una huella confirmada de forma independiente; los detalles actuales del punto de conexión están disponibles con --update-settings.",
+  "shell_report.trust_unavailable": "La confianza del actualizador no está configurada o no se pudo leer la configuración local. Solicite al propietario o al distribuidor que proporcione confianza en claves públicas autenticadas de forma independiente. Avanzado: dsh-ocean --configure-updates CONFIG --confirm-shell-key SHA256 (la raíz de confianza del entorno de ejecución es independiente). No se descubre ninguna clave en un canal de actualizaciones.",
+  "shell_report.destination": "Destino: {enrolled}\n{prefix}\nSeleccionado en disco: {current}\n{detail}\nLanzador administrado: {launcher}",
+  "shell_report.enrolled": "destino administrado independiente habilitado explícitamente",
+  "shell_report.not_enrolled": "destino administrado independiente no habilitado explícitamente",
+  "shell_report.none": "ninguno",
+  "shell_report.recovery": "Transacción interrumpida: se requiere recuperación explícita",
+  "shell_report.unchanged": "La instalación original y el proceso en ejecución no se han modificado",
+  "shell_report.unavailable": "Destino: no disponible / cargando",
+  "shell_report.candidate": "\nCandidato autenticado: {release} — {channel} / secuencia {sequence}\n{kind} · {target} · {bytes} bytes\nCaduca: {expires}\nSHA-256 del artefacto: {sha256}"
 }

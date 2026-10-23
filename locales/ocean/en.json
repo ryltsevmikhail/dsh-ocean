@@ -252,5 +252,20 @@
   "shell_status.result_changed": "Local transaction completed; selection changed on disk only. Running client/core/profile are unchanged. {launcher}\nQuit this client using its Quit action, then open DSH Ocean (managed) from the application menu. Closing to tray is not quitting.",
   "shell_status.launcher_error": "Launcher needs operator attention: {error}",
   "shell_status.result_failed": "Update action failed: {error}",
-  "shell_status.worker_failed": "native worker terminated; refresh local status and inspect pending recovery"
+  "shell_status.worker_failed": "native worker terminated; refresh local status and inspect pending recovery",
+  "shell_report.trust_valid": "{title}: {id}\nPublic-key fingerprint: {fingerprint}",
+  "shell_report.trust_invalid": "{title}: invalid local trust",
+  "shell_report.trust_unconfigured": "{title}: not configured",
+  "shell_report.shell_source": "Shell signed source",
+  "shell_report.core_source": "Core signed source",
+  "shell_report.trust": "{shell}\n{core}\nNo key is fetched from a feed. Provision public trust with --configure-updates and an independently confirmed fingerprint; current endpoint details are available with --update-settings.",
+  "shell_report.trust_unavailable": "Updater trust is not configured or local configuration could not be read. Ask the owner/distribution to provision independently authenticated public trust. Advanced: dsh-ocean --configure-updates CONFIG --confirm-shell-key SHA256 (runtime root is separate). No key is discovered from a feed.",
+  "shell_report.destination": "Destination: {enrolled}\n{prefix}\nSelected on disk: {current}\n{detail}\nManaged launcher: {launcher}",
+  "shell_report.enrolled": "enrolled",
+  "shell_report.not_enrolled": "not enrolled",
+  "shell_report.none": "none",
+  "shell_report.recovery": "Interrupted transaction: explicit recovery required",
+  "shell_report.unchanged": "Original installation and running process are unchanged",
+  "shell_report.unavailable": "Destination: unavailable / loading",
+  "shell_report.candidate": "\nAuthenticated candidate: {release} — {channel} / sequence {sequence}\n{kind} · {target} · {bytes} bytes\nExpires: {expires}\nArtifact SHA-256: {sha256}"
 }

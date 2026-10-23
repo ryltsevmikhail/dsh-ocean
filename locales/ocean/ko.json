@@ -252,5 +252,20 @@
   "shell_status.result_changed": "로컬 트랜잭션이 완료되었으며 디스크의 선택만 변경되었습니다. 실행 중인 클라이언트, 코어 및 프로필은 변경되지 않았습니다. {launcher}\n이 클라이언트의 종료 동작을 사용해 종료한 후 애플리케이션 메뉴에서 DSH Ocean (managed)를 여세요. 트레이로 닫는 것은 종료가 아닙니다.",
   "shell_status.launcher_error": "실행기에 운영자의 조치가 필요합니다: {error}",
   "shell_status.result_failed": "업데이트 작업에 실패했습니다: {error}",
-  "shell_status.worker_failed": "네이티브 작업자 프로세스가 종료되었습니다. 로컬 상태를 새로 고치고 보류 중인 복구를 확인하세요"
+  "shell_status.worker_failed": "네이티브 작업자 프로세스가 종료되었습니다. 로컬 상태를 새로 고치고 보류 중인 복구를 확인하세요",
+  "shell_report.trust_valid": "{title}: {id}\n공개 키 지문: {fingerprint}",
+  "shell_report.trust_invalid": "{title}: 로컬 신뢰 설정이 유효하지 않음",
+  "shell_report.trust_unconfigured": "{title}: 구성되지 않음",
+  "shell_report.shell_source": "셸의 서명된 배포 소스",
+  "shell_report.core_source": "코어의 서명된 배포 소스",
+  "shell_report.trust": "{shell}\n{core}\n업데이트 피드에서 키를 가져오지 않습니다. --configure-updates 및 독립적으로 확인된 지문을 사용하여 공개 키 신뢰를 구성하세요. 현재 엔드포인트 세부 정보는 --update-settings로 확인할 수 있습니다.",
+  "shell_report.trust_unavailable": "업데이터 신뢰가 구성되지 않았거나 로컬 구성을 읽을 수 없습니다. 소유자 또는 배포자에게 독립적으로 인증된 공개 키 신뢰를 구성해 달라고 요청하세요. 고급 사용: dsh-ocean --configure-updates CONFIG --confirm-shell-key SHA256 (런타임 신뢰 루트는 별개입니다). 업데이트 피드에서 키를 검색하지 않습니다.",
+  "shell_report.destination": "대상 위치: {enrolled}\n{prefix}\n디스크에서 선택됨: {current}\n{detail}\n관리되는 실행기: {launcher}",
+  "shell_report.enrolled": "별도의 관리 대상 위치가 명시적으로 활성화됨",
+  "shell_report.not_enrolled": "별도의 관리 대상 위치가 명시적으로 활성화되지 않음",
+  "shell_report.none": "없음",
+  "shell_report.recovery": "중단된 트랜잭션: 명시적 복구 필요",
+  "shell_report.unchanged": "원래 설치 및 실행 중인 프로세스는 변경되지 않았습니다",
+  "shell_report.unavailable": "대상 위치: 사용할 수 없음 / 로드 중",
+  "shell_report.candidate": "\n인증된 후보: {release} — {channel} / 시퀀스 번호 {sequence}\n{kind} · {target} · {bytes} 바이트\n만료: {expires}\n아티팩트 SHA-256: {sha256}"
 }

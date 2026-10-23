@@ -252,5 +252,20 @@
   "shell_status.result_changed": "Lokale Transaktion abgeschlossen; die Auswahl wurde nur auf dem Datenträger geändert. Laufender Client, Kern und Profil sind unverändert. {launcher}\nBeenden Sie diesen Client über die Aktion „Beenden“ und öffnen Sie anschließend DSH Ocean (managed) über das Anwendungsmenü. Schließen in den Infobereich ist kein Beenden.",
   "shell_status.launcher_error": "Das Startprogramm erfordert einen Eingriff durch den Betreiber: {error}",
   "shell_status.result_failed": "Aktualisierungsaktion fehlgeschlagen: {error}",
-  "shell_status.worker_failed": "nativer Arbeitsprozess beendet; lokalen Status aktualisieren und ausstehende Wiederherstellung prüfen"
+  "shell_status.worker_failed": "nativer Arbeitsprozess beendet; lokalen Status aktualisieren und ausstehende Wiederherstellung prüfen",
+  "shell_report.trust_valid": "{title}: {id}\nFingerabdruck des öffentlichen Schlüssels: {fingerprint}",
+  "shell_report.trust_invalid": "{title}: ungültige lokale Vertrauenskonfiguration",
+  "shell_report.trust_unconfigured": "{title}: nicht konfiguriert",
+  "shell_report.shell_source": "Signierte Updatequelle der Shell",
+  "shell_report.core_source": "Signierte Quelle des Kerns",
+  "shell_report.trust": "{shell}\n{core}\nEs wird kein Schlüssel aus einem Aktualisierungsfeed abgerufen. Richten Sie das Vertrauen in öffentliche Schlüssel mit --configure-updates und einem unabhängig bestätigten Fingerabdruck ein; aktuelle Angaben zum Endpunkt sind mit --update-settings verfügbar.",
+  "shell_report.trust_unavailable": "Das Vertrauen für das Aktualisierungsprogramm ist nicht konfiguriert oder die lokale Konfiguration konnte nicht gelesen werden. Bitten Sie den Eigentümer oder Distributionsanbieter, unabhängig authentifizierte öffentliche Vertrauensschlüssel bereitzustellen. Für Fortgeschrittene: dsh-ocean --configure-updates CONFIG --confirm-shell-key SHA256 (das Vertrauenswurzel der Laufzeit ist separat). Es wird kein Schlüssel aus einem Aktualisierungsfeed ermittelt.",
+  "shell_report.destination": "Ziel: {enrolled}\n{prefix}\nAuf dem Datenträger ausgewählt: {current}\n{detail}\nVerwaltetes Startprogramm: {launcher}",
+  "shell_report.enrolled": "separates verwaltetes Ziel ausdrücklich aktiviert",
+  "shell_report.not_enrolled": "separates verwaltetes Ziel nicht ausdrücklich aktiviert",
+  "shell_report.none": "keines",
+  "shell_report.recovery": "Unterbrochene Transaktion: ausdrückliche Wiederherstellung erforderlich",
+  "shell_report.unchanged": "Die ursprüngliche Installation und der laufende Prozess sind unverändert",
+  "shell_report.unavailable": "Ziel: nicht verfügbar / wird geladen",
+  "shell_report.candidate": "\nAuthentifizierter Kandidat: {release} — {channel} / Sequenznummer {sequence}\n{kind} · {target} · {bytes} Bytes\nGültig bis: {expires}\nSHA-256 des Artefakts: {sha256}"
 }

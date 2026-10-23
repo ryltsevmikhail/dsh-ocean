@@ -252,5 +252,20 @@
   "shell_status.result_changed": "Transação local concluída; a seleção mudou apenas no disco. O cliente, o núcleo e o perfil em execução permanecem inalterados. {launcher}\nEncerre este cliente usando a ação Sair e depois abra DSH Ocean (managed) pelo menu de aplicativos. Fechar para a bandeja não é encerrar.",
   "shell_status.launcher_error": "O iniciador precisa da atenção do operador: {error}",
   "shell_status.result_failed": "A ação de atualização falhou: {error}",
-  "shell_status.worker_failed": "o processo de trabalho nativo foi encerrado; atualize o estado local e inspecione a recuperação pendente"
+  "shell_status.worker_failed": "o processo de trabalho nativo foi encerrado; atualize o estado local e inspecione a recuperação pendente",
+  "shell_report.trust_valid": "{title}: {id}\nImpressão digital da chave pública: {fingerprint}",
+  "shell_report.trust_invalid": "{title}: confiança local inválida",
+  "shell_report.trust_unconfigured": "{title}: não configurado",
+  "shell_report.shell_source": "Fonte de atualizações assinadas da interface",
+  "shell_report.core_source": "Fonte assinada do núcleo",
+  "shell_report.trust": "{shell}\n{core}\nNenhuma chave é obtida de um fluxo de atualizações. Configure a confiança em chaves públicas com --configure-updates e uma impressão digital confirmada de forma independente; os detalhes atuais do ponto de acesso estão disponíveis com --update-settings.",
+  "shell_report.trust_unavailable": "A confiança do atualizador não está configurada ou não foi possível ler a configuração local. Peça ao proprietário ou ao distribuidor que forneça confiança em chaves públicas autenticadas de forma independente. Avançado: dsh-ocean --configure-updates CONFIG --confirm-shell-key SHA256 (a raiz de confiança do ambiente de execução é separada). Nenhuma chave é descoberta em um fluxo de atualizações.",
+  "shell_report.destination": "Destino: {enrolled}\n{prefix}\nSelecionado no disco: {current}\n{detail}\nInicializador gerenciado: {launcher}",
+  "shell_report.enrolled": "destino gerenciado separado habilitado explicitamente",
+  "shell_report.not_enrolled": "destino gerenciado separado não habilitado explicitamente",
+  "shell_report.none": "nenhum",
+  "shell_report.recovery": "Transação interrompida: recuperação explícita necessária",
+  "shell_report.unchanged": "A instalação original e o processo em execução permanecem inalterados",
+  "shell_report.unavailable": "Destino: indisponível / carregando",
+  "shell_report.candidate": "\nCandidato autenticado: {release} — {channel} / sequência {sequence}\n{kind} · {target} · {bytes} bytes\nExpira em: {expires}\nSHA-256 do artefato: {sha256}"
 }

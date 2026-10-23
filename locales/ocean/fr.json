@@ -252,5 +252,20 @@
   "shell_status.result_changed": "Transaction locale terminée ; la sélection a changé uniquement sur le disque. Le client, le noyau et le profil en cours d’exécution restent inchangés. {launcher}\nQuittez ce client avec son action Quitter, puis ouvrez DSH Ocean (managed) depuis le menu des applications. Fermer dans la zone de notification ne revient pas à quitter.",
   "shell_status.launcher_error": "Le lanceur nécessite l’intervention de l’opérateur : {error}",
   "shell_status.result_failed": "L’action de mise à jour a échoué : {error}",
-  "shell_status.worker_failed": "le processus de travail natif s’est arrêté ; actualisez l’état local et examinez la récupération en attente"
+  "shell_status.worker_failed": "le processus de travail natif s’est arrêté ; actualisez l’état local et examinez la récupération en attente",
+  "shell_report.trust_valid": "{title}: {id}\nEmpreinte de la clé publique : {fingerprint}",
+  "shell_report.trust_invalid": "{title}: configuration de confiance locale non valide",
+  "shell_report.trust_unconfigured": "{title}: non configuré",
+  "shell_report.shell_source": "Source de mises à jour signées de l’interface",
+  "shell_report.core_source": "Source signée du noyau",
+  "shell_report.trust": "{shell}\n{core}\nAucune clé n’est récupérée depuis un flux de mises à jour. Configurez la confiance dans les clés publiques avec --configure-updates et une empreinte confirmée indépendamment ; les détails actuels du point de terminaison sont disponibles avec --update-settings.",
+  "shell_report.trust_unavailable": "La confiance de l’outil de mise à jour n’est pas configurée ou la configuration locale n’a pas pu être lue. Demandez au propriétaire ou au fournisseur de la distribution de fournir des clés publiques de confiance authentifiées indépendamment. Utilisation avancée : dsh-ocean --configure-updates CONFIG --confirm-shell-key SHA256 (la racine de confiance de l’environnement d’exécution est distincte). Aucune clé n’est découverte depuis un flux de mises à jour.",
+  "shell_report.destination": "Destination : {enrolled}\n{prefix}\nSélection sur disque : {current}\n{detail}\nLanceur géré : {launcher}",
+  "shell_report.enrolled": "destination gérée distincte explicitement activée",
+  "shell_report.not_enrolled": "destination gérée distincte non explicitement activée",
+  "shell_report.none": "aucun",
+  "shell_report.recovery": "Transaction interrompue : récupération explicite requise",
+  "shell_report.unchanged": "L’installation d’origine et le processus en cours d’exécution sont inchangés",
+  "shell_report.unavailable": "Destination : indisponible / chargement",
+  "shell_report.candidate": "\nCandidat authentifié : {release} — {channel} / numéro de séquence {sequence}\n{kind} · {target} · {bytes} octets\nExpiration : {expires}\nSHA-256 de l’artefact : {sha256}"
 }

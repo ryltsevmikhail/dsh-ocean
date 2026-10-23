@@ -59,8 +59,12 @@ Its six progress phases, cancellation/commit qualifications and operation-result
 messages are localized too. Counters are explicitly not signature/installation
 success, disk-only changes do not claim to replace the running client/core/profile,
 and the remembered floor is described as a release-sequence bound. Literal launcher
-diagnostics remain plain single-pass arguments. Detailed trust/destination reports
-and the remaining core native dialogs are still being localized.
+diagnostics remain plain single-pass arguments. Trust/destination and authenticated
+candidate reports are localized too, retaining missing/invalid-trust distinctions,
+separate public trust roots, explicit recovery and independently confirmed public-key
+fingerprints. Their formatting performs no enrollment, key provisioning or network
+operation. The installation-hint introduction and remaining core native dialogs
+are still being localized.
 
 ## Harness resource tree
 
