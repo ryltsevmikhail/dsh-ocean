@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {resolve,dirname,relative} from 'node:path';
 import {languages} from '../language-pack/src/register.mjs';
 import {validateCatalogs} from '../language-pack/src/validate.mjs';
-import {renderClient} from '../language-pack/scripts/build.mjs';
+import {renderBuiltinClient} from './builtin-locale-client.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const destination=resolve(root,'locales/dsh');
 const check=process.argv.slice(2).includes('--check');
@@ -15,14 +15,14 @@ const manifest={
  name:'@dsh-ocean/builtin-locales',version:'0.4.0',private:true,type:'module',license:'MIT',
  description:'Built-in DSH Ocean UI dictionaries; application-owned composition only',
  main:'./lib/index.js',exports:{'.':'./lib/index.js','./client':'./lib/client.js','./package.json':'./package.json'},
- dsh:{client:{platform:'web',immediately:true,inject:['@deepseek-ai/dsh-client-locale']}},
+ dsh:{client:{platform:'web',immediately:true,inject:['@deepseek-ai/dsh-client-locale','@deepseek-ai/dsh-client-modules']}},
  engines:{dsh:'0.2.0-rc.2',node:'>=22'},
- peerDependencies:{'@deepseek-ai/cordis':'~4.0.4','@deepseek-ai/dsh-client-locale':'0.2.0-rc.2'},
+ peerDependencies:{'@deepseek-ai/cordis':'~4.0.4','@deepseek-ai/dsh-client-locale':'0.2.0-rc.2','@deepseek-ai/dsh-client-modules':'0.2.0-rc.2'},
 };
 const files={
  'package.json':JSON.stringify(manifest,null,2)+'\n',
  'lib/index.js':'/** Built-in host entry: no settings, dependency or profile writes. */\nexport function apply() {}\n',
- 'lib/client.js':renderClient(catalogs,manifest.name),
+ 'lib/client.js':renderBuiltinClient(catalogs,manifest.name),
  'overlay.yml':'# Application-owned activation; native profile consent is required.\n- insert:\n    - id: ocean-builtin-locales\n      name: ./lib/index.js\n',
  LICENSE:readFileSync(resolve(root,'language-pack/LICENSE'),'utf8'),
  'builtin-locale-preflight.mjs':readFileSync(resolve(root,'scripts/builtin-locale-preflight.mjs'),'utf8'),

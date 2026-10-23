@@ -4,13 +4,14 @@ import {existsSync,readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import vm from 'node:vm';
 const root=new URL('../',import.meta.url);
+const idleModules=()=>({manifest:{plugins:[{id:'@dsh-ocean/builtin-locales'}]},entries:{state:{getSnapshot:()=>({syncing:false}),subscribe:()=>()=>{}}}});
 test('built-in client resolves with pinned public LocaleRuntime and unloads its effects', {skip:!process.env.DSH_LOCALE_CLIENT_SOURCE},()=>{
  let official;vm.runInNewContext(readFileSync(process.env.DSH_LOCALE_CLIENT_SOURCE,'utf8'),{navigator:{languages:['en'],language:'en'},window:{__ModuleLoader__:{load(value){official=value;}}}});
  const {LocaleRuntime}=official.factory(()=>({}));const disposers=[];
  const ctx={effect(fn){disposers.push(fn());},emit(){}};const locale=new LocaleRuntime(ctx);
  locale.register('common','en',{builtinFallback:'Upstream English fallback'});
  let builtin;vm.runInNewContext(readFileSync(new URL('locales/dsh/lib/client.js',root),'utf8'),{window:{__ModuleLoader__:{load(value){builtin=value;}}}});
- builtin.factory().apply({...ctx,locale});
+ builtin.factory().apply({...ctx,locale,modules:idleModules()});
  for(const id of ['ru','es','pt-BR','de','fr','ja','ko']) {locale.setLocale(id);assert.equal(locale.bind('missing')('builtinFallback'),'Upstream English fallback');}
  locale.setLocale('ru');assert.equal(locale.bind('common')('cancel'),'Отмена');
  for(const dispose of disposers.reverse())if(typeof dispose==='function')dispose();
@@ -20,6 +21,8 @@ test('built-in client resolves with pinned public LocaleRuntime and unloads its 
 test('module identity is a closed package token, not executable source',async()=>{
  const {renderClient}=await import('../language-pack/scripts/build.mjs');
  assert.throws(()=>renderClient({},"@ocean/pkg';alert(1)//"),/invalid built-in module id/);
+ const {renderBuiltinClient}=await import('../scripts/builtin-locale-client.mjs');
+ assert.throws(()=>renderBuiltinClient({},"@ocean/pkg';alert(1)//"),/invalid built-in module id/);
 });
 
 test('main native payload retains the built-in dictionary copyright and licence',()=>{
@@ -42,8 +45,9 @@ test('main-package DSH locale resource is generated deterministically without an
  let definition;vm.runInNewContext(readFileSync(new URL('locales/dsh/lib/client.js',root),'utf8'),{window:{__ModuleLoader__:{load(value){definition=value;}}}});
  assert.equal(definition.id,manifest.name);const plugin=definition.factory();
  const ids=[],registered=[],disposers=[];
- const ctx={effect(fn){disposers.push(fn());},locale:{addLanguage(value){ids.push(value.id);return()=>{};},register(namespace,language,dictionary){registered.push({namespace,language,dictionary});return()=>{};}}};
+ const ctx={modules:idleModules(),effect(fn){disposers.push(fn());},locale:{getLocale(){return {locales:[{id:'en'},{id:'zh'}]};},addLanguage(value){ids.push(value.id);return()=>{};},register(namespace,language,dictionary){registered.push({namespace,language,dictionary});return()=>{};}}};
  plugin.apply(ctx);assert.deepEqual(ids,['ru','es','pt-BR','de','fr','ja','ko']);
  assert(registered.some(x=>x.language==='ru'&&x.namespace==='chat'));
- assert.equal(disposers.length,7+registered.length);
+ assert.equal(disposers.length,1,'one coordinator effect owns every language and dictionary disposer');
+  assert(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-modules'));
 });

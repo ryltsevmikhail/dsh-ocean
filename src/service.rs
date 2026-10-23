@@ -521,6 +521,18 @@ pub async fn refresh_after_update(app: &AppHandle, permit: &RuntimePermit) -> Re
     reload_systemd_server(app, &base, permit).await
 }
 
+fn refreshed_service_server(server: Option<Server>, base: &Url, token: String) -> Result<Server> {
+    let server = server.context("service refresh requires captured server metadata")?;
+    anyhow::ensure!(
+        server.base_url == *base
+            && matches!(server.mode, ServerMode::Systemd | ServerMode::Attached),
+        "service refresh cannot replace an unrelated server or child recipe"
+    );
+    // An explicit restart authorizes that action, not ownership of an attached
+    // runtime. Only an already proven owned server carries an owned recipe.
+    Ok(server.with_token(token))
+}
+
 pub(crate) async fn reload_systemd_server(
     app: &AppHandle,
     base: &Url,
@@ -530,14 +542,8 @@ pub(crate) async fn reload_systemd_server(
     loop {
         permit.ensure_open()?;
         if let Ok(token) = auth::resolve_token(base, Some(config::UNIT_NAME)) {
-            auth::cache_token(&token);
-            let new_server = match permit
-                .server()?
-                .filter(|server| server.mode == ServerMode::Systemd && server.base_url == *base)
-            {
-                Some(server) => server.with_token(token),
-                None => Server::new(base.clone(), token, ServerMode::Systemd),
-            };
+            let new_server = refreshed_service_server(permit.server()?, base, token)?;
+            auth::cache_token(&new_server.token);
             permit.publish_server(new_server.clone())?;
             reload_window(app, permit, new_server, false).await?;
             return Ok(());
@@ -553,6 +559,33 @@ pub(crate) async fn reload_systemd_server(
 mod recovery_tests {
     use super::*;
 
+    #[test]
+    fn token_refresh_never_promotes_attachment_or_invents_a_plain_owned_recipe() {
+        let base = Url::parse("http://127.0.0.1:3080/").unwrap();
+        let attached = Server::new(base.clone(), "old".into(), ServerMode::Attached);
+        let refreshed = refreshed_service_server(Some(attached), &base, "new".into()).unwrap();
+        assert_eq!(refreshed.mode, ServerMode::Attached);
+        assert_eq!(refreshed.unit, None);
+        assert_eq!(refreshed.token, "new");
+        let mut owned = Server::new(base.clone(), "old".into(), ServerMode::Systemd);
+        owned.locale_patch = Some(std::path::PathBuf::from("/private/old/overlay.yml"));
+        let refreshed = refreshed_service_server(Some(owned.clone()), &base, "new".into()).unwrap();
+        assert_eq!(refreshed.locale_patch, owned.locale_patch);
+        assert_eq!(refreshed.mode, ServerMode::Systemd);
+        assert!(refreshed_service_server(None, &base, "new".into()).is_err());
+        assert!(refreshed_service_server(
+            Some(owned),
+            &Url::parse("http://127.0.0.1:3081/").unwrap(),
+            "new".into()
+        )
+        .is_err());
+        assert!(refreshed_service_server(
+            Some(Server::new(base.clone(), "old".into(), ServerMode::Child)),
+            &base,
+            "new".into()
+        )
+        .is_err());
+    }
     #[test]
     fn remote_origins_never_authorize_local_service_fallback() {
         for origin in [

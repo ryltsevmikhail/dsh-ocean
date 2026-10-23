@@ -100,6 +100,10 @@ claim to lock settings against hostile concurrent edits.
 
 Published owned-server metadata now retains the actual overlay path atomically
 with its child. Ordinary child restart and token refresh preserve that recipe.
+A service restart or fresh token does not prove ownership: Attached metadata stays
+Attached. Refresh requires captured metadata for the same origin and refuses a
+missing server or child-to-service transition instead of inventing a plain owned
+recipe. Already-owned systemd metadata retains its exact overlay path.
 The live runtime-switch controller captures separate old, candidate and active
 recipes; candidate planning is restricted to before ownership/stop. Its systemd
 ownership comparison accepts only the explicitly captured patched template (or
@@ -124,15 +128,26 @@ Runtime replacement re-inspects the imported SDK before stop/commit for an alrea
 native server; a previously plain server is never implicitly enabled by update.
 Rollback continues using saved recipes, never a fresh preference/preflight.
 
+The client uses the pinned SDK's public module manifest and entry-state observable
+to yield synchronously before host-managed graph reconciliation activates a manual
+language pack. Initial activation order does not choose dictionary ownership;
+manual removal restores native dictionaries only after reconciliation settles.
+Existing conflicting language IDs are left untouched; partial native registration
+failures dispose only native resources. Tests use strict duplicate-rejecting doubles
+and the actual SDK LocaleRuntime/ClientModuleSystem with an explicit Loader double.
+Arbitrary out-of-band module loads absent from the host graph are not prospectively
+coordinated; no unsupported loader interception or order-sensitive override is used.
+
 Remaining validation includes real Tauri-window and user-manager integration,
-ARM64 native runs, retained-cache/inter-version compatibility, dynamic manual-pack
-coexistence, and the complete current packaging/license report. Cold systemd
+ARM64 native runs, retained-cache/inter-version compatibility, and the complete
+current packaging/license report. Cold systemd
 migration currently recognizes the plain template and this build's exact native
 cache path; unknown older paths remain refused, not rewritten or executed.
 
-**Activation is not implemented yet.** The embedding API by itself does not prove
-that a linked release ELF retains the resources; owned-runtime lifecycle calls
-and package/native integration tests must establish that before completion.
+**Release/native integration validation is not complete.** The implemented
+activation callers and component tests do not by themselves prove release ELF
+resource retention, real native-window behavior or ARM64 packaging; those checks
+must establish the remaining completion evidence.
 
 ## Activation boundary to preserve
 
