@@ -71,4 +71,72 @@ fn localized_language_picker_and_confirmation_keep_response_ids_and_plain_text()
     assert!(!hint.property::<bool>("use-markup"));
     assert_eq!(chooser.current_name().as_deref(), Some("example.txt"));
     chooser.close();
+    let (permission, body) = dsh_ocean::builtin_locale_ui::build(
+        None,
+        Language::Ru,
+        std::path::Path::new("/tmp/<b>private</b>/profiles/web"),
+    );
+    assert_eq!(permission.title().as_deref(), Some("Встроенные языки DSH"));
+    assert!(body.text().contains("/tmp/<b>private</b>/profiles/web"));
+    assert!(!body.property::<bool>("use-markup"));
+    assert!(permission
+        .widget_for_response(gtk::ResponseType::Accept)
+        .is_some());
+    assert_eq!(
+        permission
+            .default_widget()
+            .map(|w| permission.response_for_widget(&w)),
+        Some(gtk::ResponseType::Reject)
+    );
+    permission.close();
+    use dsh_ocean::builtin_locale_ui::{watch_choice, Choice};
+    use std::{
+        cell::Cell,
+        rc::Rc,
+        time::{Duration, Instant},
+    };
+    for (current, response, expected) in [
+        (true, gtk::ResponseType::Accept, Choice::Allow),
+        (true, gtk::ResponseType::Reject, Choice::Refuse),
+        (true, gtk::ResponseType::DeleteEvent, Choice::Dismissed),
+        (false, gtk::ResponseType::Accept, Choice::Stale),
+    ] {
+        let (dialog, _) = dsh_ocean::builtin_locale_ui::build(
+            None,
+            Language::En,
+            std::path::Path::new("/tmp/profiles/web"),
+        );
+        let result = Rc::new(Cell::new(None));
+        let output = result.clone();
+        watch_choice(&dialog, Rc::new(move || current), move |choice| {
+            output.set(Some(choice))
+        });
+        dialog.response(response);
+        assert_eq!(result.get(), Some(expected));
+        dialog.response(gtk::ResponseType::Accept);
+        assert_eq!(
+            result.get(),
+            Some(expected),
+            "late response cannot approve twice"
+        );
+    }
+    let (dialog, _) = dsh_ocean::builtin_locale_ui::build(
+        None,
+        Language::En,
+        std::path::Path::new("/tmp/profiles/web"),
+    );
+    let current = Rc::new(Cell::new(true));
+    let guard = current.clone();
+    let result = Rc::new(Cell::new(None));
+    let output = result.clone();
+    watch_choice(&dialog, Rc::new(move || guard.get()), move |choice| {
+        output.set(Some(choice))
+    });
+    dialog.show_all();
+    current.set(false);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while result.get().is_none() && Instant::now() < deadline {
+        gtk::glib::MainContext::default().iteration(true);
+    }
+    assert_eq!(result.get(), Some(Choice::Stale));
 }

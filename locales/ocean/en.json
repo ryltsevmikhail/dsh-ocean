@@ -91,5 +91,11 @@
   "downloads.cannot_check": "Cannot check this filename. Choose a new location.",
   "downloads.failed": "Download failed",
   "downloads.failed_text": "Download failed; destination left untouched",
-  "downloads.staging": "\nPrivate staging copy: {path}"
+  "downloads.staging": "\nPrivate staging copy: {path}",
+  "builtin.title": "Built-in DSH languages",
+  "builtin.body": "Use the built-in dictionaries for the Ocean-managed DSH runtime with this profile?\n{profile}\n\nDSH recreates generated cordis.yml and may save the language entry there. This feature does not download or install an add-on or change package.json, lockfiles, user patches, locale preferences or credentials. Normal DSH startup behavior is unchanged. Attached runtimes are not modified.",
+  "builtin.allow": "Enable for this profile",
+  "builtin.decline": "Continue without built-in languages",
+  "builtin.failed_title": "Built-in languages unavailable",
+  "builtin.failed_body": "Built-in languages were not activated. {detail}"
 }

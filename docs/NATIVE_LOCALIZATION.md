@@ -54,8 +54,12 @@ not inside a signed runtime generation.
 The separate versioned consent store binds an explicit allow/refuse choice to an
 absolute web-profile path and the pinned SDK's generated-root contract. Absence,
 a changed scope, invalid data or a future document never grants permission. The
-store does not create the profile or grant process/unit ownership. Native user
-confirmation and lifecycle wiring remain to be implemented.
+store does not create the profile or grant process/unit ownership. The native
+approval dialog now provides explicit allow/refuse actions, conservative default,
+plain profile text, and operation-stamp checks before display and persistence.
+Dismissal never approves; invalidation closes the outstanding dialog and late
+responses are ignored. The dialog is not exposed as a webview command. Actual
+owned-runtime launch wiring remains to be implemented.
 
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls

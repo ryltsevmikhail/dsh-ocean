@@ -27,7 +27,7 @@ def placeholders(value):
     return fields
 
 def referenced_keys(source):
-    pattern=r'''["']((?:common|language|setup|remote|tray|notification|downloads)\.[a-z0-9_-]+(?:\.[a-z0-9_-]+)*)["']'''
+    pattern=r'''["']((?:common|language|setup|remote|tray|notification|downloads|builtin)\.[a-z0-9_-]+(?:\.[a-z0-9_-]+)*)["']'''
     return {match.group(1) for match in re.finditer(pattern,source)
             if not re.search(r'\.join\(\s*$',source[:match.start()])}
 
@@ -54,7 +54,7 @@ class NativeLocaleCatalogs(unittest.TestCase):
     def test_owned_page_and_native_control_keys_are_embedded(self):
         english=json.loads((ROOT/'locales/ocean/en.json').read_text())
         # Literal references only; dynamic tray IDs are covered by Rust Action::ALL.
-        for relative in ('ui/index.html','ui/remote.html','src/ui.rs','src/localization_ui.rs','src/notifications.rs','src/notification_ui.rs','src/download_chooser.rs','src/download_ui.rs'):
+        for relative in ('ui/index.html','ui/remote.html','src/ui.rs','src/localization_ui.rs','src/notifications.rs','src/notification_ui.rs','src/download_chooser.rs','src/download_ui.rs','src/builtin_locale_ui.rs'):
             references=referenced_keys((ROOT/relative).read_text())
             with self.subTest(source=relative):
                 self.assertTrue(references)

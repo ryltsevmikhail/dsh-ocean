@@ -91,5 +91,11 @@
   "downloads.cannot_check": "このファイル名を確認できません。別の保存先を選択してください。",
   "downloads.failed": "ダウンロードに失敗しました",
   "downloads.failed_text": "ダウンロードに失敗しました。保存先は変更されていません",
-  "downloads.staging": "\n非公開の一時コピー: {path}"
+  "downloads.staging": "\n非公開の一時コピー: {path}",
+  "builtin.title": "DSH の組み込み言語",
+  "builtin.body": "このプロファイルを使用する Ocean 管理の DSH ランタイムで、組み込み辞書を有効にしますか？\n{profile}\n\nDSH は生成された cordis.yml を再作成し、言語モジュールの項目を保存する場合があります。この機能はアドオンのダウンロードやインストールを行わず、package.json、ロックファイル、ユーザーパッチ、言語設定、認証情報を変更しません。通常の DSH 起動動作は変わりません。接続先の外部ランタイムは変更されません。",
+  "builtin.allow": "このプロファイルで有効にする",
+  "builtin.decline": "組み込み言語なしで続行",
+  "builtin.failed_title": "組み込み言語を利用できません",
+  "builtin.failed_body": "組み込み言語は有効になっていません。{detail}"
 }

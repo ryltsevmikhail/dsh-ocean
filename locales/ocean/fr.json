@@ -91,5 +91,11 @@
   "downloads.cannot_check": "Impossible de vérifier ce nom de fichier. Choisissez un autre emplacement.",
   "downloads.failed": "Échec du téléchargement",
   "downloads.failed_text": "Le téléchargement a échoué ; la destination n’a pas été modifiée",
-  "downloads.staging": "\nCopie temporaire privée : {path}"
+  "downloads.staging": "\nCopie temporaire privée : {path}",
+  "builtin.title": "Langues intégrées de DSH",
+  "builtin.body": "Utiliser les dictionnaires intégrés dans le runtime DSH géré par Ocean avec ce profil ?\n{profile}\n\nDSH recrée le fichier cordis.yml généré et peut y enregistrer l’entrée du module de langues. Cette fonction ne télécharge ni n’installe d’extension et ne modifie ni package.json, fichiers de verrouillage, correctifs utilisateur, préférences de langue, ni identifiants. Le démarrage normal de DSH reste inchangé. Les runtimes externes connectés ne sont pas modifiés.",
+  "builtin.allow": "Activer pour ce profil",
+  "builtin.decline": "Continuer sans langues intégrées",
+  "builtin.failed_title": "Langues intégrées indisponibles",
+  "builtin.failed_body": "Les langues intégrées n’ont pas été activées. {detail}"
 }
