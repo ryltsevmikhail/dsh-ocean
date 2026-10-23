@@ -111,6 +111,11 @@ pub async fn recorded_plan(
     permit.ensure_open()?;
     launch.verify()?;
     crate::runtime_switch::ensure_no_pending(cache.parent().context("locale cache parent")?)?;
+    // A read-only metadata subprocess may outlive a user changing the private
+    // grant. Never turn its earlier approval snapshot into a new launch recipe.
+    if crate::builtin_locale_consent::load(consent, &scope)? != Some(true) {
+        return Ok(None);
+    }
     Ok((presence == crate::builtin_locale_worker::Presence::Absent)
         .then(|| tree.join("overlay.yml")))
 }

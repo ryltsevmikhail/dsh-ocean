@@ -93,7 +93,10 @@ executes the actual embedded helpers through this wrapper against the private SD
 without creating a profile. The planner binds it to the selected executable's
 nearest SDK manifest, actual launch HOME/DSH_HOME/cwd and scoped native permission.
 Relative/empty overrides, unsafe directory ancestry and profile aliases are
-refused rather than silently selecting another profile.
+refused rather than silently selecting another profile. The matching grant is
+re-read after metadata inspection: revocation while that subprocess runs cannot
+produce a new activation recipe. This is a cooperative latest-state check, not a
+claim to lock settings against hostile concurrent edits.
 
 Published owned-server metadata now retains the actual overlay path atomically
 with its child. Ordinary child restart and token refresh preserve that recipe.
