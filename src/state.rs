@@ -230,7 +230,14 @@ impl AppState {
 
     pub fn fail(&self, message: impl Into<String>) {
         let message = crate::auth::redact(&message.into());
-        self.log(format!("error: {message}"));
+        self.log(
+            crate::i18n::render(
+                crate::i18n::active_language(),
+                "notice.error",
+                &[("message", &message)],
+            )
+            .expect("validated error log caption"),
+        );
         *self.phase.lock().expect("phase mutex") = Phase::Failed(message);
     }
 
@@ -517,6 +524,23 @@ mod tests {
             assert_eq!(logs.len(), 1);
             assert!(!logs[0].contains("synthetic-private") && logs[0].contains("token=***"));
             assert!(matches!(*state.phase.lock().unwrap(), Phase::Idle));
+        }
+    }
+    #[test]
+    fn localized_notice_errors_keep_message_literal_and_redact_tokens() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            let state = AppState::default();
+            state.log(
+                crate::i18n::render(
+                    language,
+                    "notice.error",
+                    &[("message", "<b>{path}</b> token=synthetic-private")],
+                )
+                .unwrap(),
+            );
+            let logs = state.logs.lock().unwrap();
+            assert!(logs[0].contains("<b>{path}</b>"));
+            assert!(!logs[0].contains("synthetic-private"));
         }
     }
     #[test]

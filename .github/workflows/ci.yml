@@ -246,6 +246,15 @@ jobs:
           run_page_test setup_contract
           run_page_test pairing_contract
 
+      - name: Native controls in every embedded language
+        env:
+          GDK_BACKEND: x11
+          DSH_OCEAN_TEST_DIALOGS: "1"
+        run: |
+          for language in en ru es pt-BR de fr ja ko; do
+            DSH_OCEAN_TEST_LANGUAGE="$language" timeout --kill-after=5s 60s bash scripts/test-native.sh xvfb-run -a cargo test --locked --test native_locale_matrix -- --ignored --test-threads=1 --nocapture
+          done
+
       - name: Native WebKit downloads and cross-context cancellation
         env:
           GDK_BACKEND: x11

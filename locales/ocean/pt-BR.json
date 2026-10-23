@@ -361,5 +361,10 @@
   "startup.forcibly_terminated": "O instalador ignorou a solicitação de parada cooperativa e foi encerrado à força. Dados preparados, uma geração não selecionada ou um bloqueio retido do ambiente de execução podem permanecer para inspeção.",
   "startup.cooperatively_stopped": "O instalador parou de forma cooperativa; seus próprios tratadores de sinais removeram os dados preparados e restauraram a seleção anterior quando possível.",
   "startup.cancelled": "Instalação do ambiente de execução cancelada.",
-  "startup.installed": "Ambiente de execução instalado; iniciando o DSH…"
+  "startup.installed": "Ambiente de execução instalado; iniciando o DSH…",
+  "notice.history_unavailable": "Histórico de downloads indisponível; usando apenas a memória, sem alterar o arquivo existente do histórico",
+  "notice.download_saved": "Download salvo; consulte o caminho no histórico nativo de downloads",
+  "notice.preference_unreadable": "Não foi possível ler a preferência de notificações; notificações desativadas sem alterar o arquivo da preferência",
+  "notice.bridge_unavailable": "Ponte de notificações de tarefas indisponível; o comportamento principal da sessão permanece inalterado",
+  "notice.error": "erro: {message}"
 }

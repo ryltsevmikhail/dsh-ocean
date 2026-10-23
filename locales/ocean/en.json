@@ -361,5 +361,10 @@
   "startup.forcibly_terminated": "Installer ignored the cooperative stop; it was terminated forcibly. Staged work, an unselected generation or a held runtime lock may remain for inspection.",
   "startup.cooperatively_stopped": "Installer stopped cooperatively; its own traps removed staged work and restored the previous selection where possible.",
   "startup.cancelled": "Runtime installation cancelled.",
-  "startup.installed": "Runtime installed; starting DSH…"
+  "startup.installed": "Runtime installed; starting DSH…",
+  "notice.history_unavailable": "Download history unavailable; using memory only, leaving its existing file untouched",
+  "notice.download_saved": "Download saved; see native Downloads history for its path",
+  "notice.preference_unreadable": "Notification preference unreadable; notifications disabled without changing its file",
+  "notice.bridge_unavailable": "Task notification bridge unavailable; core session behavior is unchanged",
+  "notice.error": "error: {message}"
 }

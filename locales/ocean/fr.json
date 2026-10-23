@@ -361,5 +361,10 @@
   "startup.forcibly_terminated": "Le programme d’installation a ignoré la demande d’arrêt coopératif et a été arrêté de force. Des données préparées, une génération non sélectionnée ou un verrou d’environnement d’exécution encore détenu peuvent subsister pour inspection.",
   "startup.cooperatively_stopped": "Le programme d’installation s’est arrêté de manière coopérative ; ses propres gestionnaires de signaux ont supprimé les données préparées et rétabli la sélection précédente lorsque cela était possible.",
   "startup.cancelled": "Installation de l’environnement d’exécution annulée.",
-  "startup.installed": "Environnement d’exécution installé ; démarrage de DSH…"
+  "startup.installed": "Environnement d’exécution installé ; démarrage de DSH…",
+  "notice.history_unavailable": "Historique des téléchargements indisponible ; utilisation de la mémoire uniquement, sans modifier le fichier existant de l’historique",
+  "notice.download_saved": "Téléchargement enregistré ; consultez son chemin dans l’historique natif des téléchargements",
+  "notice.preference_unreadable": "Préférence de notification illisible ; notifications désactivées sans modifier le fichier de la préférence",
+  "notice.bridge_unavailable": "Passerelle de notification des tâches indisponible ; le comportement principal de la session reste inchangé",
+  "notice.error": "erreur : {message}"
 }

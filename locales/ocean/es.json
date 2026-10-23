@@ -361,5 +361,10 @@
   "startup.forcibly_terminated": "El instalador ignoró la solicitud de detención cooperativa y se terminó por la fuerza. Pueden quedar datos preparados, una generación no seleccionada o un bloqueo del entorno de ejecución retenido para su inspección.",
   "startup.cooperatively_stopped": "El instalador se detuvo de forma cooperativa; sus propios manejadores de señales eliminaron los datos preparados y restauraron la selección anterior cuando fue posible.",
   "startup.cancelled": "Instalación del entorno de ejecución cancelada.",
-  "startup.installed": "Entorno de ejecución instalado; iniciando DSH…"
+  "startup.installed": "Entorno de ejecución instalado; iniciando DSH…",
+  "notice.history_unavailable": "El historial de descargas no está disponible; se usa solo la memoria y el archivo existente del historial se deja intacto",
+  "notice.download_saved": "Descarga guardada; consulta su ruta en el historial de descargas nativo",
+  "notice.preference_unreadable": "No se puede leer la preferencia de notificaciones; las notificaciones se han desactivado sin modificar su archivo",
+  "notice.bridge_unavailable": "El puente de notificaciones de tareas no está disponible; el comportamiento principal de la sesión no cambia",
+  "notice.error": "error: {message}"
 }

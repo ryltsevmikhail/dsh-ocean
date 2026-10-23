@@ -361,5 +361,10 @@
   "startup.forcibly_terminated": "Das Installationsprogramm hat die kooperative Stoppanforderung ignoriert und wurde zwangsweise beendet. Vorbereitete Daten, eine nicht ausgewählte Generation oder eine gehaltene Sperre der Laufzeitumgebung können zur Prüfung zurückbleiben.",
   "startup.cooperatively_stopped": "Das Installationsprogramm wurde kooperativ angehalten; seine eigenen Signalhandler haben vorbereitete Daten entfernt und die vorherige Auswahl nach Möglichkeit wiederhergestellt.",
   "startup.cancelled": "Installation der Laufzeitumgebung abgebrochen.",
-  "startup.installed": "Laufzeitumgebung installiert; DSH wird gestartet…"
+  "startup.installed": "Laufzeitumgebung installiert; DSH wird gestartet…",
+  "notice.history_unavailable": "Downloadverlauf nicht verfügbar; es wird nur der Arbeitsspeicher verwendet, die vorhandene Verlaufsdatei bleibt unverändert",
+  "notice.download_saved": "Download gespeichert; den Pfad finden Sie im nativen Downloadverlauf",
+  "notice.preference_unreadable": "Benachrichtigungseinstellung nicht lesbar; Benachrichtigungen sind deaktiviert, ohne die Einstellungsdatei zu ändern",
+  "notice.bridge_unavailable": "Brücke für Aufgabenbenachrichtigungen nicht verfügbar; das grundlegende Sitzungsverhalten bleibt unverändert",
+  "notice.error": "Fehler: {message}"
 }

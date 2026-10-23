@@ -8,9 +8,7 @@ pub fn preference_path() -> std::path::PathBuf {
 pub fn initialize(app: &AppHandle) {
     let state = app.state::<AppState>();
     let enabled = notifications::load_preference(&preference_path()).unwrap_or_else(|_| {
-        state.log(
-            "Notification preference unreadable; notifications disabled without changing its file",
-        );
+        state.log(crate::i18n::text("notice.preference_unreadable"));
         false
     });
     state.notifier.set_enabled(enabled);
@@ -59,7 +57,7 @@ pub fn attach_tasks(window: &tauri::WebviewWindow, initial: url::Url) {
         let activity = std::rc::Rc::new(move || post(&app_for_activity, notifications::Kind::Task));
         if crate::task_notifications::attach(&platform.inner(), origin, activity).is_err() {
             app.state::<AppState>()
-                .log("Task notification bridge unavailable; core session behavior is unchanged");
+                .log(crate::i18n::text("notice.bridge_unavailable"));
         }
     });
 }

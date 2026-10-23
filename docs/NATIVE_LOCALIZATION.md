@@ -81,8 +81,14 @@ Typed transfer status, origin/size/concurrency checks and no-overwrite publicati
 are unchanged. Fixed service startup/restart and installer status captions are
 localized before the existing token-redacting bounded log sink. Protocol phase IDs,
 attached/owned lifecycle decisions, cooperative/forced cancellation handling and raw
-subprocess diagnostic output remain unchanged. Remaining notice-log fallbacks are
-under coverage review.
+subprocess diagnostic output remain unchanged. Download/notification fallback notice
+logs and error captions are localized through the same redacting sink.
+
+The native language matrix runs eight separate private GTK processes. It exercises
+immutable language snapshots, confirmation and language-picker controls, built-in
+language permission refusal defaults, and storage/plugin/backup-history windows.
+Labels remain plain text and response IDs remain unchanged. This is x86_64 widget
+coverage, not yet proof of every native panel, ARM64 execution or release packaging.
 
 ## Harness resource tree
 

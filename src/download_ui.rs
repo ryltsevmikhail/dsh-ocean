@@ -14,11 +14,14 @@ fn history(app: &AppHandle) -> SharedHistory {
     let state = app.state::<AppState>();
     let mut slot = state.downloads.lock().expect("download history init mutex");
     slot.get_or_insert_with(|| {
-        let history = History::open(&config::state_dir().join("downloads.json")).unwrap_or_else(|_| {
-            state.log("Download history unavailable; using memory only, leaving its existing file untouched"); History::default()
-        });
+        let history =
+            History::open(&config::state_dir().join("downloads.json")).unwrap_or_else(|_| {
+                state.log(crate::i18n::text("notice.history_unavailable"));
+                History::default()
+            });
         Arc::new(Mutex::new(history))
-    }).clone()
+    })
+    .clone()
 }
 pub fn attach(window: &WebviewWindow, initial: Url) {
     let app = window.app_handle().clone();
@@ -55,7 +58,7 @@ pub fn attach(window: &WebviewWindow, initial: Url) {
                 );
                 app_for_terminal
                     .state::<AppState>()
-                    .log("Download saved; see native Downloads history for its path");
+                    .log(crate::i18n::text("notice.download_saved"));
             }
             if entry.status == Status::Failed {
                 crate::notification_ui::post(

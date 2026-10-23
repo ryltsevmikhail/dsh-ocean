@@ -361,5 +361,10 @@
   "startup.forcibly_terminated": "インストーラーが協調的な停止要求に応じなかったため、強制終了しました。確認のため、仮配置された作業データ、未選択の世代、または保持されたランタイムロックが残っている可能性があります。",
   "startup.cooperatively_stopped": "インストーラーは協調的に停止しました。インストーラー自身のシグナルハンドラーが仮配置された作業データを削除し、可能な範囲で以前の選択を復元しました。",
   "startup.cancelled": "ランタイムのインストールをキャンセルしました。",
-  "startup.installed": "ランタイムをインストールしました。DSH を起動しています…"
+  "startup.installed": "ランタイムをインストールしました。DSH を起動しています…",
+  "notice.history_unavailable": "ダウンロード履歴を利用できません。メモリのみを使用し、既存の履歴ファイルは変更しません",
+  "notice.download_saved": "ダウンロードを保存しました。保存先のパスは標準のダウンロード履歴で確認してください",
+  "notice.preference_unreadable": "通知設定を読み取れません。設定ファイルを変更せずに通知を無効にしました",
+  "notice.bridge_unavailable": "タスク通知ブリッジを利用できません。セッションの基本動作に変更はありません",
+  "notice.error": "エラー: {message}"
 }
