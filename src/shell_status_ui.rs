@@ -35,10 +35,39 @@ impl Default for Model {
             kind: Kind::TarGz,
             active: None,
             close_after: false,
-            message: "Loading local updater state…".into(),
+            message: crate::i18n::text("shell_ui.initial").into(),
         }
     }
 }
+#[cfg(test)]
+#[test]
+fn selected_locale_names_all_signed_actions_and_keeps_enrollment_authority_explicit() {
+    for (language, _) in crate::i18n::LANGUAGES {
+        let labels = action_labels_in(language);
+        assert_eq!(labels.len(), 8);
+        for (index, key) in [
+            "refresh", "check", "download", "apply", "enroll", "rollback", "recover", "cancel",
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(
+                labels[index],
+                crate::i18n::message(language, &format!("shell_ui.{key}")).unwrap()
+            );
+        }
+        let enrollment = transaction_confirmation_in(true, language);
+        assert!(enrollment.contains("APPIMAGE"));
+        assert_eq!(
+            transaction_confirmation_in(false, language),
+            crate::i18n::message(language, "shell_ui.confirm_transaction").unwrap()
+        );
+        if language == crate::i18n::Language::Ru {
+            assert_ne!(labels[0], "Refresh local status");
+        }
+    }
+}
+
 fn discard_cache(cached: Option<Arc<managed_shell::CachedArtifact>>) {
     if let Some(cached) = cached {
         std::thread::spawn(move || drop(cached));
@@ -86,6 +115,30 @@ const ENROLL: usize = 4;
 const ROLLBACK: usize = 5;
 const RECOVER: usize = 6;
 const CANCEL: usize = 7;
+fn action_labels_in(language: crate::i18n::Language) -> [&'static str; 8] {
+    [
+        "shell_ui.refresh",
+        "shell_ui.check",
+        "shell_ui.download",
+        "shell_ui.apply",
+        "shell_ui.enroll",
+        "shell_ui.rollback",
+        "shell_ui.recover",
+        "shell_ui.cancel",
+    ]
+    .map(|key| crate::i18n::message(language, key).expect("embedded signed updater action"))
+}
+fn transaction_confirmation_in(enroll: bool, language: crate::i18n::Language) -> &'static str {
+    crate::i18n::message(
+        language,
+        if enroll {
+            "shell_ui.confirm_enroll"
+        } else {
+            "shell_ui.confirm_transaction"
+        },
+    )
+    .expect("embedded signed updater confirmation")
+}
 fn channel_name(channel: Channel) -> &'static str {
     match channel {
         Channel::Stable => "stable",
@@ -346,9 +399,13 @@ fn confirm(parent: &gtk::Dialog, text: &str, action: impl FnOnce() + 'static) {
         Some(parent),
         gtk::DialogFlags::MODAL,
         gtk::MessageType::Warning,
-        gtk::ButtonsType::YesNo,
+        gtk::ButtonsType::None,
         text,
     );
+    confirmation.add_buttons(&[
+        (crate::i18n::text("common.no"), gtk::ResponseType::No),
+        (crate::i18n::text("common.yes"), gtk::ResponseType::Yes),
+    ]);
     let action = Rc::new(RefCell::new(Some(action)));
     confirmation.connect_response(move |dialog, response| {
         dialog.close();
@@ -374,10 +431,10 @@ pub fn build_with_registry(
     registry: Arc<native_updates::Registry>,
 ) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some("DSH Ocean signed shell updates"),
+        Some(crate::i18n::text("shell_ui.title")),
         parent,
         gtk::DialogFlags::MODAL,
-        &[("Close", gtk::ResponseType::Close)],
+        &[(crate::i18n::text("common.close"), gtk::ResponseType::Close)],
     );
     dialog.set_default_size(780, 720);
     let content = gtk::Box::new(gtk::Orientation::Vertical, 10);
@@ -401,41 +458,60 @@ pub fn build_with_registry(
     }
     let kind = gtk::ComboBoxText::new();
     kind.set_widget_name("shell-update-kind");
-    kind.append(Some("tar.gz"), "tar.gz — complete package");
+    kind.append(Some("tar.gz"), crate::i18n::text("shell_ui.tar_format"));
     kind.append(Some("appimage"), "AppImage");
     kind.set_active_id(Some("tar.gz"));
-    channels.attach(&gtk::Label::new(Some("Shell channel")), 0, 0, 1, 1);
+    channels.attach(
+        &gtk::Label::new(Some(crate::i18n::text("shell_ui.shell_channel"))),
+        0,
+        0,
+        1,
+        1,
+    );
     channels.attach(&shell, 1, 0, 1, 1);
-    channels.attach(&gtk::Label::new(Some("Signed core channel")), 2, 0, 1, 1);
+    channels.attach(
+        &gtk::Label::new(Some(crate::i18n::text("shell_ui.core_channel"))),
+        2,
+        0,
+        1,
+        1,
+    );
     channels.attach(&runtime, 3, 0, 1, 1);
-    channels.attach(&gtk::Label::new(Some("Managed shell format")), 0, 1, 1, 1);
+    channels.attach(
+        &gtk::Label::new(Some(crate::i18n::text("shell_ui.format"))),
+        0,
+        1,
+        1,
+        1,
+    );
     channels.attach(&kind, 1, 1, 3, 1);
     content.pack_start(&channels, false, false, 0);
     let trust = text_label("");
-    let status = text_label("Loading local state…");
+    let status = text_label(crate::i18n::text("shell_ui.loading"));
     status.set_widget_name("shell-update-status");
     let progress = text_label("");
     content.pack_start(&trust, false, false, 0);
     content.pack_start(&status, false, false, 0);
     content.pack_start(&progress, false, false, 0);
     let definitions = [
-        ("Refresh local status", "shell-update-refresh"),
-        ("Check signed feed", "shell-update-check"),
-        ("Download verified artifact", "shell-update-download"),
-        ("Apply to managed destination…", "shell-update-apply"),
-        ("Enable separate managed install…", "shell-update-enroll"),
-        ("Rollback retained version…", "shell-update-rollback"),
-        ("Recover interrupted transaction…", "shell-update-recover"),
-        ("Cancel operation", "shell-update-cancel"),
+        "shell-update-refresh",
+        "shell-update-check",
+        "shell-update-download",
+        "shell-update-apply",
+        "shell-update-enroll",
+        "shell-update-rollback",
+        "shell-update-recover",
+        "shell-update-cancel",
     ];
+    let labels = action_labels_in(crate::i18n::active_language());
     let actions = gtk::Grid::new();
     actions.set_column_spacing(8);
     actions.set_row_spacing(8);
     let buttons: Vec<_> = definitions
         .iter()
         .enumerate()
-        .map(|(index, (text, name))| {
-            let button = gtk::Button::with_label(text);
+        .map(|(index, name)| {
+            let button = gtk::Button::with_label(labels[index]);
             button.set_widget_name(name);
             actions.attach(&button, (index % 2) as i32, (index / 2) as i32, 1, 1);
             button
@@ -461,24 +537,91 @@ pub fn build_with_registry(
         let model = model.clone();
         let widgets = widgets.clone();
         let registry = registry.clone();
-        button.connect_clicked(move|_|{
-            let Some(dialog)=widgets.dialog.upgrade()else{return;};
-            if index==CANCEL{if let Some(control)=&model.borrow().active{control.cancel();}return;}
-            if model.borrow().active.is_some()||registry.busy(){return;}
-            let run={let model=model.clone();let widgets=widgets.clone();let registry=registry.clone();move||{
-                let task:Box<dyn FnOnce(Arc<Control>)->Result<Outcome>+Send>=match index {
-                    REFRESH=>Box::new(|control|{control.check()?;let settings=update_settings::load()?;let destination=managed_shell::status()?;control.check()?;Ok(Outcome::Inspected(settings,destination))}),
-                    CHECK=>{let kind=model.borrow().kind;Box::new(move|control|{let settings=update_settings::load()?;Ok(Outcome::Checked(Arc::new(update_feed::check_shell_controlled(&settings,kind,control)?)))})}
-                    DOWNLOAD=>{let Some(candidate)=model.borrow().candidate.clone()else{return;};Box::new(move|control|Ok(Outcome::Downloaded(Arc::new(managed_shell::download(&candidate,control)?))))}
-                    APPLY=>{let data={let model=model.borrow();model.candidate.clone().zip(model.cached.clone())};let Some((candidate,cached))=data else{return;};Box::new(move|control|{let receipt=managed_shell::apply(&candidate,&cached,&control)?;Ok(Outcome::Changed(receipt,managed_shell::status()?))})}
-                    ENROLL=>Box::new(|control|{control.begin_commit()?;Ok(Outcome::Enrolled(managed_shell::enroll()?))}),
-                    ROLLBACK=>Box::new(|control|{let receipt=managed_shell::rollback(&control)?;Ok(Outcome::Changed(receipt,managed_shell::status()?))}),
-                    RECOVER=>Box::new(|control|{let receipt=managed_shell::recover(&control)?;Ok(Outcome::Changed(receipt,managed_shell::status()?))}),
-                    _=>return,
-                };
-                start(registry,model,widgets,task);
-            }};
-            if matches!(index,APPLY|ENROLL|ROLLBACK|RECOVER){confirm(&dialog,if index==ENROLL{"Enable a separate owned user destination? This does not replace your package/current executable or grant authority from an APPIMAGE/path hint. Unknown existing contents are refused."}else{"Run this explicit local transaction? It cannot be cancelled once applying/rolling back/recovering. The running client and core/profile are unchanged; quit and reopen the managed launcher afterward."},run);}else{run();}
+        button.connect_clicked(move |_| {
+            let Some(dialog) = widgets.dialog.upgrade() else {
+                return;
+            };
+            if index == CANCEL {
+                if let Some(control) = &model.borrow().active {
+                    control.cancel();
+                }
+                return;
+            }
+            if model.borrow().active.is_some() || registry.busy() {
+                return;
+            }
+            let run = {
+                let model = model.clone();
+                let widgets = widgets.clone();
+                let registry = registry.clone();
+                move || {
+                    let task: Box<dyn FnOnce(Arc<Control>) -> Result<Outcome> + Send> = match index
+                    {
+                        REFRESH => Box::new(|control| {
+                            control.check()?;
+                            let settings = update_settings::load()?;
+                            let destination = managed_shell::status()?;
+                            control.check()?;
+                            Ok(Outcome::Inspected(settings, destination))
+                        }),
+                        CHECK => {
+                            let kind = model.borrow().kind;
+                            Box::new(move |control| {
+                                let settings = update_settings::load()?;
+                                Ok(Outcome::Checked(Arc::new(
+                                    update_feed::check_shell_controlled(&settings, kind, control)?,
+                                )))
+                            })
+                        }
+                        DOWNLOAD => {
+                            let Some(candidate) = model.borrow().candidate.clone() else {
+                                return;
+                            };
+                            Box::new(move |control| {
+                                Ok(Outcome::Downloaded(Arc::new(managed_shell::download(
+                                    &candidate, control,
+                                )?)))
+                            })
+                        }
+                        APPLY => {
+                            let data = {
+                                let model = model.borrow();
+                                model.candidate.clone().zip(model.cached.clone())
+                            };
+                            let Some((candidate, cached)) = data else {
+                                return;
+                            };
+                            Box::new(move |control| {
+                                let receipt = managed_shell::apply(&candidate, &cached, &control)?;
+                                Ok(Outcome::Changed(receipt, managed_shell::status()?))
+                            })
+                        }
+                        ENROLL => Box::new(|control| {
+                            control.begin_commit()?;
+                            Ok(Outcome::Enrolled(managed_shell::enroll()?))
+                        }),
+                        ROLLBACK => Box::new(|control| {
+                            let receipt = managed_shell::rollback(&control)?;
+                            Ok(Outcome::Changed(receipt, managed_shell::status()?))
+                        }),
+                        RECOVER => Box::new(|control| {
+                            let receipt = managed_shell::recover(&control)?;
+                            Ok(Outcome::Changed(receipt, managed_shell::status()?))
+                        }),
+                        _ => return,
+                    };
+                    start(registry, model, widgets, task);
+                }
+            };
+            if matches!(index, APPLY | ENROLL | ROLLBACK | RECOVER) {
+                confirm(
+                    &dialog,
+                    transaction_confirmation_in(index == ENROLL, crate::i18n::active_language()),
+                    run,
+                );
+            } else {
+                run();
+            }
         });
     }
     for (combo, product) in [(&shell, Product::Shell), (&runtime, Product::Runtime)] {
@@ -535,7 +678,7 @@ pub fn build_with_registry(
             let mut state = model.borrow_mut();
             state.kind = kind;
             state.invalidate();
-            state.message = "Format preference changed; check the signed feed again.".into();
+            state.message = crate::i18n::text("shell_ui.format_changed").into();
             drop(state);
             render(&widgets, &model.borrow(), &registry);
         });

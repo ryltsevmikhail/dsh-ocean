@@ -52,7 +52,11 @@ cooperative progress and terminal results. Unsigned-integrity-versus-identity an
 sensitive-content warnings remain explicit. Existing no-overwrite, snapshot-read-only,
 worker cancellation and partial-archive cleanup behavior is unchanged; private GTK
 acceptance also checks that export confirmation has no default acceptance.
-Other native panels and status summaries are still being localized.
+The signed shell updater now localizes its action/channel/format controls and
+explicit enrollment/transaction confirmations, including native Yes/No captions.
+Action indices, technical channel IDs and response-based approval gates are retained.
+The updater's detailed trust/destination/progress reports and operation-result
+messages are still being localized, alongside the remaining core native dialogs.
 
 ## Harness resource tree
 

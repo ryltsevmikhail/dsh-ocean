@@ -264,6 +264,17 @@ fn native_shell_updater_has_channels_explicit_enrollment_and_no_unconfigured_app
                     if dialog.is_visible()
                         && dialog.transient_for().as_ref() == Some(parent.upcast_ref())
                     {
+                        for (response, key) in [
+                            (gtk::ResponseType::No, "common.no"),
+                            (gtk::ResponseType::Yes, "common.yes"),
+                        ] {
+                            let button = dialog
+                                .widget_for_response(response)
+                                .unwrap()
+                                .downcast::<gtk::Button>()
+                                .unwrap();
+                            assert_eq!(button.label().as_deref(), Some(dsh_ocean::i18n::text(key)));
+                        }
                         dialog.response(gtk::ResponseType::Yes);
                         return true;
                     }
