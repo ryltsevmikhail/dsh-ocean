@@ -23,7 +23,14 @@ Read-only storage and plugin overviews now localize their titles, close controls
 counts, empty/error states and safety notices. Their numeric/path filtering and
 non-destructive behavior are unchanged. Storage reports that names are not shown,
 not that directory enumeration never encounters names; file contents remain unread.
-Remaining native panels and status summaries are still being localized.
+Download history also localizes its six terminal/live state labels, progress,
+destination/staging captions, selection/cancel controls and metadata-clear notices.
+Control/bidi escaping and single-pass path insertion remain in place; cancellation
+IDs, transfer limits, publication gates and file-retention behavior are unchanged.
+Backend diagnostic details and ISO timestamps remain literal technical data.
+Component tests cover all eight catalogs; private Xvfb/non-activating D-Bus tests
+exercise the native download/storage/plugin controls in the default English locale.
+Other native panels and status summaries are still being localized.
 
 ## Harness resource tree
 

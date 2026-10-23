@@ -47,6 +47,53 @@ fn entry(name: &str, status: Status) -> Entry {
     )
 }
 #[test]
+fn selected_locale_translates_download_status_and_progress_without_reinterpreting_paths() {
+    use dsh_ocean::i18n::{Language, LANGUAGES};
+    let mut row = entry("<b>{bytes}</b>\n\u{202e}", Status::Receiving);
+    row.received_bytes = 2048;
+    row.reported_total = Some(4096);
+    row.destination = Some(PathBuf::from("/tmp/{bytes}<b>"));
+    for (language, _) in LANGUAGES {
+        for (status, key) in [
+            (Status::Receiving, "receiving"),
+            (Status::Saved, "saved"),
+            (Status::Cancelled, "cancelled"),
+            (Status::Blocked, "blocked"),
+            (Status::Failed, "failed"),
+            (Status::Interrupted, "interrupted"),
+        ] {
+            let mut status_row = row.clone();
+            status_row.status = status;
+            let label =
+                dsh_ocean::i18n::message(language, &format!("downloads.history.{key}")).unwrap();
+            assert!(download_history::render_in(&[status_row], language)
+                .starts_with(&format!("{label} — ")));
+        }
+        let rendered = download_history::render_in(&[row.clone()], language);
+        assert!(
+            rendered.contains("2048")
+                && rendered.contains("4096")
+                && rendered.contains("/tmp/{bytes}<b>")
+        );
+        assert!(!rendered.contains('\u{202e}') && !rendered.contains("synthetic-private"));
+        assert!(rendered
+            .contains(dsh_ocean::i18n::message(language, "downloads.history.receiving").unwrap()));
+        let progress = download_history::progress_label_in(
+            download_history::Aggregate {
+                received: 2048,
+                total: Some(4096),
+            },
+            language,
+        );
+        assert!(progress.contains("2048") && progress.contains("4096") && progress.contains("50"));
+        assert_eq!(
+            download_history::render_in(&[], language),
+            dsh_ocean::i18n::message(language, "downloads.history.empty").unwrap()
+        );
+    }
+    assert!(download_history::render_in(&[row], Language::Ru).contains("Получено"));
+}
+#[test]
 fn renders_newest_first_with_dates_and_without_source_url_secrets() {
     let older = entry("older", Status::Saved);
     let newer = entry("newer", Status::Receiving);

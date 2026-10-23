@@ -19,40 +19,90 @@ fn text(value: &str) -> String {
     result
 }
 pub fn render(entries: &[Entry]) -> String {
+    render_in(entries, crate::i18n::active_language())
+}
+pub fn render_in(entries: &[Entry], language: crate::i18n::Language) -> String {
     if entries.is_empty() {
-        return "No downloads recorded. Saving always asks for a new destination file.".into();
+        return crate::i18n::message(language, "downloads.history.empty")
+            .expect("embedded history empty message")
+            .into();
     }
     entries
         .iter()
         .rev()
         .map(|entry| {
+            let status = match entry.status {
+                crate::downloads::Status::Receiving => "downloads.history.receiving",
+                crate::downloads::Status::Saved => "downloads.history.saved",
+                crate::downloads::Status::Cancelled => "downloads.history.cancelled",
+                crate::downloads::Status::Blocked => "downloads.history.blocked",
+                crate::downloads::Status::Failed => "downloads.history.failed",
+                crate::downloads::Status::Interrupted => "downloads.history.interrupted",
+            };
             let mut line = format!(
-                "{:?} — {}\n{}\n{}",
-                entry.status,
+                "{} — {}\n{}\n{}",
+                crate::i18n::message(language, status).expect("embedded history status"),
                 text(&entry.name),
                 text(&entry.created_at),
-                text(entry.source_origin.as_deref().unwrap_or("blocked source"))
+                text(entry.source_origin.as_deref().unwrap_or_else(|| {
+                    crate::i18n::message(language, "downloads.history.blocked_source")
+                        .expect("embedded blocked source message")
+                }))
             );
             if entry.status == crate::downloads::Status::Receiving || entry.received_bytes > 0 {
-                line.push_str(&format!(
-                    "\nReceived: {} bytes",
-                    entry.received_bytes.min(crate::downloads::MAX_BYTES + 1)
-                ));
+                line.push_str(
+                    &crate::i18n::render(
+                        language,
+                        "downloads.history.received",
+                        &[(
+                            "bytes",
+                            &entry
+                                .received_bytes
+                                .min(crate::downloads::MAX_BYTES + 1)
+                                .to_string(),
+                        )],
+                    )
+                    .expect("validated received count"),
+                );
                 if let Some(total) = entry
                     .reported_total
                     .filter(|total| *total > 0 && *total <= crate::downloads::MAX_BYTES)
                 {
-                    line.push_str(&format!("; server reports {total} bytes total"));
+                    line.push_str(
+                        &crate::i18n::render(
+                            language,
+                            "downloads.history.total",
+                            &[("total", &total.to_string())],
+                        )
+                        .expect("validated reported total"),
+                    );
                 }
                 if entry.status == crate::downloads::Status::Receiving {
-                    line.push_str(" (not saved until Saved)");
+                    line.push_str(
+                        crate::i18n::message(language, "downloads.history.pending_save")
+                            .expect("embedded pending-save message"),
+                    );
                 }
             }
             if let Some(path) = &entry.destination {
-                line.push_str(&format!("\nDestination: {}", text(&path.to_string_lossy())));
+                line.push_str(
+                    &crate::i18n::render(
+                        language,
+                        "downloads.history.destination",
+                        &[("path", &text(&path.to_string_lossy()))],
+                    )
+                    .expect("validated destination path message"),
+                );
             }
             if let Some(path) = &entry.recovery {
-                line.push_str(&format!("\nStaging: {}", text(&path.to_string_lossy())));
+                line.push_str(
+                    &crate::i18n::render(
+                        language,
+                        "downloads.history.staging",
+                        &[("path", &text(&path.to_string_lossy()))],
+                    )
+                    .expect("validated staging path message"),
+                );
             }
             if let Some(message) = &entry.message {
                 line.push_str(&format!("\n{}", text(message)));
@@ -105,15 +155,29 @@ pub fn aggregate(entries: &[Entry]) -> Aggregate {
 
 /// Human-readable progress; counts only, never a filename or URL.
 pub fn progress_label(aggregate: Aggregate) -> String {
+    progress_label_in(aggregate, crate::i18n::active_language())
+}
+pub fn progress_label_in(aggregate: Aggregate, language: crate::i18n::Language) -> String {
     match aggregate.total {
         Some(total) if total > 0 => {
             let percent = (aggregate.received.min(total) * 100 / total).min(100);
-            format!(
-                "{} of {} bytes received ({}%)",
-                aggregate.received, total, percent
+            crate::i18n::render(
+                language,
+                "downloads.history.progress_known",
+                &[
+                    ("received", &aggregate.received.to_string()),
+                    ("total", &total.to_string()),
+                    ("percent", &percent.to_string()),
+                ],
             )
+            .expect("validated progress counts")
         }
-        _ => format!("{} bytes received; total unknown", aggregate.received),
+        _ => crate::i18n::render(
+            language,
+            "downloads.history.progress_unknown",
+            &[("received", &aggregate.received.to_string())],
+        )
+        .expect("validated unknown progress count"),
     }
 }
 
@@ -196,14 +260,23 @@ pub fn build_with_cancel(
     cancel: Option<Cancel>,
 ) -> Window {
     let dialog = gtk::Dialog::with_buttons(
-        Some("DSH Ocean downloads"),
+        Some(crate::i18n::text("downloads.history.title")),
         parent,
         gtk::DialogFlags::MODAL,
         &[
-            ("Cancel selected transfer", gtk::ResponseType::Other(3)),
-            ("Cancel active transfers", gtk::ResponseType::Other(2)),
-            ("Clear finished history", gtk::ResponseType::Other(1)),
-            ("Close", gtk::ResponseType::Close),
+            (
+                crate::i18n::text("downloads.history.cancel_selected"),
+                gtk::ResponseType::Other(3),
+            ),
+            (
+                crate::i18n::text("downloads.history.cancel_all"),
+                gtk::ResponseType::Other(2),
+            ),
+            (
+                crate::i18n::text("downloads.history.clear_finished"),
+                gtk::ResponseType::Other(1),
+            ),
+            (crate::i18n::text("common.close"), gtk::ResponseType::Close),
         ],
     );
     dialog.set_default_size(720, 440);
@@ -221,9 +294,7 @@ pub fn build_with_cancel(
     let can_cancel = cancel.is_some();
     let selection = gtk::ComboBoxText::new();
     selection.set_hexpand(true);
-    selection.set_tooltip_text(Some(
-        "Choose one active transfer. Saved/publishing files are not affected.",
-    ));
+    selection.set_tooltip_text(Some(crate::i18n::text("downloads.history.selection_hint")));
     let choices = Rc::new(RefCell::new(Vec::new()));
     refresh_choices(&selection, &history, &choices, can_cancel);
     let weak_selected = selected_button.downgrade();
@@ -237,7 +308,12 @@ pub fn build_with_cancel(
     row.set_margin_end(16);
     row.set_margin_top(12);
     row.set_margin_bottom(8);
-    row.pack_start(&gtk::Label::new(Some("Active transfer:")), false, false, 0);
+    row.pack_start(
+        &gtk::Label::new(Some(crate::i18n::text("downloads.history.active_transfer"))),
+        false,
+        false,
+        0,
+    );
     row.pack_start(&selection, true, true, 0);
     dialog.content_area().pack_start(&row, false, false, 0);
     cancel_button
@@ -283,18 +359,56 @@ pub fn build_with_cancel(
     let choices_for_response = choices.clone();
     dialog.connect_response(move |dialog, response| {
         if response == gtk::ResponseType::Other(1) {
-            let result = { let mut history = records.lock().expect("downloads mutex"); history.clear_finished(); history.persist() };
-            notice_for_clear.set_text(if result.is_ok() { "Finished metadata cleared from this view. Saved and staging files were not removed." } else { "Cleared in memory only: history could not be saved. Previous entries may return after restart. No files were removed." });
+            let result = {
+                let mut history = records.lock().expect("downloads mutex");
+                history.clear_finished();
+                history.persist()
+            };
+            notice_for_clear.set_text(crate::i18n::text(if result.is_ok() {
+                "downloads.history.clear_ok"
+            } else {
+                "downloads.history.clear_failed"
+            }));
             refresh(&label_for_clear, &records);
-            refresh_choices(&selection_for_response,&records,&choices_for_response,can_cancel);
-        } else if response == gtk::ResponseType::Other(2) || response == gtk::ResponseType::Other(3) {
-            let selected=selection_for_response.active_id();
-            let ids = { let history = records.lock().expect("downloads mutex"); history.entries().iter().filter(|entry| entry.status == crate::downloads::Status::Receiving && (response==gtk::ResponseType::Other(2)||selected.as_ref().is_some_and(|id|id.as_str()==entry.id))).take(4).map(|entry| entry.id.clone()).collect::<Vec<_>>() };
-            refresh_choices(&selection_for_response,&records,&choices_for_response,can_cancel);
-            notice_for_clear.set_text(if ids.is_empty() { "No selected/current active transfers to cancel. Saved files were not touched." }
-                else if cancel.as_ref().is_some_and(|request| request(ids)) { "Cancellation requested for these active network transfers. Saved files and transfers already publishing are not affected; see terminal status in history." }
-                else { "Cancellation is unavailable or already pending. Saved files were not touched." });
-        } else { dialog.close(); }
+            refresh_choices(
+                &selection_for_response,
+                &records,
+                &choices_for_response,
+                can_cancel,
+            );
+        } else if response == gtk::ResponseType::Other(2) || response == gtk::ResponseType::Other(3)
+        {
+            let selected = selection_for_response.active_id();
+            let ids = {
+                let history = records.lock().expect("downloads mutex");
+                history
+                    .entries()
+                    .iter()
+                    .filter(|entry| {
+                        entry.status == crate::downloads::Status::Receiving
+                            && (response == gtk::ResponseType::Other(2)
+                                || selected.as_ref().is_some_and(|id| id.as_str() == entry.id))
+                    })
+                    .take(4)
+                    .map(|entry| entry.id.clone())
+                    .collect::<Vec<_>>()
+            };
+            refresh_choices(
+                &selection_for_response,
+                &records,
+                &choices_for_response,
+                can_cancel,
+            );
+            notice_for_clear.set_text(crate::i18n::text(if ids.is_empty() {
+                "downloads.history.cancel_none"
+            } else if cancel.as_ref().is_some_and(|request| request(ids)) {
+                "downloads.history.cancel_requested"
+            } else {
+                "downloads.history.cancel_unavailable"
+            }));
+        } else {
+            dialog.close();
+        }
     });
     let weak_cancel = cancel_button.downgrade();
     let weak_dialog = dialog.downgrade();
