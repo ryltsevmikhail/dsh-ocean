@@ -73,8 +73,13 @@ def package_origin(path):
     for candidate in (str(path),str(path.resolve())):
         found=subprocess.run(['dpkg-query','-S',candidate],capture_output=True,text=True,timeout=15)
         if found.returncode==0:
-            package=found.stdout.splitlines()[0].rsplit(': ',1)[0]
-            record=command(['dpkg-query','-W','-f=${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\n',package]).strip().split('\t')
+            # usr-merge may prepend diversion-by/from/to records. Only an exact
+            # Debian binary package identity is a package-owner row.
+            owners=[line.rsplit(': ',1)[0] for line in found.stdout.splitlines() if ': ' in line]
+            owners=[name for name in owners if re.fullmatch(r'[a-z0-9][a-z0-9+.-]*(?::[a-z0-9][a-z0-9-]*)?',name)]
+            if len(set(owners))!=1:continue
+            record=command(['dpkg-query','-W','-f=${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\n',owners[0]]).strip().split('\t')
+            if len(record)!=5:raise ValueError('unexpected dpkg package metadata')
             return dict(zip(('package','version','architecture','sourcePackage','sourceVersion'),record))
     return {'status':'system origin unresolved; requires review'}
 

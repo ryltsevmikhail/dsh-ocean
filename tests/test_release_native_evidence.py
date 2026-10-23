@@ -32,6 +32,20 @@ class NativeEvidence(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'payload'):
                 module.verify_archive(archive(binary.read_bytes(),b'truncated'),binary,inputs)
 
+    def test_dpkg_diversion_headers_are_not_package_owners(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        spec=importlib.util.spec_from_file_location('release_native',ROOT/'scripts/release-native-evidence.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        output='diversion by libc6 from: /lib/ld-linux.so\ndiversion by libc6 to: /lib/ld-linux.so.usr-is-merged\nlibc6:arm64: /lib/ld-linux.so\n'
+        def query(args):
+            self.assertEqual(args[-1],'libc6:arm64')
+            return 'libc6\t2.39-test\tarm64\tglibc\t2.39-test\n'
+        with patch.object(module.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=output)),patch.object(module,'command',side_effect=query):
+            record=module.package_origin(Path('/lib/ld-linux.so'))
+        self.assertEqual(record['package'],'libc6')
+        self.assertEqual(record['sourcePackage'],'glibc')
+
     def test_map_output_must_identify_this_exact_cargo_elf(self):
         spec=importlib.util.spec_from_file_location('release_native',ROOT/'scripts/release-native-evidence.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
