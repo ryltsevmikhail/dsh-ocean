@@ -43,6 +43,16 @@ class NativeLocaleCatalogs(unittest.TestCase):
                 self.assertEqual(placeholders(catalog['setup.log_lines']),{'count'})
                 if locale!='en':self.assertNotEqual(catalog['language.title'],catalogs['en']['language.title'])
 
+    def test_owned_page_and_native_control_keys_are_embedded(self):
+        english=json.loads((ROOT/'locales/ocean/en.json').read_text())
+        # Literal references only; dynamic tray IDs are covered by Rust Action::ALL.
+        pattern=r'''["']((?:common|language|setup|remote|tray)\.[a-z0-9_-]+(?:\.[a-z0-9_-]+)*)["']'''
+        for relative in ('ui/index.html','ui/remote.html','src/ui.rs','src/localization_ui.rs'):
+            references=set(re.findall(pattern,(ROOT/relative).read_text()))
+            with self.subTest(source=relative):
+                self.assertTrue(references)
+                self.assertFalse(references-set(english),'unembedded message keys: '+str(references-set(english)))
+
     def test_duplicate_and_unsupported_placeholder_contract_is_strict(self):
         with self.assertRaisesRegex(ValueError,'duplicate'):json.loads('{"x":"a","x":"b"}',object_pairs_hook=unique_object)
         for text in ('{x.y}','{x!r}','{x:>10}','{x:}','{unterminated'):

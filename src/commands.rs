@@ -25,6 +25,33 @@ fn require_window(window: &tauri::WebviewWindow, allowed: &[&str]) -> Result<(),
     }
 }
 
+/// Pure boundary used by the actual IPC command; labels come from Tauri, never arguments.
+pub fn native_locale_snapshot(
+    label: &str,
+    language: crate::i18n::Language,
+) -> Result<serde_json::Value, String> {
+    if !["setup", "remote"].contains(&label) {
+        return Err("native catalogs are only available to owned pages".into());
+    }
+    Ok(serde_json::json!({"language":language.code(),"messages":crate::i18n::messages(language)}))
+}
+pub fn language_settings_allowed(label: &str) -> bool {
+    label == "setup"
+}
+
+#[tauri::command]
+pub fn get_native_locale(window: tauri::WebviewWindow) -> Result<serde_json::Value, String> {
+    native_locale_snapshot(window.label(), crate::i18n::active_language())
+}
+#[tauri::command]
+pub fn open_language_settings(window: tauri::WebviewWindow, app: AppHandle) -> Result<(), String> {
+    if !language_settings_allowed(window.label()) {
+        return Err("language settings are only available to setup".into());
+    }
+    crate::localization_ui::show(&app);
+    Ok(())
+}
+
 #[tauri::command(async)]
 pub fn get_setup_state(window: tauri::WebviewWindow, state: State<'_, AppState>) -> SetupState {
     // Errors are ignored on purpose: a foreign caller gets the plain snapshot,

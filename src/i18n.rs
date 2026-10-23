@@ -128,6 +128,14 @@ fn lookup<'a>(selected: &'a Messages, english: &'a Messages, key: &str) -> Optio
         .map(String::as_str)
 }
 
+/// Plain IPC data for owned local pages; no code generation or HTML markup.
+pub fn messages(language: Language) -> BTreeMap<String, String> {
+    let catalogs = catalogs();
+    let mut messages = catalogs["en"].clone();
+    messages.extend(catalogs[language.code()].clone());
+    messages
+}
+
 pub fn message(language: Language, key: &str) -> Option<&'static str> {
     let catalogs = catalogs();
     lookup(&catalogs[language.code()], &catalogs["en"], key)

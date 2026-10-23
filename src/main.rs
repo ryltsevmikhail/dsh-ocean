@@ -16,6 +16,8 @@ fn main() {
         .manage(state::AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::get_setup_state,
+            commands::get_native_locale,
+            commands::open_language_settings,
             commands::prepare_service,
             commands::recover_runtime,
             commands::start_bootstrap,
