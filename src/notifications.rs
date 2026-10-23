@@ -25,23 +25,29 @@ pub enum Kind {
 }
 impl Kind {
     pub fn parameters(self, replaces: u32) -> glib::Variant {
+        self.parameters_for(crate::i18n::active_language(), replaces)
+    }
+    pub fn parameters_for(self, language: crate::i18n::Language, replaces: u32) -> glib::Variant {
+        let tr = |key| crate::i18n::message(language, key).expect("validated notification message");
         let (summary, body, category) = match self {
             Self::Task => (
-                "DSH task activity",
-                "Open DSH Ocean to view the update.",
+                tr("notification.task_title"),
+                tr("notification.task_body"),
                 "im.received",
             ),
             Self::DownloadSaved => (
-                "Download saved",
-                "Open DSH Ocean Downloads history for its location.",
+                tr("notification.download_saved"),
+                tr("notification.download_saved_body"),
                 "transfer.complete",
             ),
             Self::DownloadFailed => (
-                "Download not saved",
-                "Open DSH Ocean Downloads history for details.",
+                tr("notification.download_failed"),
+                tr("notification.download_failed_body"),
                 "transfer.error",
             ),
         };
+        // freedesktop body supports markup; our messages are always plain text.
+        let body = glib::markup_escape_text(body);
         let hints: HashMap<String, glib::Variant> = [
             ("desktop-entry", "dsh-ocean".to_variant()),
             ("category", category.to_variant()),
@@ -57,8 +63,8 @@ impl Kind {
             replaces,
             "dsh-ocean",
             summary,
-            body,
-            vec!["default", "Open DSH Ocean"],
+            body.as_str(),
+            vec!["default", tr("notification.open")],
             hints,
             5000i32,
         )

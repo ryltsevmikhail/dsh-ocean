@@ -66,13 +66,20 @@ pub fn attach(window: &WebviewWindow, initial: Url) {
                 let _ = app_for_terminal.run_on_main_thread(move || {
                     let mut message = entry
                         .message
-                        .unwrap_or_else(|| "Download failed; destination left untouched".into());
+                        .unwrap_or_else(|| crate::i18n::text("downloads.failed_text").into());
                     if let Some(path) = entry.recovery {
-                        message.push_str(&format!("\nPrivate staging copy: {}", path.display()));
+                        message.push_str(
+                            &crate::i18n::render(
+                                crate::i18n::active_language(),
+                                "downloads.staging",
+                                &[("path", &path.display().to_string())],
+                            )
+                            .expect("validated download message"),
+                        );
                     }
                     ui::message(
                         &app,
-                        "Download failed",
+                        crate::i18n::text("downloads.failed"),
                         &crate::auth::redact(&message),
                         gtk::MessageType::Warning,
                     );

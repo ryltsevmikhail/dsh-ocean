@@ -26,7 +26,15 @@ def placeholders(value):
             raise ValueError('unsupported named placeholder')
     return fields
 
+def referenced_keys(source):
+    pattern=r'''["']((?:common|language|setup|remote|tray|notification|downloads)\.[a-z0-9_-]+(?:\.[a-z0-9_-]+)*)["']'''
+    return {match.group(1) for match in re.finditer(pattern,source)
+            if not re.search(r'\.join\(\s*$',source[:match.start()])}
+
 class NativeLocaleCatalogs(unittest.TestCase):
+    def test_source_key_detector_distinguishes_path_literals_from_messages(self):
+        self.assertEqual(referenced_keys('path.join("downloads.json"); t("downloads.missing", "fallback")'),{'downloads.missing'})
+
     def test_all_eight_locales_ship_complete_plain_message_catalogs(self):
         directory=ROOT/'locales/ocean'
         self.assertTrue(directory.is_dir(),'Ocean has no built-in locale catalogs')
@@ -46,9 +54,8 @@ class NativeLocaleCatalogs(unittest.TestCase):
     def test_owned_page_and_native_control_keys_are_embedded(self):
         english=json.loads((ROOT/'locales/ocean/en.json').read_text())
         # Literal references only; dynamic tray IDs are covered by Rust Action::ALL.
-        pattern=r'''["']((?:common|language|setup|remote|tray)\.[a-z0-9_-]+(?:\.[a-z0-9_-]+)*)["']'''
-        for relative in ('ui/index.html','ui/remote.html','src/ui.rs','src/localization_ui.rs'):
-            references=set(re.findall(pattern,(ROOT/relative).read_text()))
+        for relative in ('ui/index.html','ui/remote.html','src/ui.rs','src/localization_ui.rs','src/notifications.rs','src/notification_ui.rs','src/download_chooser.rs','src/download_ui.rs'):
+            references=referenced_keys((ROOT/relative).read_text())
             with self.subTest(source=relative):
                 self.assertTrue(references)
                 self.assertFalse(references-set(english),'unembedded message keys: '+str(references-set(english)))

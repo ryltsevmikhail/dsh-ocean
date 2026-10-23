@@ -42,4 +42,33 @@ fn localized_language_picker_and_confirmation_keep_response_ids_and_plain_text()
         Some(gtk::ResponseType::No)
     );
     confirm.close();
+    let chooser = dsh_ocean::download_chooser::build_for(
+        Language::Ru,
+        None,
+        "example.txt",
+        "http://user:secret@127.0.0.1:3080/private?token=hidden",
+        None,
+    );
+    assert_eq!(
+        chooser.title().as_deref(),
+        Some("Сохранить загрузку из http://127.0.0.1:3080")
+    );
+    let save = chooser
+        .widget_for_response(gtk::ResponseType::Accept)
+        .unwrap()
+        .downcast::<gtk::Button>()
+        .unwrap();
+    assert_eq!(save.label().as_deref(), Some("Сохранить новый файл"));
+    let hint = chooser
+        .extra_widget()
+        .unwrap()
+        .downcast::<gtk::Label>()
+        .unwrap();
+    assert_eq!(
+        hint.text().as_str(),
+        "Существующие файлы не перезаписываются. Выберите новое имя файла."
+    );
+    assert!(!hint.property::<bool>("use-markup"));
+    assert_eq!(chooser.current_name().as_deref(), Some("example.txt"));
+    chooser.close();
 }

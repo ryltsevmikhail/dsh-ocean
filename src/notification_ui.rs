@@ -32,7 +32,12 @@ pub fn toggle(app: &AppHandle, requested: bool) -> bool {
             requested
         }
         Err(_) => {
-            ui::message(app, "Notification preference not saved", "The preference file could not be updated. Disabling still takes effect for this session; a restart may restore the previous setting. Existing configuration was not replaced.", gtk::MessageType::Warning);
+            ui::message(
+                app,
+                crate::i18n::text("notification.preference_title"),
+                crate::i18n::text("notification.preference_failed"),
+                gtk::MessageType::Warning,
+            );
             state.notifier.enabled()
         }
     }
