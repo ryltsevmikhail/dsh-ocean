@@ -86,9 +86,13 @@ logs and error captions are localized through the same redacting sink.
 
 The native language matrix runs eight separate private GTK processes. It exercises
 immutable language snapshots, confirmation and language-picker controls, built-in
-language permission refusal defaults, and storage/plugin/backup-history windows.
-Labels remain plain text and response IDs remain unchanged. This is x86_64 widget
-coverage, not yet proof of every native panel, ARM64 execution or release packaging.
+language permission refusal defaults, storage/plugin/backup-history windows,
+download/history controls, private-folder snapshot/export choosers, and data-snapshot
+and export confirmations/progress. Destructive confirmations have no default
+acceptance, download origins are sanitized and empty-history cancellation is disabled.
+No real action callbacks or file selections are invoked. Labels remain plain text and
+response IDs remain unchanged. This is x86_64 coverage of 15 widget variants, not yet
+proof of every native panel, ARM64 execution or release packaging.
 
 ## Harness resource tree
 
