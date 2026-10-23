@@ -47,6 +47,11 @@ localized. The existing explicit-accept requirement, single-run gate, cooperativ
 cancellation and staging cleanup flow remain unchanged. A private native GTK test
 checks that confirmation has no default acceptance and uses plain-text labels;
 it constructs synthetic counters only and does not start a snapshot worker.
+Archive export now localizes both choosers, scope-aware explicit confirmation,
+cooperative progress and terminal results. Unsigned-integrity-versus-identity and
+sensitive-content warnings remain explicit. Existing no-overwrite, snapshot-read-only,
+worker cancellation and partial-archive cleanup behavior is unchanged; private GTK
+acceptance also checks that export confirmation has no default acceptance.
 Other native panels and status summaries are still being localized.
 
 ## Harness resource tree

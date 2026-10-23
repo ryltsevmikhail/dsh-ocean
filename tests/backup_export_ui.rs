@@ -99,6 +99,10 @@ fn export_dialogs_are_choosers_and_close_only_surfaces() {
     tick();
     assert_eq!(window.dialog.title().as_deref(), Some(ui::TITLE));
     assert!(window.accept.is_sensitive());
+    assert!(
+        window.dialog.default_widget().is_none(),
+        "export requires explicit acceptance"
+    );
     assert!(window.label.is_selectable() && !window.label.uses_markup());
     for response in [
         gtk::ResponseType::Ok,
