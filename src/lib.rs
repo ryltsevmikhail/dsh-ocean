@@ -25,6 +25,7 @@ pub mod downloads;
 pub mod exposure_plan;
 pub mod http;
 pub mod i18n;
+pub mod localization;
 pub mod managed_child;
 pub mod managed_runtime;
 pub mod managed_shell;
