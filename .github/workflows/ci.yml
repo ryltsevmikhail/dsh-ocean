@@ -145,6 +145,7 @@ jobs:
           python3 -B -m unittest discover -s tests -p 'test_child_recovery_smoke.py' -v
           python3 -B -m unittest discover -s tests -p 'test_branding.py' -v
           python3 -B tests/test_native_locale_catalogs.py
+          python3 -B tests/test_embedded_locales.py
 
       - name: Shell script lint
         run: |
@@ -358,6 +359,11 @@ jobs:
           python3 -B scripts/artifact-license-evidence.py "${args[@]}"
           # Independent log cross-check for reviewers; never upload the ELF itself.
           sha256sum target/release/dsh-ocean
+
+      - name: Verify embedded language resources in the exact native ELF
+        run: |
+          python3 -B scripts/check-embedded-locales.py --binary target/release/dsh-ocean \
+            --output "$RUNNER_TEMP/native-license-evidence/embedded-locales.json"
 
       - name: Retain reports and public notice text only (no ELF publication)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

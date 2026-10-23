@@ -101,6 +101,14 @@ feed, candidate or cached artifact means update actions remain disabled and no
 settings or managed destination are created. This is x86_64 coverage of 18 widget
 variants, not proof of ARM64 execution, visual font coverage or release packaging.
 
+The ELF retention check compares exact bytes for all eight Ocean catalogs and all
+seven embedded Harness resources against the built executable, validates its native
+ELF machine and records hashes/sizes. CI retains this observation beside the native
+license report for the same ELF. Synthetic wrong-target/missing-resource tests and a
+local optimized x86_64 build pass; native ARM64 execution remains a separate required
+check. Byte retention is not activation proof, full license closure, a signature or
+release approval.
+
 ## Harness resource tree
 
 The source catalogs and registration logic remain in `language-pack/`. Generate
