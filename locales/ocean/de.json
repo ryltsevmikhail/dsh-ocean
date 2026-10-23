@@ -325,5 +325,10 @@
   "runtime_ui.block.external": "Dies ist eine externe oder ältere Installation. Ocean überschreibt keine externen npm-Präfixe oder älteren Verzeichnisstrukturen; aktualisieren Sie sie mit dem ursprünglichen Paketmanager (eine sichere Migration zu zugriffsbeschränkten Generationen ist noch nicht implementiert). Es wurden keine Dateien geändert.",
   "runtime_ui.block.attached": "Dieser DSH-Server ist angebunden und gehört einem anderen Prozess. Ocean aktualisiert nur seinen eigenen systemd-Dienst oder eine verwaltete untergeordnete Laufzeit; aktualisieren Sie den Server dort, wo er gestartet wurde. Es wurden keine Dateien geändert.",
   "runtime_ui.block.remote": "Der konfigurierte DSH-Ursprung ist entfernt. Für einen entfernten Server wird kein Update einer eigenen lokalen Laufzeit angeboten; aktualisieren Sie diese Installation direkt. Es wurden keine Dateien geändert.",
-  "runtime_ui.block.no_server": "Es läuft kein lokaler DSH-Server. Ein Update einer eigenen Laufzeit erfordert den lokalen Dienst dsh-web.service oder einen verwalteten Kindprozess. Starten Sie zuerst DSH und prüfen Sie dann erneut. Es wurden keine Dateien geändert."
+  "runtime_ui.block.no_server": "Es läuft kein lokaler DSH-Server. Ein Update einer eigenen Laufzeit erfordert den lokalen Dienst dsh-web.service oder einen verwalteten Kindprozess. Starten Sie zuerst DSH und prüfen Sie dann erneut. Es wurden keine Dateien geändert.",
+  "diagnostics.saved_title": "Diagnosedaten gespeichert",
+  "diagnostics.saved": "Das Diagnosepaket wurde hier gespeichert:\n{path}\n\nEs enthält Versionen, den Dienststatus, Speicher- und Laufzeitzähler, die geladene WebKitGTK-ABI sowie die letzten Journalzeilen mit unkenntlich gemachten Start-Tokens. Sitzungsinhalte und Journale nicht zugehöriger Anwendungen sind nicht enthalten. Prüfen Sie den Bericht vor der Weitergabe: Dienstprotokolle und Plugin-Metadaten können private Informationen enthalten.",
+  "diagnostics.failed_title": "Diagnosedaten konnten nicht gespeichert werden",
+  "tray.pairing_failed": "Kopplung konnte nicht geöffnet werden",
+  "tray.restart_failed": "DSH konnte nicht neu gestartet werden"
 }

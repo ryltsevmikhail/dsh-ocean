@@ -325,5 +325,10 @@
   "runtime_ui.block.external": "Esta es una instalación externa o antigua. Ocean no sobrescribe prefijos externos de npm ni estructuras antiguas; actualícela con el gestor de paquetes original (la migración segura a generaciones de acceso restringido aún no está implementada). No se modificó ningún archivo.",
   "runtime_ui.block.attached": "Este servidor DSH está conectado y pertenece a otro proceso. Ocean solo actualiza su propio servicio systemd o entorno de ejecución hijo administrado; actualice el servidor donde se inició. No se modificó ningún archivo.",
   "runtime_ui.block.remote": "El origen de DSH configurado es remoto. No se ofrece una actualización del entorno de ejecución local propio para un servidor remoto; actualice esa instalación directamente. No se modificó ningún archivo.",
-  "runtime_ui.block.no_server": "No hay ningún servidor DSH local en ejecución. La actualización de un entorno de ejecución propio requiere el servicio local dsh-web.service o un proceso hijo administrado. Inicie DSH primero y vuelva a comprobarlo. No se modificó ningún archivo."
+  "runtime_ui.block.no_server": "No hay ningún servidor DSH local en ejecución. La actualización de un entorno de ejecución propio requiere el servicio local dsh-web.service o un proceso hijo administrado. Inicie DSH primero y vuelva a comprobarlo. No se modificó ningún archivo.",
+  "diagnostics.saved_title": "Diagnóstico guardado",
+  "diagnostics.saved": "El paquete de diagnóstico se ha guardado en:\n{path}\n\nContiene las versiones, el estado del servicio, los contadores de almacenamiento y del entorno de ejecución, la ABI de WebKitGTK cargada y las últimas líneas del registro con los tokens de inicio ocultados. No incluye el contenido de las sesiones ni los registros de aplicaciones ajenas. Revise el informe antes de compartirlo: los registros del servicio y los metadatos de los complementos pueden contener información privada.",
+  "diagnostics.failed_title": "No se pudo guardar el diagnóstico",
+  "tray.pairing_failed": "No se pudo abrir el emparejamiento",
+  "tray.restart_failed": "No se pudo reiniciar DSH"
 }

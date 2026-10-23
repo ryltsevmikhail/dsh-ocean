@@ -72,8 +72,10 @@ all eight language cases retain diagnostic credential redaction. Runtime update
 checks, current/available summaries, explicit apply questions and terminal messages
 are localized too. Attached/external/remote/no-server guidance remains check-only;
 unencrypted full-home backup, credential-content and server/WebSocket restart
-warnings are retained. Diagnostic and remaining tray error dialogs are still being
-localized.
+warnings are retained. Diagnostic-save receipts and tray pairing/restart error
+headings are localized, retaining the warning to review logs/plugin metadata before
+sharing. Technical backend details remain literal data. Remaining startup/status
+log captions and fixed download-reason messages are under coverage review.
 
 ## Harness resource tree
 

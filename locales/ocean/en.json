@@ -325,5 +325,10 @@
   "runtime_ui.block.external": "This is an external or legacy installation. Ocean does not overwrite external npm prefixes or legacy layouts; update it with the original package manager (safe migration to private generations is not implemented yet). No files were changed.",
   "runtime_ui.block.attached": "This DSH server is attached and owned by another process. Ocean only updates its own systemd service or managed child runtime; update the server where it was started. No files were changed.",
   "runtime_ui.block.remote": "The configured DSH origin is remote. An owned local runtime update is not offered for a remote server; update that installation directly. No files were changed.",
-  "runtime_ui.block.no_server": "No local DSH server is running. An owned runtime update requires the local dsh-web.service or a managed child. Start DSH first, then check again. No files were changed."
+  "runtime_ui.block.no_server": "No local DSH server is running. An owned runtime update requires the local dsh-web.service or a managed child. Start DSH first, then check again. No files were changed.",
+  "diagnostics.saved_title": "Diagnostics saved",
+  "diagnostics.saved": "The diagnostic bundle was written to:\n{path}\n\nIt contains versions, service status, storage/runtime counters, the loaded WebKitGTK ABI and the last journal lines with launch tokens redacted. It excludes session contents and unrelated applications’ journals. Review the report before sharing: service logs and plugin metadata may contain private information.",
+  "diagnostics.failed_title": "Could not save diagnostics",
+  "tray.pairing_failed": "Could not open pairing",
+  "tray.restart_failed": "Could not restart DSH"
 }

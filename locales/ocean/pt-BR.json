@@ -325,5 +325,10 @@
   "runtime_ui.block.external": "Esta é uma instalação externa ou antiga. O Ocean não sobrescreve prefixos externos do npm nem estruturas antigas; atualize-a com o gerenciador de pacotes original (a migração segura para gerações com acesso restrito ainda não foi implementada). Nenhum arquivo foi alterado.",
   "runtime_ui.block.attached": "Este servidor DSH está conectado e pertence a outro processo. O Ocean atualiza apenas seu próprio serviço systemd ou ambiente de execução filho gerenciado; atualize o servidor onde ele foi iniciado. Nenhum arquivo foi alterado.",
   "runtime_ui.block.remote": "A origem configurada do DSH é remota. A atualização de um ambiente de execução local próprio não é oferecida para um servidor remoto; atualize essa instalação diretamente. Nenhum arquivo foi alterado.",
-  "runtime_ui.block.no_server": "Nenhum servidor DSH local está em execução. A atualização de um ambiente de execução próprio requer o serviço local dsh-web.service ou um processo filho gerenciado. Inicie o DSH primeiro e verifique novamente. Nenhum arquivo foi alterado."
+  "runtime_ui.block.no_server": "Nenhum servidor DSH local está em execução. A atualização de um ambiente de execução próprio requer o serviço local dsh-web.service ou um processo filho gerenciado. Inicie o DSH primeiro e verifique novamente. Nenhum arquivo foi alterado.",
+  "diagnostics.saved_title": "Diagnóstico salvo",
+  "diagnostics.saved": "O pacote de diagnóstico foi salvo em:\n{path}\n\nEle contém as versões, o estado do serviço, os contadores de armazenamento e do ambiente de execução, a ABI do WebKitGTK carregada e as últimas linhas do registro com os tokens de inicialização ocultados. Ele não inclui o conteúdo das sessões nem os registros de outros aplicativos sem relação com o DSH. Revise o relatório antes de compartilhá-lo: os registros do serviço e os metadados dos plugins podem conter informações privadas.",
+  "diagnostics.failed_title": "Não foi possível salvar o diagnóstico",
+  "tray.pairing_failed": "Não foi possível abrir o pareamento",
+  "tray.restart_failed": "Não foi possível reiniciar o DSH"
 }

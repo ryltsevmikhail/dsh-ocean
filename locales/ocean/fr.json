@@ -325,5 +325,10 @@
   "runtime_ui.block.external": "Il s’agit d’une installation externe ou ancienne. Ocean n’écrase pas les préfixes npm externes ni les anciennes structures ; mettez-la à jour avec le gestionnaire de paquets d’origine (la migration sûre vers des générations à accès restreint n’est pas encore implémentée). Aucun fichier n’a été modifié.",
   "runtime_ui.block.attached": "Ce serveur DSH est rattaché et appartient à un autre processus. Ocean ne met à jour que son propre service systemd ou un environnement d’exécution enfant géré ; mettez à jour le serveur à l’endroit où il a été démarré. Aucun fichier n’a été modifié.",
   "runtime_ui.block.remote": "L’origine DSH configurée est distante. La mise à jour d’un environnement d’exécution local appartenant à Ocean n’est pas proposée pour un serveur distant ; mettez directement à jour cette installation. Aucun fichier n’a été modifié.",
-  "runtime_ui.block.no_server": "Aucun serveur DSH local n’est en cours d’exécution. La mise à jour d’un environnement d’exécution appartenant à Ocean nécessite le service local dsh-web.service ou un processus enfant géré. Démarrez d’abord DSH, puis relancez la vérification. Aucun fichier n’a été modifié."
+  "runtime_ui.block.no_server": "Aucun serveur DSH local n’est en cours d’exécution. La mise à jour d’un environnement d’exécution appartenant à Ocean nécessite le service local dsh-web.service ou un processus enfant géré. Démarrez d’abord DSH, puis relancez la vérification. Aucun fichier n’a été modifié.",
+  "diagnostics.saved_title": "Données de diagnostic enregistrées",
+  "diagnostics.saved": "Le paquet de diagnostic a été enregistré à cet emplacement :\n{path}\n\nIl contient les versions, l’état du service, les compteurs de stockage et d’exécution, l’ABI WebKitGTK chargée et les dernières lignes du journal dont les jetons de lancement ont été masqués. Il exclut le contenu des sessions et les journaux des applications sans rapport avec DSH. Examinez le rapport avant de le partager : les journaux du service et les métadonnées des extensions peuvent contenir des informations privées.",
+  "diagnostics.failed_title": "Impossible d’enregistrer les données de diagnostic",
+  "tray.pairing_failed": "Impossible d’ouvrir l’appairage",
+  "tray.restart_failed": "Impossible de redémarrer DSH"
 }

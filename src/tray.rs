@@ -231,7 +231,7 @@ pub fn install(app: &tauri::App) -> tauri::Result<TrayIcon> {
                     if let Err(error) = remote::open_window(app) {
                         ui::message(
                             app,
-                            "Could not open pairing",
+                            crate::i18n::text("tray.pairing_failed"),
                             &format!("{error:#}"),
                             gtk::MessageType::Error,
                         );
@@ -279,7 +279,7 @@ fn restart_server(app: &AppHandle) {
             let _ = app.run_on_main_thread(move || {
                 ui::message(
                     &app_for_main,
-                    "Could not restart DSH",
+                    crate::i18n::text("tray.restart_failed"),
                     &message,
                     gtk::MessageType::Error,
                 );
