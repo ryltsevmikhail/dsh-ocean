@@ -45,6 +45,18 @@ Cordis-owned effects, with upstream English fallback. It does not call
 and licence are retained both in the embedded tree and the native package's
 explicit licence payload.
 
+The low-level cache helper now publishes an exact, sealed, content-addressed
+resource tree using atomic no-replace rename. Existing conflicting trees, links
+and unexpected entries are refused rather than repaired. Its caller must first
+establish owned-start, pending-operation and profile-consent gates; the cache is
+not inside a signed runtime generation.
+
+The separate versioned consent store binds an explicit allow/refuse choice to an
+absolute web-profile path and the pinned SDK's generated-root contract. Absence,
+a changed scope, invalid data or a future document never grants permission. The
+store does not create the profile or grant process/unit ownership. Native user
+confirmation and lifecycle wiring remain to be implemented.
+
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls
 and package/native integration tests must establish that before completion.
