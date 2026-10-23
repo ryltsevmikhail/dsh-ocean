@@ -1,0 +1,21 @@
+--- a/lib/mcp/tool-visibility.js
++++ b/lib/mcp/tool-visibility.js
+@@ -341,11 +341,14 @@
+             return;
+         appliedNamesKey = key;
+         desiredNames = names;
+-        // 每次重放先撤掉每个 agent 上的旧层：名单变短（重新启用某个工具）时，只有撤掉这层限制
+-        // 它才会重新可见；名单变了（含逐 agent 那份）也必须重装而不是叠加。
++        // Keep live agents' layers and comparison keys: restrictAgent replaces a
++        // changed deny list (including an empty one). Unconditional teardown here
++        // erases those keys and makes tools/change continuously retrigger itself.
+         epoch += 1;
+-        for (const agent of [...agentRestrictions.keys()])
+-            liftRestriction(agent);
++        for (const agent of [...agentRestrictions.keys()]) {
++            if (!seenAgents.has(agent))
++                liftRestriction(agent);
++        }
+         for (const agent of seenAgents)
+             void restrictAgent(agent).catch(() => { });
+     }
