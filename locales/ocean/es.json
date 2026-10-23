@@ -286,5 +286,22 @@
   "installation.unknown.label": "Instalación desconocida",
   "installation.unknown.evidence": "No hay ningún indicio fiable del contexto de instalación.",
   "installation.unknown.guidance": "Determine el método de instalación original y utilice su procedimiento de actualización. No se ofrece la sustitución automática de la interfaz gráfica para una instalación sin clasificar.",
-  "installation.introduction": "Interfaz gráfica en ejecución: {version}\nIndicio de instalación: {hint} — {evidence}\n{guidance}\nLa información de instalación no es una comprobación de actualizaciones en la red ni una prueba de pertenencia a un paquete. Usuarios de paquetes: actualicen el original mediante AUR/deb/Flatpak, según corresponda. Las acciones gestionadas que aparecen abajo solo afectan a un destino de usuario separado y habilitado explícitamente, nunca al ejecutable original."
+  "installation.introduction": "Interfaz gráfica en ejecución: {version}\nIndicio de instalación: {hint} — {evidence}\n{guidance}\nLa información de instalación no es una comprobación de actualizaciones en la red ni una prueba de pertenencia a un paquete. Usuarios de paquetes: actualicen el original mediante AUR/deb/Flatpak, según corresponda. Las acciones gestionadas que aparecen abajo solo afectan a un destino de usuario separado y habilitado explícitamente, nunca al ejecutable original.",
+  "recovery.title": "Recuperación del entorno de ejecución",
+  "recovery.no_pending": "No hay ninguna recuperación del entorno de ejecución pendiente. Vuelva a intentar el inicio normal si es necesario.",
+  "recovery.inspection_failed_title": "Error al comprobar la recuperación del entorno de ejecución",
+  "recovery.required_title": "Se requiere recuperar el entorno de ejecución",
+  "recovery.snapshot_available": "Hay disponible una instantánea privada de copia de seguridad completa del directorio de datos de DSH para revertir los cambios.",
+  "recovery.snapshot_missing": "No se creó ninguna instantánea antes de la activación.",
+  "recovery.confirmation": "Hay un cambio de entorno de ejecución pendiente y el inicio y reinicio normales seguirán bloqueados hasta que la recuperación se complete correctamente.\n\nGeneración anterior: {old}\nGeneración nueva: {new}\n{snapshot}\n\n¿Recuperar el entorno de ejecución anterior ahora?",
+  "recovery.pending_confirmation": "El cambio de entorno de ejecución no se completó y no se pudo restaurar automáticamente el entorno anterior. El inicio y reinicio normales seguirán bloqueados hasta que la recuperación se complete correctamente.\n\n{error}\n\n¿Recuperar el entorno de ejecución anterior ahora?",
+  "recovery.runtime_busy_title": "Entorno de ejecución ocupado",
+  "recovery.busy_title": "Recuperación en curso",
+  "recovery.cancelled_title": "Recuperación cancelada",
+  "recovery.cancelled": "Se ha conservado la transacción pendiente.",
+  "recovery.recovered_title": "Entorno de ejecución recuperado",
+  "recovery.recovered": "El entorno de ejecución anterior se ha restaurado y vuelve a atender solicitudes.",
+  "recovery.refresh_warning": "El entorno de ejecución anterior se ha restaurado y vuelve a atender solicitudes.\n\nNo se pudo actualizar la ventana para conectarla al entorno de ejecución restaurado: {error}\nLa recuperación ha finalizado y la transacción pendiente se ha eliminado; inicie o reinicie DSH normalmente.",
+  "recovery.incomplete_title": "Recuperación incompleta",
+  "recovery.incomplete": "Se ha conservado la transacción pendiente; el inicio y reinicio normales siguen bloqueados.\n\n{error}"
 }

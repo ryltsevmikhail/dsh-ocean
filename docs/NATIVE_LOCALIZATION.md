@@ -65,8 +65,11 @@ separate public trust roots, explicit recovery and independently confirmed publi
 fingerprints. Their formatting performs no enrollment, key provisioning or network
 operation. The installation-hint introduction now localizes all six heuristic
 contexts and their original-distribution guidance, without changing classification,
-machine-readable ownership flags or probing package managers. Remaining runtime
-update/recovery and diagnostic dialogs are still being localized.
+machine-readable ownership flags or probing package managers. Explicit runtime
+recovery confirmations and outcomes are localized, preserving the difference between
+an incomplete blocked transaction and completed recovery with a failed window refresh;
+all eight language cases retain diagnostic credential redaction. Runtime update/apply
+and diagnostic dialogs are still being localized.
 
 ## Harness resource tree
 

@@ -286,5 +286,22 @@
   "installation.unknown.label": "Instalação desconhecida",
   "installation.unknown.evidence": "Não há indício confiável sobre o contexto da instalação.",
   "installation.unknown.guidance": "Determine o método de instalação original e use seu fluxo de atualização. A substituição automática da interface gráfica não é oferecida para uma instalação não classificada.",
-  "installation.introduction": "Interface gráfica em execução: {version}\nIndício de instalação: {hint} — {evidence}\n{guidance}\nAs informações de instalação não são uma verificação de atualizações pela rede nem uma prova de vínculo com um pacote. Usuários de pacotes: atualizem o original via AUR/deb/Flatpak, conforme aplicável. As ações gerenciadas abaixo afetam somente um destino de usuário separado e explicitamente habilitado, nunca o executável original."
+  "installation.introduction": "Interface gráfica em execução: {version}\nIndício de instalação: {hint} — {evidence}\n{guidance}\nAs informações de instalação não são uma verificação de atualizações pela rede nem uma prova de vínculo com um pacote. Usuários de pacotes: atualizem o original via AUR/deb/Flatpak, conforme aplicável. As ações gerenciadas abaixo afetam somente um destino de usuário separado e explicitamente habilitado, nunca o executável original.",
+  "recovery.title": "Recuperação do ambiente de execução",
+  "recovery.no_pending": "Não há recuperação pendente do ambiente de execução. Tente iniciar normalmente de novo, se necessário.",
+  "recovery.inspection_failed_title": "Falha ao verificar a recuperação do ambiente de execução",
+  "recovery.required_title": "É necessário recuperar o ambiente de execução",
+  "recovery.snapshot_available": "Um snapshot privado de backup completo do diretório de dados do DSH está disponível para reversão.",
+  "recovery.snapshot_missing": "Nenhum snapshot foi criado antes da ativação.",
+  "recovery.confirmation": "Há uma troca de ambiente de execução pendente, e a inicialização e a reinicialização normais continuarão bloqueadas até que a recuperação seja bem-sucedida.\n\nGeração anterior: {old}\nNova geração: {new}\n{snapshot}\n\nRecuperar o ambiente de execução anterior agora?",
+  "recovery.pending_confirmation": "A troca de ambiente de execução não foi concluída, e não foi possível restaurar automaticamente o ambiente anterior. A inicialização e a reinicialização normais continuarão bloqueadas até que a recuperação seja bem-sucedida.\n\n{error}\n\nRecuperar o ambiente de execução anterior agora?",
+  "recovery.runtime_busy_title": "Ambiente de execução ocupado",
+  "recovery.busy_title": "Recuperação em andamento",
+  "recovery.cancelled_title": "Recuperação cancelada",
+  "recovery.cancelled": "A transação pendente foi mantida.",
+  "recovery.recovered_title": "Ambiente de execução recuperado",
+  "recovery.recovered": "O ambiente de execução anterior foi restaurado e está atendendo solicitações novamente.",
+  "recovery.refresh_warning": "O ambiente de execução anterior foi restaurado e está atendendo solicitações novamente.\n\nFalha ao atualizar a janela para conectar ao ambiente de execução restaurado: {error}\nA recuperação foi concluída e a transação pendente foi removida; inicie ou reinicie o DSH normalmente.",
+  "recovery.incomplete_title": "Recuperação incompleta",
+  "recovery.incomplete": "A transação pendente foi mantida; a inicialização e a reinicialização normais continuam bloqueadas.\n\n{error}"
 }

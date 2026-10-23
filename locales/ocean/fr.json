@@ -286,5 +286,22 @@
   "installation.unknown.label": "Installation inconnue",
   "installation.unknown.evidence": "Aucun indice fiable sur le contexte d’installation n’est disponible.",
   "installation.unknown.guidance": "Déterminez le mode d’installation d’origine et suivez sa procédure de mise à jour. Aucun remplacement automatique de l’interface graphique n’est proposé pour une installation non classée.",
-  "installation.introduction": "Interface graphique en cours d’exécution : {version}\nIndice d’installation : {hint} — {evidence}\n{guidance}\nLes informations d’installation ne constituent ni une recherche de mises à jour sur le réseau ni une preuve d’appartenance à un paquet. Utilisateurs de paquets : mettez à jour l’original via AUR/deb/Flatpak selon le cas. Les actions gérées ci-dessous concernent uniquement une destination utilisateur distincte et explicitement activée, jamais l’exécutable d’origine."
+  "installation.introduction": "Interface graphique en cours d’exécution : {version}\nIndice d’installation : {hint} — {evidence}\n{guidance}\nLes informations d’installation ne constituent ni une recherche de mises à jour sur le réseau ni une preuve d’appartenance à un paquet. Utilisateurs de paquets : mettez à jour l’original via AUR/deb/Flatpak selon le cas. Les actions gérées ci-dessous concernent uniquement une destination utilisateur distincte et explicitement activée, jamais l’exécutable d’origine.",
+  "recovery.title": "Récupération de l’environnement d’exécution",
+  "recovery.no_pending": "Aucune récupération de l’environnement d’exécution n’est en attente. Réessayez de démarrer normalement si nécessaire.",
+  "recovery.inspection_failed_title": "Échec de la vérification de la récupération de l’environnement d’exécution",
+  "recovery.required_title": "Récupération de l’environnement d’exécution requise",
+  "recovery.snapshot_available": "Un instantané privé de sauvegarde complète du répertoire de données de DSH est disponible pour revenir à l’état précédent.",
+  "recovery.snapshot_missing": "Aucun instantané n’a été créé avant l’activation.",
+  "recovery.confirmation": "Un changement d’environnement d’exécution est en attente et le démarrage et le redémarrage normaux restent bloqués jusqu’à la réussite de la récupération.\n\nAncienne génération : {old}\nNouvelle génération : {new}\n{snapshot}\n\nRécupérer l’environnement d’exécution précédent maintenant ?",
+  "recovery.pending_confirmation": "Le changement d’environnement d’exécution n’a pas abouti et l’environnement précédent n’a pas pu être restauré automatiquement. Le démarrage et le redémarrage normaux restent bloqués jusqu’à la réussite de la récupération.\n\n{error}\n\nRécupérer l’environnement d’exécution précédent maintenant ?",
+  "recovery.runtime_busy_title": "Environnement d’exécution occupé",
+  "recovery.busy_title": "Récupération en cours",
+  "recovery.cancelled_title": "Récupération annulée",
+  "recovery.cancelled": "La transaction en attente a été conservée.",
+  "recovery.recovered_title": "Environnement d’exécution récupéré",
+  "recovery.recovered": "L’environnement d’exécution précédent a été restauré et traite de nouveau les requêtes.",
+  "recovery.refresh_warning": "L’environnement d’exécution précédent a été restauré et traite de nouveau les requêtes.\n\nL’actualisation de la fenêtre pour se connecter à l’environnement d’exécution restauré a échoué : {error}\nLa récupération est terminée et la transaction en attente a été supprimée ; démarrez ou redémarrez DSH normalement.",
+  "recovery.incomplete_title": "Récupération incomplète",
+  "recovery.incomplete": "La transaction en attente a été conservée ; le démarrage et le redémarrage normaux restent bloqués.\n\n{error}"
 }

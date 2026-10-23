@@ -286,5 +286,22 @@
   "installation.unknown.label": "不明なインストール方法",
   "installation.unknown.evidence": "インストール状況を示す信頼できる手掛かりがありません。",
   "installation.unknown.guidance": "元のインストール方法を特定し、その更新手順を使用してください。分類できないインストールに対して、グラフィカルインターフェースの自動置換は提供されません。",
-  "installation.introduction": "実行中のグラフィカルインターフェース: {version}\nインストールの手掛かり: {hint} — {evidence}\n{guidance}\nインストール情報は、ネットワーク経由の更新確認でも、パッケージへの所属の証明でもありません。パッケージをご利用の場合は、該当する AUR/deb/Flatpak 経由で元のアプリケーションを更新してください。以下の管理対象操作は、明示的に有効化された別のユーザー用保存先にのみ適用され、元の実行ファイルには一切適用されません。"
+  "installation.introduction": "実行中のグラフィカルインターフェース: {version}\nインストールの手掛かり: {hint} — {evidence}\n{guidance}\nインストール情報は、ネットワーク経由の更新確認でも、パッケージへの所属の証明でもありません。パッケージをご利用の場合は、該当する AUR/deb/Flatpak 経由で元のアプリケーションを更新してください。以下の管理対象操作は、明示的に有効化された別のユーザー用保存先にのみ適用され、元の実行ファイルには一切適用されません。",
+  "recovery.title": "ランタイムの復旧",
+  "recovery.no_pending": "保留中のランタイム復旧はありません。必要に応じて通常の起動を再試行してください。",
+  "recovery.inspection_failed_title": "ランタイムの復旧状態の確認に失敗しました",
+  "recovery.required_title": "ランタイムの復旧が必要です",
+  "recovery.snapshot_available": "ロールバックに使用できる、DSHデータホーム全体の非公開バックアップスナップショットがあります。",
+  "recovery.snapshot_missing": "有効化前にスナップショットは作成されませんでした。",
+  "recovery.confirmation": "ランタイムの切り替えが保留中です。復旧に成功するまで、通常の起動と再起動はブロックされます。\n\n旧世代: {old}\n新世代: {new}\n{snapshot}\n\n以前のランタイムを今すぐ復旧しますか？",
+  "recovery.pending_confirmation": "ランタイムの切り替えが完了せず、以前のランタイムを自動的に復元できませんでした。復旧に成功するまで、通常の起動と再起動はブロックされます。\n\n{error}\n\n以前のランタイムを今すぐ復旧しますか？",
+  "recovery.runtime_busy_title": "ランタイムは使用中です",
+  "recovery.busy_title": "復旧処理中です",
+  "recovery.cancelled_title": "復旧をキャンセルしました",
+  "recovery.cancelled": "保留中のトランザクションは保持されています。",
+  "recovery.recovered_title": "ランタイムを復旧しました",
+  "recovery.recovered": "以前のランタイムが復元され、リクエストの処理を再開しました。",
+  "recovery.refresh_warning": "以前のランタイムが復元され、リクエストの処理を再開しました。\n\n復元されたランタイムに接続するためのウィンドウの再読み込みに失敗しました: {error}\n復旧は完了し、保留中のトランザクションは削除されました。DSHを通常どおり起動または再起動してください。",
+  "recovery.incomplete_title": "復旧は未完了です",
+  "recovery.incomplete": "保留中のトランザクションは保持されています。通常の起動と再起動は引き続きブロックされます。\n\n{error}"
 }

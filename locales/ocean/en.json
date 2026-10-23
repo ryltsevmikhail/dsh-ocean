@@ -286,5 +286,22 @@
   "installation.unknown.label": "Unknown installation",
   "installation.unknown.evidence": "No reliable installation context hint is available.",
   "installation.unknown.guidance": "Determine the original installation method and use its update workflow. No automatic shell replacement is offered for an unclassified installation.",
-  "installation.introduction": "Running shell: {version}\nInstallation hint: {hint} — {evidence}\n{guidance}\nInstallation information is not a network update check or package ownership proof. Package users: update the original via AUR/deb/Flatpak as applicable. Managed actions below affect only an explicitly enabled separate user destination, never the original executable."
+  "installation.introduction": "Running shell: {version}\nInstallation hint: {hint} — {evidence}\n{guidance}\nInstallation information is not a network update check or package ownership proof. Package users: update the original via AUR/deb/Flatpak as applicable. Managed actions below affect only an explicitly enabled separate user destination, never the original executable.",
+  "recovery.title": "Runtime recovery",
+  "recovery.no_pending": "No runtime recovery is pending. Retry the normal startup if needed.",
+  "recovery.inspection_failed_title": "Runtime recovery inspection failed",
+  "recovery.required_title": "Runtime recovery required",
+  "recovery.snapshot_available": "A full private home backup snapshot is available for rollback.",
+  "recovery.snapshot_missing": "No snapshot was captured before activation.",
+  "recovery.confirmation": "A runtime switch is pending and ordinary start/restart stays blocked until recovery succeeds.\n\nOld generation: {old}\nNew generation: {new}\n{snapshot}\n\nRecover the previous runtime now?",
+  "recovery.pending_confirmation": "The runtime switch did not complete and the previous runtime could not be restored automatically. Ordinary start/restart stays blocked until recovery succeeds.\n\n{error}\n\nRecover the previous runtime now?",
+  "recovery.runtime_busy_title": "Runtime busy",
+  "recovery.busy_title": "Recovery busy",
+  "recovery.cancelled_title": "Recovery cancelled",
+  "recovery.cancelled": "The pending transaction was retained.",
+  "recovery.recovered_title": "Runtime recovered",
+  "recovery.recovered": "The previous runtime was restored and is serving again.",
+  "recovery.refresh_warning": "The previous runtime was restored and is serving again.\n\nThe window refresh to the restored runtime failed: {error}\nRecovery is complete and the pending transaction was cleared; start or restart DSH normally.",
+  "recovery.incomplete_title": "Recovery incomplete",
+  "recovery.incomplete": "The pending transaction was retained; ordinary start/restart stays blocked.\n\n{error}"
 }

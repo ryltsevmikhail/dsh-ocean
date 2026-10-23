@@ -34,8 +34,8 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
             Ok(None) if recovery_only => {
                 show_message(
                     &app,
-                    "Runtime recovery",
-                    "No runtime recovery is pending. Retry the normal startup if needed.",
+                    crate::i18n::text("recovery.title"),
+                    crate::i18n::text("recovery.no_pending"),
                     gtk::MessageType::Info,
                 );
                 return;
@@ -44,7 +44,7 @@ fn check_and_show_mode(app: &AppHandle, recovery_only: bool) {
             Err(error) => {
                 show_message(
                     &app,
-                    "Runtime recovery inspection failed",
+                    crate::i18n::text("recovery.inspection_failed_title"),
                     &format!("{error:#}"),
                     gtk::MessageType::Error,
                 );
@@ -187,7 +187,7 @@ fn perform_apply(app: AppHandle, runtime: Runtime, candidate: Candidate) {
         Err(error) => {
             show_message(
                 &app,
-                "Runtime busy",
+                crate::i18n::text("recovery.runtime_busy_title"),
                 &error.to_string(),
                 gtk::MessageType::Warning,
             );
@@ -261,30 +261,48 @@ fn present_apply_outcome(app: &AppHandle, cancelled: bool, result: anyhow::Resul
 }
 
 fn present_recovery(app: &AppHandle, info: &crate::runtime_switch::PendingInfo) {
-    let snapshot = if info.has_snapshot {
-        "A full private home backup snapshot is available for rollback."
+    let snapshot = crate::i18n::text(if info.has_snapshot {
+        "recovery.snapshot_available"
     } else {
-        "No snapshot was captured before activation."
-    };
-    let body = format!(
-        "A runtime switch is pending and ordinary start/restart stays blocked until recovery succeeds.\n\nOld generation: {}\nNew generation: {}\n{snapshot}\n\nRecover the previous runtime now?",
-        info.old.display(),
-        info.new.display()
-    );
-    let app_for_recover = app.clone();
-    ui::confirm(app, "Runtime recovery required", &body, move || {
-        perform_recover(app_for_recover);
+        "recovery.snapshot_missing"
     });
+    let body = crate::i18n::render(
+        crate::i18n::active_language(),
+        "recovery.confirmation",
+        &[
+            ("old", &info.old.display().to_string()),
+            ("new", &info.new.display().to_string()),
+            ("snapshot", snapshot),
+        ],
+    )
+    .expect("validated explicit recovery confirmation");
+    let app_for_recover = app.clone();
+    ui::confirm(
+        app,
+        crate::i18n::text("recovery.required_title"),
+        &body,
+        move || {
+            perform_recover(app_for_recover);
+        },
+    );
 }
 
 fn present_pending(app: &AppHandle, error: &str) {
-    let body = format!(
-        "The runtime switch did not complete and the previous runtime could not be restored automatically. Ordinary start/restart stays blocked until recovery succeeds.\n\n{error}\n\nRecover the previous runtime now?"
-    );
+    let body = crate::i18n::render(
+        crate::i18n::active_language(),
+        "recovery.pending_confirmation",
+        &[("error", error)],
+    )
+    .expect("validated blocked recovery confirmation");
     let app_for_recover = app.clone();
-    ui::confirm(app, "Runtime recovery required", &body, move || {
-        perform_recover(app_for_recover);
-    });
+    ui::confirm(
+        app,
+        crate::i18n::text("recovery.required_title"),
+        &body,
+        move || {
+            perform_recover(app_for_recover);
+        },
+    );
 }
 
 fn perform_recover(app: AppHandle) {
@@ -294,7 +312,7 @@ fn perform_recover(app: AppHandle) {
         Err(error) => {
             show_message(
                 &app,
-                "Runtime busy",
+                crate::i18n::text("recovery.runtime_busy_title"),
                 &error.to_string(),
                 gtk::MessageType::Warning,
             );
@@ -306,7 +324,7 @@ fn perform_recover(app: AppHandle) {
         Err(error) => {
             show_message(
                 &app,
-                "Recovery busy",
+                crate::i18n::text("recovery.busy_title"),
                 &error.to_string(),
                 gtk::MessageType::Warning,
             );
@@ -344,10 +362,18 @@ fn recover_outcome_message(
     cancelled: bool,
     result: &anyhow::Result<RecoverOutcome>,
 ) -> (&'static str, String, gtk::MessageType) {
+    recover_outcome_message_in(cancelled, result, crate::i18n::active_language())
+}
+fn recover_outcome_message_in(
+    cancelled: bool,
+    result: &anyhow::Result<RecoverOutcome>,
+    language: crate::i18n::Language,
+) -> (&'static str, String, gtk::MessageType) {
+    let message = |key| crate::i18n::message(language, key).expect("embedded recovery message");
     if cancelled {
         return (
-            "Recovery cancelled",
-            "The pending transaction was retained.".to_owned(),
+            message("recovery.cancelled_title"),
+            message("recovery.cancelled").into(),
             gtk::MessageType::Warning,
         );
     }
@@ -355,29 +381,30 @@ fn recover_outcome_message(
         Ok(RecoverOutcome::Recovered {
             refresh_error: None,
         }) => (
-            "Runtime recovered",
-            "The previous runtime was restored and is serving again.".to_owned(),
+            message("recovery.recovered_title"),
+            message("recovery.recovered").into(),
             gtk::MessageType::Info,
         ),
         Ok(RecoverOutcome::Recovered {
             refresh_error: Some(error),
         }) => (
-            "Runtime recovered",
-            format!(
-                "The previous runtime was restored and is serving again.\n\n\
-                 The window refresh to the restored runtime failed: {}\n\
-                 Recovery is complete and the pending transaction was cleared; \
-                 start or restart DSH normally.",
-                auth::redact(error)
-            ),
+            message("recovery.recovered_title"),
+            crate::i18n::render(
+                language,
+                "recovery.refresh_warning",
+                &[("error", &auth::redact(error))],
+            )
+            .expect("validated recovered window warning"),
             gtk::MessageType::Warning,
         ),
         Err(error) => (
-            "Recovery incomplete",
-            format!(
-                "The pending transaction was retained; ordinary start/restart stays blocked.\n\n{}",
-                auth::redact(&format!("{error:#}"))
-            ),
+            message("recovery.incomplete_title"),
+            crate::i18n::render(
+                language,
+                "recovery.incomplete",
+                &[("error", &auth::redact(&format!("{error:#}")))],
+            )
+            .expect("validated pending recovery diagnostic"),
             gtk::MessageType::Error,
         ),
     }
@@ -393,6 +420,35 @@ fn show_message(app: &AppHandle, title: &'static str, body: &str, kind: gtk::Mes
 mod tests {
     use super::*;
 
+    #[test]
+    fn recovery_truth_and_redaction_are_preserved_in_every_language() {
+        for (language, _) in crate::i18n::LANGUAGES {
+            let result = Ok(RecoverOutcome::Recovered {
+                refresh_error: Some("http://127.0.0.1/?token=synthetic-private".into()),
+            });
+            let (title, body, kind) = recover_outcome_message_in(false, &result, language);
+            assert_eq!(
+                title,
+                crate::i18n::message(language, "recovery.recovered_title").unwrap()
+            );
+            assert!(
+                matches!(kind, gtk::MessageType::Warning) && !body.contains("synthetic-private")
+            );
+            let (_, body, kind) =
+                recover_outcome_message_in(false, &Err(anyhow::anyhow!("failure")), language);
+            assert!(matches!(kind, gtk::MessageType::Error));
+            assert!(body.contains(
+                &crate::i18n::render(language, "recovery.incomplete", &[("error", "failure")])
+                    .unwrap()
+            ));
+            let (_, body, kind) = recover_outcome_message_in(true, &result, language);
+            assert!(matches!(kind, gtk::MessageType::Warning));
+            assert_eq!(
+                body,
+                crate::i18n::message(language, "recovery.cancelled").unwrap()
+            );
+        }
+    }
     #[test]
     fn recover_outcome_message_never_claims_pending_after_recovery() {
         // A completed recovery with a failed window refresh is a warning that

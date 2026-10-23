@@ -286,5 +286,22 @@
   "installation.unknown.label": "Unbekannte Installation",
   "installation.unknown.evidence": "Es ist kein zuverlässiger Hinweis auf den Installationskontext verfügbar.",
   "installation.unknown.guidance": "Ermitteln Sie die ursprüngliche Installationsmethode und verwenden Sie deren Aktualisierungsablauf. Für eine nicht klassifizierte Installation wird kein automatischer Austausch der grafischen Oberfläche angeboten.",
-  "installation.introduction": "Laufende grafische Oberfläche: {version}\nInstallationshinweis: {hint} — {evidence}\n{guidance}\nInstallationsinformationen sind weder eine netzwerkbasierte Aktualisierungsprüfung noch ein Nachweis der Paketzugehörigkeit. Paketnutzer: Aktualisieren Sie das Original je nach Installation über AUR/deb/Flatpak. Die unten aufgeführten verwalteten Aktionen betreffen nur ein ausdrücklich aktiviertes, separates Benutzerziel, niemals die ursprüngliche ausführbare Datei."
+  "installation.introduction": "Laufende grafische Oberfläche: {version}\nInstallationshinweis: {hint} — {evidence}\n{guidance}\nInstallationsinformationen sind weder eine netzwerkbasierte Aktualisierungsprüfung noch ein Nachweis der Paketzugehörigkeit. Paketnutzer: Aktualisieren Sie das Original je nach Installation über AUR/deb/Flatpak. Die unten aufgeführten verwalteten Aktionen betreffen nur ein ausdrücklich aktiviertes, separates Benutzerziel, niemals die ursprüngliche ausführbare Datei.",
+  "recovery.title": "Wiederherstellung der Laufzeitumgebung",
+  "recovery.no_pending": "Es steht keine Wiederherstellung der Laufzeitumgebung aus. Versuchen Sie bei Bedarf erneut, normal zu starten.",
+  "recovery.inspection_failed_title": "Prüfung der Laufzeitwiederherstellung fehlgeschlagen",
+  "recovery.required_title": "Wiederherstellung der Laufzeitumgebung erforderlich",
+  "recovery.snapshot_available": "Für das Zurücksetzen ist ein vollständiger privater Sicherungssnapshot des DSH-Datenverzeichnisses verfügbar.",
+  "recovery.snapshot_missing": "Vor der Aktivierung wurde kein Snapshot erstellt.",
+  "recovery.confirmation": "Ein Wechsel der Laufzeitumgebung steht aus. Der normale Start und Neustart bleiben gesperrt, bis die Wiederherstellung erfolgreich abgeschlossen ist.\n\nAlte Generation: {old}\nNeue Generation: {new}\n{snapshot}\n\nDie vorherige Laufzeitumgebung jetzt wiederherstellen?",
+  "recovery.pending_confirmation": "Der Wechsel der Laufzeitumgebung wurde nicht abgeschlossen und die vorherige Laufzeitumgebung konnte nicht automatisch wiederhergestellt werden. Der normale Start und Neustart bleiben gesperrt, bis die Wiederherstellung erfolgreich abgeschlossen ist.\n\n{error}\n\nDie vorherige Laufzeitumgebung jetzt wiederherstellen?",
+  "recovery.runtime_busy_title": "Laufzeitumgebung beschäftigt",
+  "recovery.busy_title": "Wiederherstellung läuft bereits",
+  "recovery.cancelled_title": "Wiederherstellung abgebrochen",
+  "recovery.cancelled": "Die ausstehende Transaktion wurde beibehalten.",
+  "recovery.recovered_title": "Laufzeitumgebung wiederhergestellt",
+  "recovery.recovered": "Die vorherige Laufzeitumgebung wurde wiederhergestellt und verarbeitet wieder Anfragen.",
+  "recovery.refresh_warning": "Die vorherige Laufzeitumgebung wurde wiederhergestellt und verarbeitet wieder Anfragen.\n\nDas Aktualisieren des Fensters zur Verbindung mit der wiederhergestellten Laufzeitumgebung ist fehlgeschlagen: {error}\nDie Wiederherstellung ist abgeschlossen und die ausstehende Transaktion wurde entfernt; starten Sie DSH normal oder starten Sie es normal neu.",
+  "recovery.incomplete_title": "Wiederherstellung unvollständig",
+  "recovery.incomplete": "Die ausstehende Transaktion wurde beibehalten; der normale Start und Neustart bleiben gesperrt.\n\n{error}"
 }
