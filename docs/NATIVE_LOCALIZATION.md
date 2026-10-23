@@ -82,6 +82,13 @@ stock empty generated root and avoids adding profile dependencies. It checks
 restart authentication and descendant cleanup. This does not yet prove the
 application's cold-start/systemd/update paths select that overlay automatically.
 
+The Rust metadata subprocess wrapper now supplies an explicit executable, script,
+profile scope, process home and cwd. It clears inherited credentials and Node
+startup injections, bounds both output pipes to 8 KiB and the operation to 30
+seconds, kills/reaps failures and rejects extra protocol fields. An opt-in test
+executes the actual embedded helpers through this wrapper against the private SDK
+without creating a profile. Lifecycle/consent callers are still pending.
+
 **Activation is not implemented yet.** The embedding API by itself does not prove
 that a linked release ELF retains the resources; owned-runtime lifecycle calls
 and package/native integration tests must establish that before completion.
