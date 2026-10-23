@@ -7,6 +7,38 @@ use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[test]
+fn installation_introduction_uses_selected_locale_without_changing_machine_ownership_report() {
+    for (path, appimage, flatpak, key) in [
+        (None, true, false, "appimage"),
+        (None, false, true, "flatpak"),
+        (
+            Some("/private-secret/target/debug/dsh-ocean"),
+            false,
+            false,
+            "development",
+        ),
+        (Some("/usr/bin/dsh-ocean"), false, false, "system"),
+        (None, true, true, "conflicting"),
+        (None, false, false, "unknown"),
+    ] {
+        let report = shell_status::classify(path.map(Path::new), appimage, flatpak);
+        let before = serde_json::to_string(&report).unwrap();
+        for (language, _) in dsh_ocean::i18n::LANGUAGES {
+            let text = shell_status::introduction_text_in(&report, language);
+            assert!(text.contains(env!("CARGO_PKG_VERSION")) && !text.contains("private-secret"));
+            assert!(text.contains(
+                dsh_ocean::i18n::message(language, &format!("installation.{key}.label")).unwrap()
+            ));
+            assert!(text.contains(
+                dsh_ocean::i18n::message(language, &format!("installation.{key}.guidance"))
+                    .unwrap()
+            ));
+        }
+        assert_eq!(serde_json::to_string(&report).unwrap(), before);
+        assert!(!report.ownership_verified && !report.automatic_update_available);
+    }
+}
+#[test]
 fn installation_hints_never_claim_package_ownership_or_apply_authority() {
     for (path, appimage, flatpak, expected) in [
         (None, false, false, Hint::Unknown),

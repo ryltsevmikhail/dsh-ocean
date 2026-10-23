@@ -63,8 +63,10 @@ diagnostics remain plain single-pass arguments. Trust/destination and authentica
 candidate reports are localized too, retaining missing/invalid-trust distinctions,
 separate public trust roots, explicit recovery and independently confirmed public-key
 fingerprints. Their formatting performs no enrollment, key provisioning or network
-operation. The installation-hint introduction and remaining core native dialogs
-are still being localized.
+operation. The installation-hint introduction now localizes all six heuristic
+contexts and their original-distribution guidance, without changing classification,
+machine-readable ownership flags or probing package managers. Remaining runtime
+update/recovery and diagnostic dialogs are still being localized.
 
 ## Harness resource tree
 

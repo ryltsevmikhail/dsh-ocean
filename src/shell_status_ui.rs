@@ -708,7 +708,10 @@ pub fn build_with_registry(
     content.set_margin_end(18);
     content.set_margin_top(18);
     content.set_margin_bottom(18);
-    let label=text_label(&format!("Running shell: {}\nInstallation hint: {:?} — {}\n{}\nInstallation information is not a network update check or package ownership proof. Package users: update the original via AUR/deb/Flatpak as applicable. Managed actions below affect only an explicitly enabled separate user destination, never the original executable.",env!("CARGO_PKG_VERSION"),report.installation_hint,report.evidence,report.guidance));
+    let label = text_label(&crate::shell_status::introduction_text_in(
+        report,
+        crate::i18n::active_language(),
+    ));
     content.pack_start(&label, false, false, 0);
     let channels = gtk::Grid::new();
     channels.set_column_spacing(12);
