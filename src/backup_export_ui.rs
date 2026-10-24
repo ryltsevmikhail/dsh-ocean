@@ -58,6 +58,13 @@ pub struct ProgressState {
     pub cancel_requested: bool,
 }
 
+impl ProgressState {
+    fn finish(&mut self, outcome: Outcome) {
+        // A late request cannot undo an archive that was already published.
+        self.outcome = Some(outcome);
+    }
+}
+
 pub struct Window {
     pub dialog: gtk::Dialog,
     pub label: gtk::Label,
@@ -422,11 +429,7 @@ pub fn show(app: &AppHandle) {
             let mut state = worker_state
                 .lock()
                 .unwrap_or_else(|error| error.into_inner());
-            state.outcome = Some(if state.cancel_requested {
-                Outcome::Cancelled
-            } else {
-                outcome
-            });
+            state.finish(outcome);
         });
     });
     window.dialog.show_all();
@@ -448,6 +451,89 @@ pub fn ensure_parent(destination: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn late_cancel_does_not_rewrite_worker_result() {
+        for outcome in [
+            Outcome::Exported { files: 1, bytes: 2 },
+            Outcome::Failed,
+            Outcome::Cancelled,
+        ] {
+            let mut state = ProgressState {
+                cancel_requested: true,
+                ..Default::default()
+            };
+            state.finish(outcome);
+            assert_eq!(state.outcome, Some(outcome));
+            assert!(state.cancel_requested);
+        }
+    }
+
+    #[test]
+    fn late_cancel_keeps_a_real_published_archive_successful() {
+        let root = std::env::temp_dir().join(format!(
+            "ocean-o2-export-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let home = root.join("data");
+        let backups = root.join("backups");
+        std::fs::create_dir_all(home.join("sessions")).unwrap();
+        std::fs::create_dir_all(home.join("storages")).unwrap();
+        std::fs::create_dir(&backups).unwrap();
+        std::fs::write(home.join("sessions/synthetic.jsonl"), b"synthetic").unwrap();
+        let snapshot =
+            crate::data_backup::snapshot_with_checkpoint(&home, &backups, None, &mut || Ok(()))
+                .unwrap();
+        let destination = root.join("archive.tar");
+        let receipt =
+            crate::backup_export::export_with_checkpoint(&snapshot, &destination, &mut || Ok(()))
+                .unwrap();
+        let mut state = ProgressState {
+            cancel_requested: true,
+            ..Default::default()
+        };
+        state.finish(Outcome::Exported {
+            files: receipt.files,
+            bytes: receipt.bytes,
+        });
+        assert_eq!(
+            state.outcome,
+            Some(Outcome::Exported { files: 1, bytes: 9 })
+        );
+        assert_eq!(
+            crate::backup_export::verify_export(&destination).unwrap(),
+            receipt
+        );
+        let cancelled = root.join("cancelled.tar");
+        let mut checkpoints = 0;
+        assert!(
+            crate::backup_export::export_with_checkpoint(&snapshot, &cancelled, &mut || {
+                checkpoints += 1;
+                if checkpoints == 2 {
+                    assert!(std::fs::metadata(&cancelled).unwrap().len() > 0);
+                    anyhow::bail!("export cancelled");
+                }
+                Ok(())
+            })
+            .is_err()
+        );
+        assert!(!cancelled.exists());
+        assert!(root
+            .canonicalize()
+            .unwrap()
+            .starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("ocean-o2-export-"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     fn description(scope: &str, files: usize, bytes: u64) -> Description {
         Description {
