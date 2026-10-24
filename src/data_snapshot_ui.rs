@@ -104,6 +104,7 @@ pub struct ProgressWindow {
     pub dialog: gtk::Dialog,
     pub label: gtk::Label,
     pub cancel: gtk::Button,
+    pub state: Arc<Mutex<ProgressState>>,
 }
 
 /// Progress dialog with an explicit cancel action; counts only.
@@ -132,10 +133,40 @@ pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
         .expect("cancel button")
         .downcast::<gtk::Button>()
         .expect("cancel button is a gtk button");
+    let state = Arc::new(Mutex::new(ProgressState::default()));
+    let cancel_state = state.clone();
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk::ResponseType::Cancel {
+            let mut state = cancel_state
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            if state.outcome.is_none() {
+                state.cancel_requested = true;
+            }
+            if let Some(button) = dialog.widget_for_response(gtk::ResponseType::Cancel) {
+                button.set_sensitive(false);
+            }
+        }
+    });
+    let cancel_state = state.clone();
+    dialog.connect_delete_event(move |_, _| {
+        let mut state = cancel_state
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if state.outcome.is_none() {
+            // Keep the running copy visible until cooperative cancellation settles.
+            state.cancel_requested = true;
+            gtk::glib::Propagation::Stop
+        } else {
+            // GTK close emits delete-event too; do not veto the terminal timer.
+            gtk::glib::Propagation::Proceed
+        }
+    });
     ProgressWindow {
         dialog,
         label,
         cancel,
+        state,
     }
 }
 
@@ -249,42 +280,9 @@ pub fn show(app: &AppHandle) {
         dialog.close();
         // The worker only touches this shared state; the timer below owns every
         // widget, so no GTK object ever crosses a thread boundary.
-        let shared = Arc::new(Mutex::new(ProgressState::default()));
         let progress_window = build_progress(parent.as_ref().map(|parent| parent.upcast_ref()));
+        let shared = progress_window.state.clone();
         progress_window.dialog.show_all();
-        let cancel_state = shared.clone();
-        // Cancelling requests a stop but keeps the progress window alive: the timer
-        // renders the terminal outcome there, and closing it would discard the
-        // final "staging copy removed" message.
-        progress_window
-            .dialog
-            .connect_response(move |dialog, response| {
-                if response == gtk::ResponseType::Cancel {
-                    let mut state = cancel_state
-                        .lock()
-                        .unwrap_or_else(|error| error.into_inner());
-                    if state.outcome.is_none() {
-                        state.cancel_requested = true;
-                    }
-                    if let Some(button) = dialog.widget_for_response(gtk::ResponseType::Cancel) {
-                        button.set_sensitive(false);
-                    }
-                }
-            });
-        // Closing the window with the WM button asks for the same cooperative stop
-        // instead of destroying the only view of a running copy.
-        {
-            let cancel_state = shared.clone();
-            progress_window.dialog.connect_delete_event(move |_, _| {
-                let mut state = cancel_state
-                    .lock()
-                    .unwrap_or_else(|error| error.into_inner());
-                if state.outcome.is_none() {
-                    state.cancel_requested = true;
-                }
-                gtk::glib::Propagation::Stop
-            });
-        }
         let weak_dialog = progress_window.dialog.downgrade();
         let weak_label = progress_window.label.downgrade();
         let timer_state = shared.clone();
@@ -303,8 +301,8 @@ pub fn show(app: &AppHandle) {
             let Some(outcome) = outcome else {
                 return glib::ControlFlow::Continue;
             };
-            dialog.close();
-            match outcome {
+            let timer_app = timer_app.clone();
+            crate::ui::close_progress_then(&dialog, move || match outcome {
                 Outcome::Created {
                     files,
                     bytes,
@@ -338,7 +336,7 @@ pub fn show(app: &AppHandle) {
                     crate::i18n::text("data_snapshot.failure"),
                     gtk::MessageType::Warning,
                 ),
-            }
+            });
             glib::ControlFlow::Break
         });
 

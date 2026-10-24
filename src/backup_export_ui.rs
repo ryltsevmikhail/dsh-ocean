@@ -185,6 +185,7 @@ pub fn choose(dialog: &gtk::FileChooserDialog) -> Option<PathBuf> {
 pub struct ProgressWindow {
     pub dialog: gtk::Dialog,
     pub label: gtk::Label,
+    pub state: Arc<Mutex<ProgressState>>,
 }
 
 pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
@@ -206,10 +207,40 @@ pub fn build_progress(parent: Option<&gtk::Window>) -> ProgressWindow {
     label.set_margin_end(18);
     label.set_margin_top(18);
     dialog.content_area().pack_start(&label, false, false, 0);
-    // No blanket close here: a caller attaches a handler that keeps the window open
-    // to render the terminal outcome, and a blanket close would win the race.
-
-    ProgressWindow { dialog, label }
+    let state = Arc::new(Mutex::new(ProgressState::default()));
+    let cancel_state = state.clone();
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk::ResponseType::Cancel {
+            let mut state = cancel_state
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            if state.outcome.is_none() {
+                state.cancel_requested = true;
+            }
+            if let Some(button) = dialog.widget_for_response(gtk::ResponseType::Cancel) {
+                button.set_sensitive(false);
+            }
+        }
+    });
+    let cancel_state = state.clone();
+    dialog.connect_delete_event(move |_, _| {
+        let mut state = cancel_state
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if state.outcome.is_none() {
+            // Keep the partial-archive cleanup visible until the worker settles.
+            state.cancel_requested = true;
+            gtk::glib::Propagation::Stop
+        } else {
+            // Terminal timer/WM close must actually release the modal window.
+            gtk::glib::Propagation::Proceed
+        }
+    });
+    ProgressWindow {
+        dialog,
+        label,
+        state,
+    }
 }
 
 pub fn outcome_text(outcome: Outcome) -> (&'static str, String) {
@@ -311,40 +342,10 @@ pub fn show(app: &AppHandle) {
             return;
         };
         dialog.close();
-        let shared = Arc::new(Mutex::new(ProgressState::default()));
         let parent_for_progress = parent_owned.as_ref().map(|window| window.upcast_ref());
         let progress_window = build_progress(parent_for_progress);
+        let shared = progress_window.state.clone();
         progress_window.dialog.show_all();
-        let cancel_state = shared.clone();
-        // Cancelling requests a stop and leaves the window to report the terminal
-        // outcome (the worker removes a partial archive before finishing).
-        progress_window
-            .dialog
-            .connect_response(move |dialog, response| {
-                if response == gtk::ResponseType::Cancel {
-                    let mut state = cancel_state
-                        .lock()
-                        .unwrap_or_else(|error| error.into_inner());
-                    if state.outcome.is_none() {
-                        state.cancel_requested = true;
-                    }
-                    if let Some(button) = dialog.widget_for_response(gtk::ResponseType::Cancel) {
-                        button.set_sensitive(false);
-                    }
-                }
-            });
-        {
-            let cancel_state = shared.clone();
-            progress_window.dialog.connect_delete_event(move |_, _| {
-                let mut state = cancel_state
-                    .lock()
-                    .unwrap_or_else(|error| error.into_inner());
-                if state.outcome.is_none() {
-                    state.cancel_requested = true;
-                }
-                gtk::glib::Propagation::Stop
-            });
-        }
         let weak_dialog = progress_window.dialog.downgrade();
         let weak_label = progress_window.label.downgrade();
         let timer_state = shared.clone();
@@ -367,14 +368,16 @@ pub fn show(app: &AppHandle) {
                 });
                 return glib::ControlFlow::Continue;
             }
-            dialog.close();
             let outcome = outcome.expect("checked above");
             let (title, body) = outcome_text(outcome);
             let kind = match outcome {
                 Outcome::Exported { .. } => gtk::MessageType::Info,
                 Outcome::Cancelled | Outcome::Failed => gtk::MessageType::Warning,
             };
-            crate::ui::message(&timer_app, title, &body, kind);
+            let timer_app = timer_app.clone();
+            crate::ui::close_progress_then(&dialog, move || {
+                crate::ui::message(&timer_app, title, &body, kind);
+            });
             glib::ControlFlow::Break
         });
         let worker_state = shared.clone();
