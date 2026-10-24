@@ -64,8 +64,23 @@ fn release_metadata_versions_match_the_binary() {
     assert_eq!(
         pkgbuild
             .lines()
-            .find_map(|line| line.strip_prefix("pkgver=")),
+            .find_map(|line| line.strip_prefix("_source_version=")),
         Some(version)
+    );
+    let arch_version = version.replace("-rc.", "rc");
+    assert!(!arch_version.contains('-'));
+    assert_eq!(
+        pkgbuild
+            .lines()
+            .find_map(|line| line.strip_prefix("pkgver=")),
+        Some(arch_version.as_str())
+    );
+    assert!(pkgbuild.contains("source=(\"$pkgname-${_source_version}.tar.gz\")"));
+    assert_eq!(
+        pkgbuild
+            .matches("cd \"$srcdir/$pkgname-${_source_version}\"")
+            .count(),
+        2
     );
     assert!(include_str!("../CHANGELOG.md")
         .lines()

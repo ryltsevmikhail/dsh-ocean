@@ -302,9 +302,11 @@ fn reset_requires_confirmation_and_forgets_the_remembered_sequence() {
     assert!(sandbox.state()["channels"].as_object().unwrap().is_empty());
 
     // Reset removes the remembered sequence floor, not the running binary's
-    // release-version floor. Use this version so a package version bump does not
-    // accidentally turn a state-reset test into a legitimate downgrade refusal.
-    let [older, older_sig] = sandbox.signed("older", 4, env!("CARGO_PKG_VERSION"), 2);
+    // release-version floor. The stable fixture uses this core version without
+    // prerelease fields, so an RC binary does not put a prerelease on stable.
+    let current = semver::Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+    let stable = semver::Version::new(current.major, current.minor, current.patch).to_string();
+    let [older, older_sig] = sandbox.signed("older", 4, &stable, 2);
     let accepted = sandbox.invoke("--accept-release", &older, &older_sig, "1");
     assert!(accepted.status.success(), "{}", describe(&accepted));
     assert_eq!(sandbox.state()["channels"]["stable"]["sequence"], 4);

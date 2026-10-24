@@ -9,6 +9,20 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+## 0.1.2-rc.1
+
+Local unsigned Linux x86_64 candidate.
+
+- Keep completed snapshot/export outcomes truthful when cancellation arrives late;
+  close progress dialogs before showing the actual result.
+- Validate against the separately supplied local DSH `0.2.0-rc.2.ocean.1` and
+  tool-management `0.20.1-ocean.1` candidate artifacts. These versions are not
+  published registry releases; use the candidate's isolated runtime instructions,
+  not a registry bootstrap for the custom DSH version.
+- This local candidate is unsigned and has no production feed, sequence or release
+  clearance. Python/Electron, ARM64, signing and public distribution are outside
+  its acceptance scope. Immutable 0.1.1 release inputs are not changed.
+
 - Retain exact Rust 1.90 standard-library/compiler-runtime notice and source
   payloads through package extraction and initial installation, rather than only
   temporary CI reports. Native release checks now bind the actual tar's ELF and

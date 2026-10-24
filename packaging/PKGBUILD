@@ -1,6 +1,8 @@
 # Maintainer: DSH Ocean contributors
 pkgname=dsh-ocean
-pkgver=0.1.1
+# makepkg pkgver excludes hyphens; source archives retain Cargo SemVer.
+_source_version=0.1.2-rc.1
+pkgver=0.1.2rc1
 pkgrel=1
 pkgdesc="DSH Ocean — native desktop client for the DeepSeek Harness web UI"
 arch=('x86_64' 'aarch64')
@@ -11,16 +13,16 @@ license=('MIT' 'LicenseRef-ThirdParty-Notices')
 depends=('gtk3' 'webkit2gtk-4.1' 'libayatana-appindicator')
 makedepends=('cargo')
 options=('!lto')
-source=("$pkgname-$pkgver.tar.gz")
+source=("$pkgname-${_source_version}.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-  cd "$srcdir/$pkgname-$pkgver" || return 1
+  cd "$srcdir/$pkgname-${_source_version}" || return 1
   cargo build --release --locked
 }
 
 package() {
-  cd "$srcdir/$pkgname-$pkgver" || return 1
+  cd "$srcdir/$pkgname-${_source_version}" || return 1
   local -a payload=() required=(LICENSE NOTICE THIRD_PARTY_NOTICES.txt locales/dsh/LICENSE docs/third-party/inventory.json docs/BINARY_LICENSE_AUDIT.md
     docs/third-party/sources/cssparser-0.37.0.crate docs/third-party/sources/cssparser-macros-0.7.1.crate
     docs/third-party/sources/dtoa-short-0.3.5.crate docs/third-party/sources/option-ext-0.2.0.crate
