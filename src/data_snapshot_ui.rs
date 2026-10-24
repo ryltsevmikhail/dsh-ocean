@@ -77,6 +77,14 @@ pub struct ProgressState {
     pub outcome: Option<Outcome>,
 }
 
+impl ProgressState {
+    fn finish(&mut self, outcome: Option<Outcome>) {
+        // The request is cooperative; the worker result determines whether
+        // cancellation actually happened before publication.
+        self.outcome = outcome;
+    }
+}
+
 pub const FAILURE_TEXT: &str =
     "The snapshot could not be created. Existing snapshots and live data were not changed.";
 pub const CANCELLED_TEXT: &str = "The snapshot was cancelled. Live data was not changed; an incomplete staging copy was removed.";
@@ -394,11 +402,7 @@ pub fn show(app: &AppHandle) {
             let mut state = worker_state
                 .lock()
                 .unwrap_or_else(|error| error.into_inner());
-            if state.cancel_requested {
-                state.outcome = Some(Outcome::Cancelled);
-            } else {
-                state.outcome = outcome;
-            }
+            state.finish(outcome);
         });
     });
     window.dialog.show_all();
@@ -407,6 +411,82 @@ pub fn show(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn late_cancel_does_not_rewrite_worker_result() {
+        for outcome in [
+            Outcome::Created {
+                files: 1,
+                bytes: 2,
+                consistent: true,
+            },
+            Outcome::Failed,
+            Outcome::Cancelled,
+        ] {
+            let mut state = ProgressState {
+                cancel_requested: true,
+                ..Default::default()
+            };
+            state.finish(Some(outcome));
+            assert_eq!(state.outcome, Some(outcome));
+            assert!(state.cancel_requested);
+        }
+    }
+
+    #[test]
+    fn late_cancel_keeps_a_real_published_snapshot_successful() {
+        let root = std::env::temp_dir().join(format!(
+            "ocean-o2-snapshot-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let home = root.join("data");
+        let backups = root.join("backups");
+        std::fs::create_dir_all(home.join("sessions")).unwrap();
+        std::fs::create_dir_all(home.join("storages")).unwrap();
+        std::fs::create_dir(&backups).unwrap();
+        std::fs::write(home.join("sessions/synthetic.jsonl"), b"synthetic").unwrap();
+        let path =
+            crate::data_backup::snapshot_with_checkpoint(&home, &backups, None, &mut || Ok(()))
+                .unwrap();
+        let manifest = crate::data_backup::manifest(&path).unwrap();
+        let mut state = ProgressState {
+            cancel_requested: true,
+            ..Default::default()
+        };
+        state.finish(Some(Outcome::Created {
+            files: manifest.files.len(),
+            bytes: manifest.total_bytes(),
+            consistent: manifest.consistent,
+        }));
+        assert_eq!(
+            state.outcome,
+            Some(Outcome::Created {
+                files: 1,
+                bytes: 9,
+                consistent: true
+            })
+        );
+        assert_eq!(
+            std::fs::read(path.join("data/sessions/synthetic.jsonl")).unwrap(),
+            b"synthetic"
+        );
+        assert!(crate::data_backup::manifest(&path).unwrap().consistent);
+        assert!(root
+            .canonicalize()
+            .unwrap()
+            .starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("ocean-o2-snapshot-"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     fn summary(
         session_files: usize,
