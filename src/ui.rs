@@ -1,6 +1,20 @@
 use gtk::prelude::*;
 use tauri::{AppHandle, Manager};
 
+/// Close a completed progress window before showing its modal result.
+/// GTK close is queued; showing another modal immediately can filter that event.
+/// Call on the GTK default context for a live terminal dialog. The callback runs
+/// at idle only after actual destruction; this does not force other modal grabs.
+pub fn close_progress_then(dialog: &gtk::Dialog, after_close: impl FnOnce() + 'static) {
+    let after_close = std::cell::Cell::new(Some(after_close));
+    dialog.connect_destroy(move |_| {
+        if let Some(after_close) = after_close.take() {
+            gtk::glib::idle_add_local_once(after_close);
+        }
+    });
+    dialog.close();
+}
+
 pub fn build_message(
     parent: Option<&gtk::Window>,
     language: crate::i18n::Language,

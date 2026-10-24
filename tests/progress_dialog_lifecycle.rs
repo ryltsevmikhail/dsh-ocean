@@ -152,6 +152,62 @@ fn progress_windows_preserve_running_view_and_release_all_terminal_modals() {
         assert!(!state.cancel_requested);
         assert_eq!(state.outcome, Some(outcome));
     }
+    // Mirror the fixed timer ordering: request close, wait for actual destroy
+    // and idle dispatch, then show and dismiss the real modal result builder.
+    let snapshot_notice = snapshot::build_progress(Some(parent.upcast_ref()));
+    snapshot_notice.state.lock().unwrap().outcome = Some(snapshot::Outcome::Cancelled);
+    let export_notice = export::build_progress(Some(parent.upcast_ref()));
+    export_notice.state.lock().unwrap().outcome = Some(export::Outcome::Cancelled);
+    for (name, dialog) in [
+        ("snapshot result", snapshot_notice.dialog),
+        ("export result", export_notice.dialog),
+    ] {
+        let _guard = WindowGuard(dialog.clone());
+        let destroyed = std::rc::Rc::new(std::cell::Cell::new(false));
+        let observed = destroyed.clone();
+        dialog.connect_destroy(move |_| observed.set(true));
+        dialog.show_all();
+        pump();
+        let result = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let observed_result = result.clone();
+        let observed_destroyed = destroyed.clone();
+        let result_parent = parent.clone();
+        dsh_ocean::ui::close_progress_then(&dialog, move || {
+            assert!(
+                observed_destroyed.get(),
+                "result must follow actual progress destruction"
+            );
+            let message = dsh_ocean::ui::build_message(
+                Some(result_parent.upcast_ref()),
+                dsh_ocean::i18n::Language::En,
+                "Result",
+                "Synthetic terminal result",
+                gtk::MessageType::Info,
+            );
+            message.connect_response(|message, _| message.close());
+            message.show_all();
+            *observed_result.borrow_mut() = Some(message);
+        });
+        assert!(
+            result.borrow().is_none(),
+            "result is not shown synchronously over queued close"
+        );
+        pump();
+        let message = result
+            .borrow()
+            .clone()
+            .expect("terminal result must still be shown");
+        let _message_guard = WindowGuard(message.clone().upcast());
+        let before = destroyed.get();
+        message.response(gtk::ResponseType::Ok);
+        pump();
+        if !destroyed.get() {
+            blocked.push(format!(
+                "{name}: destroyed before result dismissal={before}, after={}",
+                destroyed.get()
+            ));
+        }
+    }
     assert!(parent.is_visible());
     assert!(
         blocked.is_empty(),

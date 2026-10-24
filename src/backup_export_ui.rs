@@ -368,14 +368,16 @@ pub fn show(app: &AppHandle) {
                 });
                 return glib::ControlFlow::Continue;
             }
-            dialog.close();
             let outcome = outcome.expect("checked above");
             let (title, body) = outcome_text(outcome);
             let kind = match outcome {
                 Outcome::Exported { .. } => gtk::MessageType::Info,
                 Outcome::Cancelled | Outcome::Failed => gtk::MessageType::Warning,
             };
-            crate::ui::message(&timer_app, title, &body, kind);
+            let timer_app = timer_app.clone();
+            crate::ui::close_progress_then(&dialog, move || {
+                crate::ui::message(&timer_app, title, &body, kind);
+            });
             glib::ControlFlow::Break
         });
         let worker_state = shared.clone();

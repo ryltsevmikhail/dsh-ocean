@@ -301,8 +301,8 @@ pub fn show(app: &AppHandle) {
             let Some(outcome) = outcome else {
                 return glib::ControlFlow::Continue;
             };
-            dialog.close();
-            match outcome {
+            let timer_app = timer_app.clone();
+            crate::ui::close_progress_then(&dialog, move || match outcome {
                 Outcome::Created {
                     files,
                     bytes,
@@ -336,7 +336,7 @@ pub fn show(app: &AppHandle) {
                     crate::i18n::text("data_snapshot.failure"),
                     gtk::MessageType::Warning,
                 ),
-            }
+            });
             glib::ControlFlow::Break
         });
 
