@@ -49,7 +49,7 @@ jobs:
           jq -e --arg p "$PRODUCT" '.[$p]' docs/releases/rc2-prebuilt-lock.json > "$RUNNER_TEMP/lock.json"
           tag="$(jq -er .tag "$RUNNER_TEMP/lock.json")"
           file="$(jq -er .filename "$RUNNER_TEMP/lock.json")"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$RUNNER_TEMP/draft.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -e --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] | if length == 1 then .[0] else error("missing/duplicate release") end' > "$RUNNER_TEMP/draft.json"
           jq -e --arg tag "$tag" '.draft == true and .tag_name == $tag' "$RUNNER_TEMP/draft.json"
           commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
           mkdir -m 700 "$RUNNER_TEMP/prebuilt"
@@ -131,12 +131,12 @@ jobs:
           commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
           python3 -B scripts/check-prebuilt-release.py --lock "$RUNNER_TEMP/lock.json" --directory "$RUNNER_TEMP/prebuilt" --tag-commit "$commit"
           release_id="$(jq -er .id "$RUNNER_TEMP/draft.json")"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$RUNNER_TEMP/before-upload.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -e --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] | if length == 1 then .[0] else error("missing/duplicate release") end' > "$RUNNER_TEMP/before-upload.json"
           jq -e --argjson id "$release_id" '.id == $id and .draft == true' "$RUNNER_TEMP/before-upload.json"
           # No --clobber: an existing signature/manifest must be investigated.
           gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/manifest.json" "$RUNNER_TEMP/signature/signature.json" "$RUNNER_TEMP/signature/public-key.json"
           # Verify remote identities AND bytes after compilation/signing/upload.
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$RUNNER_TEMP/final-draft.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -e --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] | if length == 1 then .[0] else error("missing/duplicate release") end' > "$RUNNER_TEMP/final-draft.json"
           jq -e --argjson id "$release_id" '.id == $id and .draft == true' "$RUNNER_TEMP/final-draft.json"
           mkdir -m 700 "$RUNNER_TEMP/remote-final"
           file="$(jq -er .filename "$RUNNER_TEMP/lock.json")"
