@@ -5,6 +5,30 @@
 DSH packages from npm, change updater trust, or activate an installed runtime.
 Its workflow commit differs from the accepted product source commit in the lock.
 
+The final runtime lock selects the documentation-complete archive
+`ba86c35d76df38cadebd19b7b1be7a4db199c4ef05c311b748025be92ef6be31`
+(487,101,871 bytes). All 39,970 previous regular files retain identical bytes and
+executable flags; 796 added files contain component notices and source-access
+instructions. Exact-archive relocation, native bindings and authenticated HTTP
+401/303 were checked. The prior archive remains retained as evidence.
+
+Publish these source companions on the runtime's same release page, without an
+additional source-access charge. The runtime's retained notice instructions bind
+their filenames and hashes; its updater signature covers the runtime archive,
+not a separate signature on each companion:
+
+| Source asset | SHA256 |
+| --- | --- |
+| `dsh-ocean-runtime-next-0.2.0-rc.2.ocean.2-1-x86_64-native-source.tar.gz` | `a39c6263aca9e46e5eda2162298dc6c2ac2c72359a5469b1f8e52d53f76617af` |
+| `rc2-js-notice-source-companion.tar.gz` | `9b868660ae484cbf721b8f2263486b1be9e828c6c425a2ea628b8f883b993c6e` |
+| `dsh-sdk-0.2.0-rc.2.ocean.2-473d474-source.tar.gz` | `6600cc88ad628aad7941fea0cd037915e18ea415ae92cdc175d25ddf9a733717` |
+| `dsh-plugin-tool-management-0.20.1-ocean.1-1eb3a72-source.tar.gz` | `6b235c5ec754cc8d0e67663f13bd129ede1ccd4f486eb746223e5a0b3930059d` |
+
+Sherpa/eSpeak's combined native component follows GPLv3-or-later source delivery;
+its npm Apache declaration does not replace that component's terms. Other
+components retain their own licenses. These are scoped source/notice findings,
+not a claim of whole-runtime relicensing or byte-identical supplier rebuilds.
+
 First integrate this workflow into the default branch so workflow_dispatch is
 registered, and verify that its selected ref is allowed by the existing
 release-shell/release-runtime environment policies. Preserve both environments'
