@@ -9,6 +9,11 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+## 0.1.2-rc.2
+
+- Pin the separately supplied local DSH 0.2.0-rc.2.ocean.2 with corrected published exports.
+- Retain Linux x86_64 scope; signing/publication follows separate acceptance.
+
 ## 0.1.2-rc.1
 
 Local unsigned Linux x86_64 candidate.

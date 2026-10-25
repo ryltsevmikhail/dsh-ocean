@@ -1,6 +1,6 @@
 [package]
 name = "dsh-ocean"
-version = "0.1.2-rc.1"
+version = "0.1.2-rc.2"
 edition = "2021"
 rust-version = "1.90"
 description = "DSH Ocean — native desktop client for DeepSeek Harness"
