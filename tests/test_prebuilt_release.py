@@ -86,6 +86,30 @@ class PrebuiltReleaseTests(unittest.TestCase):
             result = subprocess.run(base + ['manifest'] + flags + ['--publication-target', 'linux-x86_64', '--artifact', str(output)], capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr.decode())
 
+    def test_initial_lookup_finds_unpublished_draft_in_paginated_listing(self):
+        repo = Path(__file__).resolve().parents[1]
+        workflow = (repo / '.github/workflows/prebuilt-rc.yml').read_text()
+        section = workflow.split('      - name: Download exact reviewed inputs from the unpublished draft\n', 1)[1]
+        script = textwrap.dedent(section.split('        run: |\n', 1)[1].split('      - name:', 1)[0])
+        script = script.split('commit="$(gh api', 1)[0]
+        lock = dict(self.lock, tag='runtime-next-v1.0.0-rc.1-r1')
+        lockfile = self.root / 'reviewed-lock.json'
+        lockfile.write_text(json.dumps({'runtime': lock}))
+        script = script.replace('docs/releases/rc2-prebuilt-lock.json', str(lockfile))
+        fake = self.root / 'fake-bin'; fake.mkdir()
+        gh = fake / 'gh'
+        gh.write_text("#!/usr/bin/python3\nimport json,sys\n"
+                      "if '/releases/tags/' in ' '.join(sys.argv): sys.exit('published-only tag endpoint returns404 for draft')\n"
+                      "assert '--paginate' in sys.argv and '--slurp' in sys.argv\n"
+                      "print(json.dumps([[{'id':1,'tag_name':'old','draft':False}],"
+                      "[{'id':42,'tag_name':'runtime-next-v1.0.0-rc.1-r1','draft':True}]]))\n")
+        gh.chmod(0o700)
+        env = dict(os.environ, RUNNER_TEMP=str(self.root), PRODUCT='runtime',
+                   GITHUB_REPOSITORY='fixture/repo', PATH=str(fake)+':/usr/bin:/bin')
+        result = subprocess.run(['bash','-c',script], env=env, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        self.assertEqual(json.loads((self.root/'draft.json').read_text())['id'],42)
+
     def run_remote_publication_fixture(self, scenario):
         repo = Path(__file__).resolve().parents[1]
         workflow = (repo / '.github/workflows/prebuilt-rc.yml').read_text()
@@ -116,11 +140,11 @@ if '--method' in args:
 endpoint=next(x for x in args if x.startswith('repos/'))
 if '/commits/' in endpoint:
  print('a'*40); sys.exit(0)
-if '/releases/tags/' in endpoint:
- data=dict(id=43 if scenario=='recreated' else 42,draft=True,assets=[
+if endpoint.endswith('/releases?per_page=100'):
+ data=dict(tag_name='runtime-next-v1.0.0-rc.1-r1',id=43 if scenario=='recreated' else 42,draft=True,assets=[
   dict(id=9 if scenario=='replaced-id' else 1,name='candidate.tar.gz'),
   dict(id=2,name='manifest.json'),dict(id=3,name='signature.json'),dict(id=4,name='public-key.json')])
- print(json.dumps(data)); sys.exit(0)
+ print(json.dumps([[data]])); sys.exit(0)
 if '/releases/assets/' in endpoint:
  identity=endpoint.rsplit('/',1)[1]
  paths={'1':r/'prebuilt/candidate.tar.gz','2':r/'manifest.json','3':r/'signature/signature.json','4':r/'signature/public-key.json'}
