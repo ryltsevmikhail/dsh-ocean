@@ -177,12 +177,16 @@ jobs:
       - name: Check built-in DSH dictionary resources
         run: node scripts/build-builtin-locales.mjs --check
 
-      - name: Prepare pinned native SDK in a private fixture
+      - name: Prepare public SDK compatibility baseline in a private fixture
         run: |
+          # Public baseline exercises source compatibility on both CI arches.
+          # The unpublished Linux x86_64 RC host has separate exact-artifact
+          # acceptance; this fixture is not RC2 or ARM64 release acceptance.
           python3 -B tests/test_ci_sdk_env.py
+          python3 -B tests/test_prebuilt_release.py
           root="$(mktemp -d "$RUNNER_TEMP/ocean-sdk.XXXXXX")"
           root="$(realpath -- "$root")"
-          python3 -B scripts/ci-sdk-env.py --fixture-root "$root" > "$root/environment"
+          python3 -B scripts/ci-sdk-env.py --manifest tests/fixtures/public-sdk-runtime.json --fixture-root "$root" > "$root/environment"
           while IFS= read -r assignment; do export "$assignment"; done < "$root/environment"
           DSH_HOME="$root/dsh-home" DSH_OCEAN_DATA_DIR="$root/ocean-data" \
             bash scripts/bootstrap-runtime.sh

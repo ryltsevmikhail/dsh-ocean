@@ -6,7 +6,10 @@ use std::fs;
 use std::os::unix::fs::{symlink, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
 struct Fixture {
     root: PathBuf,
@@ -20,10 +23,22 @@ impl Fixture {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "dsh-ocean-data-backup-{}-{nanos}",
-            std::process::id()
-        ));
+        Self::with_stamp(nanos)
+    }
+
+    fn with_stamp(nanos: u128) -> Self {
+        let root = loop {
+            let sequence = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
+            let candidate = std::env::temp_dir().join(format!(
+                "dsh-ocean-data-backup-{}-{nanos}-{sequence}",
+                std::process::id()
+            ));
+            match fs::create_dir(&candidate) {
+                Ok(()) => break candidate,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("reserve synthetic fixture directory: {error}"),
+            }
+        };
         let home = root.join("dsh");
         let backups = root.join("backups dir");
         let sessions = home.join("sessions/2026-01-01");
@@ -78,6 +93,20 @@ impl Fixture {
             .output()
             .expect("run the client CLI")
     }
+}
+
+#[test]
+fn fixtures_do_not_share_data_when_the_clock_repeats() {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let first = Fixture::with_stamp(stamp);
+    let marker = first.root.join("synthetic-owner-marker");
+    fs::write(&marker, b"first fixture").unwrap();
+    let second = Fixture::with_stamp(stamp);
+    assert_ne!(first.root, second.root);
+    assert_eq!(fs::read(marker).unwrap(), b"first fixture");
 }
 
 impl Drop for Fixture {

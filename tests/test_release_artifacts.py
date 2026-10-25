@@ -42,6 +42,27 @@ class ReleaseArtifacts(unittest.TestCase):
             refused=self.run_tool("manifest","--product","runtime","--channel","stable","--release","0.2.1","--sequence","9","--components",components,*artifacts)
             self.assertNotEqual(refused.returncode,0);self.assertEqual(refused.stdout,"")
 
+    def test_explicit_publication_targets_bind_plan_and_complete_manifest(self):
+        with tempfile.TemporaryDirectory(prefix="ocean-selected-targets-") as directory:
+            root=Path(directory)
+            archive=root/"dsh-ocean-0.3.0-rc.1-x86_64.tar.gz"
+            archive.write_bytes(b"selected-shell")
+            common=["--product","shell","--channel","next","--release","0.3.0-rc.1","--sequence","10"]
+            plan=self.run_tool("plan",*common,"--publication-target","linux-x86_64")
+            self.assertEqual(plan.returncode,0,plan.stderr)
+            self.assertEqual(json.loads(plan.stdout)["targets"],["linux-x86_64"])
+            described=self.run_tool("artifact",*common,"--target","linux-x86_64","--file",archive)
+            self.assertEqual(described.returncode,0,described.stderr)
+            item=root/"artifact.json";item.write_text(described.stdout)
+            args=["manifest",*common,"--artifact",item]
+            complete=self.run_tool(*args,"--publication-target","linux-x86_64")
+            self.assertEqual(complete.returncode,0,complete.stderr)
+            self.assertEqual(len(json.loads(complete.stdout)["artifacts"]),1)
+            self.assertNotEqual(self.run_tool(*args).returncode,0)
+            self.assertNotEqual(self.run_tool(*args,"--publication-target","linux-aarch64").returncode,0)
+            self.assertNotEqual(self.run_tool(*args,"--publication-target","linux-x86_64","--publication-target","linux-x86_64").returncode,0)
+            self.assertNotEqual(self.run_tool(*args,"--publication-target","linux-x86_64","--single-target-validation").returncode,0)
+
     def test_release_plan_validates_inputs_without_building_signing_or_publishing(self):
         result=self.run_tool("plan","--product","shell","--channel","next","--release","0.3.0","--sequence","10")
         self.assertEqual(result.returncode,0,result.stderr);plan=json.loads(result.stdout);self.assertEqual(plan["tag"],"v0.3.0");self.assertEqual(plan["targets"],["linux-aarch64","linux-x86_64"]);self.assertFalse(plan["published"])

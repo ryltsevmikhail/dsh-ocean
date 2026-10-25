@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from license_payload_fixture import ROOT, NAMES, populate
 
@@ -14,7 +15,8 @@ class ArchLicensePayload(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.srcdir = self.root / "src"
-        self.source = self.srcdir / "dsh-ocean-0.1.1"
+        version = tomllib.loads((ROOT / "Cargo.toml").read_text())["package"]["version"]
+        self.source = self.srcdir / f"dsh-ocean-{version}"
         populate(self.source)
         for relative in ("target/release/dsh-ocean", "packaging/dsh-ocean.desktop",
                          "icons/32x32.png", "icons/64x64.png", "icons/128x128.png",

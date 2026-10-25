@@ -16,7 +16,9 @@ export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data" XDG_STATE_HOME=
 export DSH_OCEAN_DATA_DIR="$TEST_ROOT/runtime"
 DSH_NODE_VERSION="$(jq -er '.node.version' "$ROOT/runtime-manifest.json")"
 DSH_NODE_SHA256="$(jq -er '.node.archives["linux-x64"].sha256' "$ROOT/runtime-manifest.json")"
-DSH_VERSION="$(jq -er '.dsh.version' "$ROOT/runtime-manifest.json")"
+# This standalone optional asset declares an exact upstream DSH compatibility
+# baseline. Testing it does not bootstrap or accept the shell's private RC host.
+DSH_VERSION="$(jq -er '.engines.dsh | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"))' "$ROOT/language-pack/package.json")"
 DSH_PNPM_VERSION="$(jq -er '.pnpm.version' "$ROOT/runtime-manifest.json")"
 export DSH_NODE_VERSION DSH_NODE_SHA256 DSH_VERSION DSH_PNPM_VERSION
 unset NODE_OPTIONS NODE_PATH DSH_OCEAN_URL DSH_INSTALL
