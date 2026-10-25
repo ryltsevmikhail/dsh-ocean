@@ -9,6 +9,15 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+## 0.1.2
+
+Production candidate under preparation; publication and platform acceptance pending.
+
+- Support built-in DSH dictionaries with the shipped `0.2.0-rc.2.ocean.2` and installed `0.2.1-rc.2` SDKs while keeping permission tied to the exact SDK and profile.
+- Resolve the actual DSH package behind the portable runtime's regular executable shim.
+- Explain the separate Ocean/DSH language settings and dictionary activation limits for an already running server.
+- Prepare Ocean for the stable channel while DSH remains independently in next.
+
 ## 0.1.2-rc.2
 
 - Pin the separately supplied local DSH 0.2.0-rc.2.ocean.2 with corrected published exports.
