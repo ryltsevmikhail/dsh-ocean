@@ -6,10 +6,10 @@
     "release": "0.1.2-rc.2",
     "sequence": 2,
     "tag": "v0.1.2-rc.2",
-    "sourceCommit": "ab7458b7411e6a2cdb057f9e46c78b7ddc14df2a",
+    "sourceCommit": "c45e72dab6a73823cc28f4478866fc20468a49b8",
     "filename": "dsh-ocean-0.1.2-rc.2-x86_64.tar.gz",
-    "sha256": "8088c9816b308c4920e2cd5b355ed08a690391db8abfc2767e61f44d11d2a946",
-    "size": 7687484
+    "sha256": "a6e2907f40813b37d9180b3622ea78add326aa03f7142ba4567802e3730dda78",
+    "size": 7687480
   },
   "runtime": {
     "product": "runtime",
