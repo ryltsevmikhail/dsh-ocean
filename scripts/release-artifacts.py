@@ -92,6 +92,17 @@ def describe(args):
     return result
 
 
+def publication_targets(args):
+    selected = getattr(args, "publication_target", None)
+    if selected is None:
+        return set(ARCHES)
+    if len(selected) != len(set(selected)):
+        raise ValueError("duplicate publication target")
+    if getattr(args, "single_target_validation", False):
+        raise ValueError("publication selection cannot use temporary runner validation")
+    return set(selected)
+
+
 def manifest(args):
     values, hashes = components(args)
     artifacts = []
@@ -116,8 +127,8 @@ def manifest(args):
         if describe(argparse.Namespace(**actual_args)) != item:
             raise ValueError("built archive bytes changed after artifact description")
         artifacts.append(item)
-    if targets != set(ARCHES) and not (args.single_target_validation and len(targets) == 1):
-        raise ValueError("publication manifest requires both native architecture artifacts")
+    if targets != publication_targets(args) and not (args.single_target_validation and len(targets) == 1):
+        raise ValueError("publication manifest requires exactly the declared native architecture artifacts")
     if not 1 <= args.valid_hours <= 720:
         raise ValueError("manifest lifetime exceeds client policy")
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
@@ -137,6 +148,8 @@ def main():
         command.add_argument("--release", required=True)
         command.add_argument("--sequence", required=True, type=int)
         command.add_argument("--components", type=Path, default=Path(__file__).resolve().parent.parent / "runtime-manifest.json")
+        if name in ["plan", "manifest"]:
+            command.add_argument("--publication-target", choices=ARCHES, action="append", help="explicit complete supported target set; defaults to both architectures")
         if name == "plan":
             command.add_argument("--source-commit")
             command.add_argument("--tag-commit")
@@ -160,7 +173,7 @@ def main():
                     raise ValueError("release tag does not resolve to the exact built source commit")
             values, _ = components(args)
             _, url = identity(args, "linux-x86_64")
-            result = {"product": args.product, "channel": args.channel, "release": args.release, "sequence": args.sequence, "tag": url.rsplit("/", 1)[0].rsplit("/", 1)[1], "targets": sorted(ARCHES), "components": values, "published": False}
+            result = {"product": args.product, "channel": args.channel, "release": args.release, "sequence": args.sequence, "tag": url.rsplit("/", 1)[0].rsplit("/", 1)[1], "targets": sorted(publication_targets(args)), "components": values, "published": False}
             if args.source_commit is not None:
                 result["sourceCommit"] = args.source_commit
         else:
