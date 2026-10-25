@@ -3,7 +3,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Component, Path, PathBuf};
-const SDK: &str = "0.2.0-rc.2";
+const SDKS: &[&str] = &["0.2.0-rc.2", "0.2.0-rc.2.ocean.2", "0.2.1-rc.2"];
 const CONTRACT: &str = "generated-cordis-root-v1";
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,7 +27,7 @@ impl Scope {
     }
     fn validate(&self) -> Result<()> {
         anyhow::ensure!(
-            self.sdk == SDK && self.contract == CONTRACT,
+            SDKS.contains(&self.sdk.as_str()) && self.contract == CONTRACT,
             "unsupported generated-profile locale contract"
         );
         anyhow::ensure!(

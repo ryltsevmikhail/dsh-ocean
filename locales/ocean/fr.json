@@ -5,6 +5,7 @@
   "language.title": "Langue",
   "language.system": "Langue du système",
   "language.restart_notice": "Le changement de langue prendra effet après le redémarrage d’Ocean.",
+  "language.dsh_notice": "Choisissez la langue de DSH dans ses paramètres. Les langues supplémentaires sont disponibles quand Ocean démarre son propre serveur DSH et que vous autorisez les dictionnaires intégrés. La connexion à un serveur déjà actif n’active pas les dictionnaires ; son propriétaire gère les langues disponibles.",
   "setup.starting": "Démarrage…",
   "setup.retry": "Réessayer",
   "setup.recover": "Restaurer le runtime…",

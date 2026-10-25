@@ -39,6 +39,11 @@ pub fn build(
     notice.set_use_markup(false);
     content.pack_start(&combo, false, false, 0);
     content.pack_start(&notice, false, false, 0);
+    let dsh_notice = gtk::Label::new(Some(tr("language.dsh_notice")));
+    dsh_notice.set_line_wrap(true);
+    dsh_notice.set_use_markup(false);
+    dsh_notice.set_max_width_chars(64);
+    content.pack_start(&dsh_notice, false, false, 0);
     (dialog, combo)
 }
 

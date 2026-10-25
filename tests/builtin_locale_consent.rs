@@ -6,6 +6,34 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 struct Fixture(PathBuf);
+#[test]
+fn shipped_and_installed_sdks_are_supported_without_transferring_exact_version_grants() {
+    let f = Fixture::new();
+    let profile = f.0.join("profiles/web");
+    let path = f.0.join("consent.json");
+    let original = Scope::new(&profile, "0.2.0-rc.2").unwrap();
+    record(&path, &original, true).unwrap();
+    for version in ["0.2.0-rc.2.ocean.2", "0.2.1-rc.2"] {
+        let scope = Scope::new(&profile, version)
+            .unwrap_or_else(|e| panic!("supported installed SDK {version} rejected: {e}"));
+        assert_eq!(load(&path, &scope).unwrap(), None);
+        record(&path, &scope, true).unwrap();
+        assert_eq!(load(&path, &scope).unwrap(), Some(true));
+        assert_eq!(load(&path, &original).unwrap(), None);
+    }
+    for version in [
+        "0.2.0",
+        "0.2.0-rc.2.ocean.3",
+        "0.2.1-rc.3",
+        "0.2.1-rc.2+unknown",
+        "0.3.0",
+    ] {
+        assert!(
+            Scope::new(&profile, version).is_err(),
+            "unreviewed SDK {version} accepted"
+        );
+    }
+}
 impl Fixture {
     fn new() -> Self {
         let p = std::env::temp_dir().join(format!(

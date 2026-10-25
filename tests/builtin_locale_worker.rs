@@ -74,8 +74,16 @@ async fn rust_metadata_worker_resolves_real_embedded_sdk_helpers_without_profile
     ));
     fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
     let tree = dsh_ocean::builtin_locale_cache::materialize(&root.join("cache")).unwrap();
+    let runtime = dsh_ocean::bootstrap::Runtime {
+        node: sdk.join("runtime/node/bin/node"),
+        dsh: sdk.join("harness/node_modules/.bin/dsh"),
+        version: "0.2.0-rc.2.ocean.2".into(),
+        install_root: Some(sdk.join("harness")),
+    };
+    let (anchor, version) = dsh_ocean::builtin_locale_planner::selected_sdk(&runtime).unwrap();
+    assert_eq!(version, runtime.version);
     let request = Request {
-        install_anchor: sdk.join("harness/node_modules/@deepseek-ai/dsh/package.json"),
+        install_anchor: anchor,
         profile_dir: root.join("dsh/profiles/web"),
         home: root.join("dsh"),
         cwd: root.clone(),
