@@ -98,6 +98,9 @@ class DebianPackaging(PackagingFixture):
         self.assertIn("Version: 0.1.0-1\n", control)
         self.assertIn("Architecture: " + ("amd64" if platform.machine() == "x86_64" else "arm64"), control)
         self.assertIn("libwebkit2gtk-4.1-0", control)
+        dependencies = next(line for line in control.splitlines() if line.startswith("Depends: "))
+        self.assertIn("curl", dependencies.split(": ", 1)[1].split(", "))
+        self.assertIn("ca-certificates", dependencies.split(": ", 1)[1].split(", "))
         self.assertIn(b"fresh-cargo-output", files["usr/bin/dsh-ocean"])
         self.assertNotIn(b"stale-should-not-ship", files["usr/bin/dsh-ocean"])
         self.assertIn(b"fixture LICENSE", files["usr/share/doc/dsh-ocean/copyright"])
@@ -115,6 +118,13 @@ class DebianPackaging(PackagingFixture):
         args = json.loads((self.root / "cargo-argv.jsonl").read_text().strip())
         self.assertIn("--locked", args)
         self.assertFalse(list(output.parent.glob(".dsh-ocean-package-*")))
+
+    def test_arch_template_declares_download_and_tls_prerequisites(self):
+        import shlex
+        template = (ROOT / "packaging/PKGBUILD").read_text()
+        declaration = next(line for line in template.splitlines() if line.startswith("depends=("))
+        dependencies = shlex.split(declaration[len("depends=("):-1])
+        self.assertTrue({"curl", "ca-certificates"}.issubset(dependencies))
 
     def test_same_inputs_reproduce_bytes_and_existing_or_racing_output_survives(self):
         first, a = self.build("one")

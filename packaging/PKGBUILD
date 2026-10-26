@@ -10,7 +10,7 @@ url="https://github.com/ryltsevmikhail/dsh-ocean"
 # Original code is MIT; mixed dependency evidence is not a blanket MIT grant.
 # Reconcile the final linked payload before publishing this packaging template.
 license=('MIT' 'LicenseRef-ThirdParty-Notices')
-depends=('gtk3' 'webkit2gtk-4.1' 'libayatana-appindicator')
+depends=('curl' 'ca-certificates' 'gtk3' 'webkit2gtk-4.1' 'libayatana-appindicator')
 makedepends=('cargo')
 options=('!lto')
 source=("$pkgname-${_source_version}.tar.gz")

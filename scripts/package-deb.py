@@ -114,7 +114,7 @@ Section: devel
 Priority: optional
 Architecture: {ARCHITECTURES[arch]}
 Maintainer: DSH Ocean contributors <noreply@example.invalid>
-Depends: libgtk-3-0, libwebkit2gtk-4.1-0, libayatana-appindicator3-1, libc6, libgcc-s1
+Depends: curl, ca-certificates, libgtk-3-0, libwebkit2gtk-4.1-0, libayatana-appindicator3-1, libc6, libgcc-s1
 Recommends: nodejs
 Installed-Size: {installed_kib}
 Description: DSH Ocean - native desktop client for DeepSeek Harness
