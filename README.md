@@ -94,6 +94,11 @@ for the per-user installer.
 
 ### Packages and platform coverage
 
+The signed first-install and update paths require the system `curl` command and
+a trusted CA certificate store. Debian packages declare `curl` and
+`ca-certificates` as dependencies; portable installations must provide both
+through their distribution package manager before downloading a runtime.
+
 Local tar, Debian and AppDir build helpers are available; see [packaging](docs/PACKAGING.md)
 and [portable installation](docs/INSTALLATION.md). Artifacts are not a promise of
 ABI portability or publisher authenticity. The Arch `PKGBUILD` is a **developer

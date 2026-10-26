@@ -1,5 +1,5 @@
 {
-  "cargo_lock_sha256": "a0b1a20aebe56e3808e14db029c68191d6651aeafc8e9a5d4b04eae56fd4b872",
+  "cargo_lock_sha256": "aa5d46afb912b8fefd8da8697bdf8c347672539c9b52f0823dc345e22aa11256",
   "metadata_command": "cargo metadata --locked --format-version 1 --filter-platform TARGET (from root, no feature overrides)",
   "packages": [
     {
@@ -32460,7 +32460,7 @@
     "aarch64-unknown-linux-gnu": [],
     "x86_64-unknown-linux-gnu": []
   },
-  "root_manifest_sha256": "da63dcce724834781b26984cf8e56ea65c68446dcfb668cdf62142992c987bbc",
+  "root_manifest_sha256": "33a31c37a9a1ba500a27089b32887dad98d2d7e3311f36bec75ce2b2aaa745fa",
   "schema_version": 1,
   "scope": [
     "Conservative default-feature Cargo source graph union, not an exact linked SBOM. Build/proc-macro edges and target predicates are recorded, not a precise host/target compilation simulation.",
