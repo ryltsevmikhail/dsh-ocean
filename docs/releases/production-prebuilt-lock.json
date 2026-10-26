@@ -2,22 +2,22 @@
   "shell": {
     "product": "shell",
     "channel": "stable",
-    "release": "0.1.4",
-    "sequence": 3,
-    "tag": "v0.1.4",
-    "sourceCommit": "c653f1a958c2cdc90741be58a9222560897cf982",
+    "release": "0.1.5",
+    "sequence": 4,
+    "tag": "v0.1.5",
+    "sourceCommit": "de57848031f7956ee87f272f79c20f721b49b8e6",
     "artifacts": [
       {
         "target": "linux-x86_64",
-        "filename": "dsh-ocean-0.1.4-x86_64.tar.gz",
-        "size": 7711383,
-        "sha256": "ebc3b894ccb0c974981dc8e3f21a274a70ab0ee522ce53a09a62e08b4756d756"
+        "filename": "dsh-ocean-0.1.5-x86_64.tar.gz",
+        "size": 7716856,
+        "sha256": "5b93c1cdb19b1fa21fc57d83a29a0074b5b06be4187dbe16bacb1fa22269a3b2"
       },
       {
         "target": "linux-aarch64",
-        "filename": "dsh-ocean-0.1.4-aarch64.tar.gz",
-        "size": 7543199,
-        "sha256": "e9249ea3b4a9e8fcb8dedf12daa9b905218d0c1c34ae038c2603f74124eaf776"
+        "filename": "dsh-ocean-0.1.5-aarch64.tar.gz",
+        "size": 7543590,
+        "sha256": "fdba791fcf8feb7ccc624c25821121fae2381afcf8396c0edd08de2ec8b29206"
       }
     ]
   },
