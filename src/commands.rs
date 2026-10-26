@@ -101,13 +101,41 @@ pub async fn start_bootstrap(
     // One-shot ownership: a second click/command cannot start a competing
     // download. The gate covers only the installer child; service preparation
     // below is a separate step, so cancellation cannot claim to stop it.
-    let Some(_gate) = app.state::<AppState>().begin_bootstrap() else {
+    let Some(gate) = app.state::<AppState>().begin_bootstrap() else {
         return Ok(app.state::<AppState>().snapshot());
     };
-    let outcome = run_bootstrap(&app).await;
+    // The task owns the entire operation, including outcome and preparation.
+    // Reloading the renderer may drop its IPC observer, never this task.
+    owned_bootstrap_task(gate, async move {
+        finish_bootstrap(&app).await;
+        app.state::<AppState>().snapshot()
+    })
+    .await
+    .map_err(|error| format!("join bootstrap completion: {error}"))
+}
+
+fn owned_bootstrap_task<T: Send + 'static>(
+    gate: crate::state::BootstrapGuard,
+    completion: impl std::future::Future<Output = T> + Send + 'static,
+) -> tauri::async_runtime::JoinHandle<T> {
+    tauri::async_runtime::spawn(async move {
+        let _gate = gate;
+        completion.await
+    })
+}
+
+async fn finish_bootstrap(app: &AppHandle) {
+    let outcome = run_bootstrap(app).await;
     match outcome {
         Ok(Outcome::Committed) => {
-            if let Err(error) = service::prepare_and_open(&app).await {
+            if app
+                .state::<AppState>()
+                .quitting
+                .load(std::sync::atomic::Ordering::SeqCst)
+            {
+                return;
+            }
+            if let Err(error) = service::prepare_and_open(app).await {
                 app.state::<AppState>().fail(format!("{error:#}"));
             }
         }
@@ -128,7 +156,6 @@ pub async fn start_bootstrap(
         }
         Err(error) => app.state::<AppState>().fail(format!("{error:#}")),
     }
-    Ok(app.state::<AppState>().snapshot())
 }
 
 /// Requests cooperative cancellation of a running runtime installation.
@@ -269,4 +296,43 @@ pub fn pairing_proxy_status(
         return None;
     }
     app.state::<crate::state::AppState>().pairing_status()
+}
+
+#[cfg(test)]
+mod bootstrap_task_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn dropped_renderer_observer_keeps_ownership_and_completion() {
+        let state = std::sync::Arc::new(AppState::default());
+        let gate = state.begin_bootstrap().unwrap();
+        let (resume, pending) = tokio::sync::oneshot::channel();
+        let (finished, completion) = tokio::sync::oneshot::channel();
+        let worker_state = state.clone();
+        let observer = owned_bootstrap_task(gate, async move {
+            pending.await.unwrap();
+            worker_state.fail("native outcome survived renderer reload");
+            finished.send(()).unwrap();
+        });
+        drop(observer);
+        assert!(state.begin_bootstrap().is_none());
+        resume.send(()).unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), completion)
+            .await
+            .unwrap()
+            .unwrap();
+        // The callback sends before its gate is dropped; wait for the actual end.
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while state.bootstrap_running() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            state.snapshot().message.as_deref(),
+            Some("native outcome survived renderer reload")
+        );
+        assert!(state.begin_bootstrap().is_some());
+    }
 }

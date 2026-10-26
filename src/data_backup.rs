@@ -3,10 +3,10 @@
 //! The profile-config engine deliberately backs up only the web profile. Sessions
 //! and shared stores are much larger and contain conversation/log data, so they
 //! get their own explicit snapshot format with their own limits and scope, and
-//! **no restore**: restoring live session data while DSH runs is a different and
-//! riskier operation that stays unimplemented.
+//! explicit offline restore: `--restore-data SNAPSHOT --confirm-offline`.
+//! Restore requires independently stopping all writers and retains previous roots.
 //!
-//! Everything here is read-only with respect to the source tree: the same
+//! Snapshot creation is read-only with respect to the source tree: the same
 //! no-follow, bounded, checksum-verified primitives used for profile snapshots.
 use std::collections::BTreeMap;
 use std::fs::{self, File};

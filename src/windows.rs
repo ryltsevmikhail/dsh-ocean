@@ -12,6 +12,30 @@ const MIN_ZOOM: f64 = 0.2;
 const MAX_ZOOM: f64 = 10.0;
 const ZOOM_STEP: f64 = 0.2;
 
+/// Native window chrome remains available when the server page or tray is absent.
+pub fn install_app_menu(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem, Submenu};
+    let quit = MenuItem::with_id(
+        app,
+        "ocean-window-quit",
+        crate::tray::Action::Quit.label_for(crate::i18n::active_language()),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
+    let application = Submenu::with_items(app, "Ocean", true, &[&quit])?;
+    app.set_menu(Menu::with_items(app, &[&application])?)?;
+    app.on_menu_event(|app, event| {
+        if event.id().as_ref() == "ocean-window-quit" {
+            app.state::<AppState>()
+                .quitting
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            // ExitRequested owns cancellation and waits for installer cleanup.
+            app.exit(0);
+        }
+    });
+    Ok(())
+}
+
 /// Auxiliary windows keep their existing hide-only behavior. Closing a primary
 /// window quits only when the user explicitly disables close-to-tray.
 pub fn close_exits_app(label: &str, close_to_tray: Option<bool>) -> bool {

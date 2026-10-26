@@ -2,6 +2,14 @@
 
 For installation and project status, see the [README](../README.md).
 
+## Quit the application
+
+Choose **Ocean → Quit DSH Ocean** in the window menu, or press **Ctrl+Q**
+(**Cmd+Q** on macOS). The command is translated into Ocean's selected language
+and remains available without a system tray. Closing the window still follows
+the close-to-tray preference. Quitting waits for active installer cleanup; it
+does not interrupt a transaction while it is committing.
+
 ## Runtime maintenance
 
 The installed client can report, collect and roll back its private runtime

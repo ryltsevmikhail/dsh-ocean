@@ -239,8 +239,9 @@
       let busy = false;
       let recoveryRequired = false;
       let recoveryBlocked = true;
-      // True while start_bootstrap is in flight in this webview.
+      // This page's pending IPC; native ownership comes from lastState.
       let installing = false;
+      const nativeOperationRunning = () => Boolean(lastState && (lastState.installing || lastState.updating || lastState.phase === 'preparing'));
 
       function setPhase(phase, message) {
         const labels = { idle: t('setup.phase.idle', 'Waiting'), preparing: t('setup.phase.preparing', 'Starting'), ready: t('setup.phase.ready', 'Ready'), failed: t('setup.phase.failed', 'Needs attention') };
@@ -302,9 +303,9 @@
             : t('setup.recovery_text', 'Choose Recover runtime to review the pending transaction and confirm restoration of the previous runtime. Ordinary startup stays blocked until recovery succeeds. If inspection fails, save diagnostics.');
         }
         el("install").classList.toggle("hidden", recoveryRequired || !canInstall || state.phase === "ready" || state.phase === "preparing");
-        el("retry").disabled = busy;
+        el("retry").disabled = busy || nativeOperationRunning();
         const installingNow = Boolean(state.installing);
-        el("install").disabled = busy || installingNow;
+        el("install").disabled = busy || installing || nativeOperationRunning();
         el("cancel-install").classList.toggle("hidden", !installingNow);
         el("cancel-install").disabled = !installingNow || Boolean(state.cancelRequested);
         el("cancel-install").textContent = state.cancelRequested
@@ -319,7 +320,7 @@
         el("diagnostics").disabled = busy;
         el("folder").disabled = busy;
 
-        if (state.phase === "idle" && !autoStarted && !recoveryRequired) {
+        if (state.phase === "idle" && !autoStarted && !recoveryRequired && !nativeOperationRunning()) {
           autoStarted = true;
           setTimeout(() => runPrepare(), 350);
         }
@@ -375,7 +376,7 @@
       }
 
       async function runPrepare() {
-        if (busy || recoveryRequired) return;
+        if (busy || recoveryRequired || nativeOperationRunning()) return;
         busy = true;
         try {
           await invoke("prepare_service");
@@ -390,7 +391,7 @@
       async function runInstall() {
         // Deliberately not the shared `busy` flag: the cancel control must stay
         // usable while start_bootstrap is still awaiting the installer.
-        if (installing || recoveryRequired) return;
+        if (installing || recoveryRequired || nativeOperationRunning()) return;
         installing = true;
         el("install").disabled = true;
         el("retry").disabled = true;
@@ -405,7 +406,7 @@
       }
 
       async function runCancelInstall() {
-        if (!installing) return;
+        if (!lastState?.installing || lastState.cancelRequested) return;
         el("cancel-install").disabled = true;
         try {
           const accepted = await invoke("cancel_bootstrap");
