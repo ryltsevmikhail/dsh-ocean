@@ -286,3 +286,34 @@ pub fn verify(
         key_id: trust.id().to_owned(),
     })
 }
+
+/// Proof reserved for the compiled immutable first-install identity.
+pub(crate) struct ImmutableBootstrap {
+    verified: Verified,
+}
+impl ImmutableBootstrap {
+    pub(crate) fn verified(&self) -> &Verified {
+        &self.verified
+    }
+}
+pub(crate) fn verify_immutable_bootstrap(
+    bytes: &[u8],
+    signature: &[u8],
+) -> Result<ImmutableBootstrap> {
+    let (manifest, key_id) = crate::runtime_install::authenticated_bootstrap(bytes, signature)?;
+    let native = crate::update_feed::native_target()?;
+    let artifact = manifest
+        .artifacts
+        .iter()
+        .find(|a| a.target == native)
+        .context("native bootstrap archive missing")?
+        .clone();
+    Ok(ImmutableBootstrap {
+        verified: Verified {
+            manifest,
+            artifact,
+            digest: release_feed::hex(&Sha256::digest(bytes)),
+            key_id,
+        },
+    })
+}

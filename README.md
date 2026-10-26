@@ -27,8 +27,10 @@ names and marks belong to their respective owners.
 
 - **Use an existing server or start one:** attach to local DSH, use a generated
   `systemd --user` service, or fall back to an owned child on a temporary loopback port.
-- **Set up a private runtime:** explicitly install Node.js, DSH and pnpm under
-  `~/.local/share/dsh-ocean`, without replacing system Node.js.
+- **Set up a private runtime:** explicitly install the publisher-built, signed
+  DSH runtime under `~/.local/share/dsh-ocean`, without replacing system Node.js.
+  Linux x86_64 and ARM64 first installation verifies the pinned `next` runtime
+  before native checks and selection; it does not install the custom SDK from npm.
 - **Integrate with the desktop:** tray controls, single-instance activation, zoom,
   native save dialogs and optional desktop notifications.
 - **Keep credentials scoped:** exchange the launch token for the server's HttpOnly

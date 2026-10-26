@@ -34,6 +34,30 @@ pub fn check(
     release: &crate::runtime_feed::Verified,
     control: Arc<Control>,
 ) -> Result<Health> {
+    check_authorized(prepared, release, control, || {
+        fresh(
+            &release.manifest().published_at,
+            &release.manifest().expires_at,
+            chrono::Utc::now(),
+        )
+    })
+}
+
+// Only the sealed, exact compiled bootstrap proof authorizes timeless health.
+// There is intentionally no public expiry flag or Verified -> proof conversion.
+pub(crate) fn check_immutable_bootstrap(
+    prepared: &crate::runtime_bundle::Prepared,
+    proof: &crate::runtime_feed::ImmutableBootstrap,
+    control: Arc<Control>,
+) -> Result<Health> {
+    check_authorized(prepared, proof.verified(), control, || Ok(()))
+}
+fn check_authorized(
+    prepared: &crate::runtime_bundle::Prepared,
+    release: &crate::runtime_feed::Verified,
+    control: Arc<Control>,
+    authority: impl Fn() -> Result<()>,
+) -> Result<Health> {
     use std::io::Read;
     use std::os::unix::fs::OpenOptionsExt;
     control.phase(crate::update_control::Phase::Verifying, None)?;
@@ -41,11 +65,7 @@ pub fn check(
         release.artifact().target == crate::update_feed::native_target()?,
         "cannot execute a foreign-architecture runtime"
     );
-    fresh(
-        &release.manifest().published_at,
-        &release.manifest().expires_at,
-        chrono::Utc::now(),
-    )?;
+    authority()?;
     prepared.verify(release)?;
     let node = prepared.root().join("runtime/node/bin/node");
     let mut file = std::fs::OpenOptions::new()
@@ -105,11 +125,7 @@ pub fn check(
     }
     run(&mut command, control.clone(), Duration::from_secs(95))?;
     control.check()?;
-    fresh(
-        &release.manifest().published_at,
-        &release.manifest().expires_at,
-        chrono::Utc::now(),
-    )?;
+    authority()?;
     prepared.verify(release)?;
     Ok(Health {
         generation: prepared.root().into(),

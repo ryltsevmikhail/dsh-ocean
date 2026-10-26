@@ -59,6 +59,7 @@ pub mod runtime_cli;
 pub mod runtime_controller;
 pub mod runtime_feed;
 pub mod runtime_health;
+pub mod runtime_install;
 pub mod runtime_lifecycle;
 pub mod runtime_maintenance;
 pub mod runtime_snapshot;

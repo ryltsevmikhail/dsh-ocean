@@ -140,6 +140,13 @@ pub fn health_script() -> &'static str {
 /// Resolve one immutable generation. With no selector, retain legacy layout
 /// support. Broken/untrusted selectors are errors, never a silent legacy fallback.
 pub fn selected_private_root(data: &Path) -> Result<PathBuf> {
+    match fs::symlink_metadata(crate::runtime_install::pending_path(data)) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(error).context("inspect first-install recovery gate"),
+        Ok(_) => {
+            anyhow::bail!("incomplete first installation; retry installation before starting DSH")
+        }
+    }
     let current = data.join("current");
     match fs::symlink_metadata(&current) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(data.to_path_buf()),
@@ -371,6 +378,13 @@ pub fn detect() -> Option<Runtime> {
 
 /// Detects the runtime, giving a version probe at most `limit` before refusing.
 pub fn detect_within(limit: std::time::Duration) -> Option<Runtime> {
+    // No fallback (including environment/PATH) may execute a half-committed
+    // first installation. Retry installation performs narrow journal recovery.
+    if !matches!(fs::symlink_metadata(crate::runtime_install::pending_path(&config::data_dir())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+    {
+        return None;
+    }
     // Resolve current exactly once, so Node and DSH cannot straddle a switch.
     let root = selected_private_root(&config::data_dir()).ok();
     let dsh = find_dsh_at(root.as_deref())?;
@@ -433,6 +447,25 @@ pub fn npm_path(runtime: &Runtime) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn incomplete_first_install_blocks_private_selection_even_for_dangling_journal() {
+        let path = std::env::temp_dir().join(format!(
+            "ocean-install-gate-{}-{}",
+            std::process::id(),
+            crate::downloads::unique_id()
+        ));
+        fs::create_dir(&path).unwrap();
+        assert_eq!(selected_private_root(&path).unwrap(), path);
+        let journal = crate::runtime_install::pending_path(&path);
+        fs::write(&journal, b"corrupt").unwrap();
+        assert!(selected_private_root(&path).is_err());
+        fs::remove_file(&journal).unwrap();
+        std::os::unix::fs::symlink("absent", &journal).unwrap();
+        assert!(selected_private_root(&path).is_err());
+        assert!(crate::runtime_switch::ensure_no_pending(&path).is_err());
+        fs::remove_dir_all(path).unwrap();
+    }
 
     #[test]
     fn rejects_invalid_manifest_fields() {

@@ -92,6 +92,13 @@ pub fn command(mode: Mode, prefix: &Path) -> Command {
 
 /// Runs one maintenance mode and returns the installer's exit status.
 pub fn run(mode: Mode) -> Result<i32> {
+    match std::fs::symlink_metadata(crate::runtime_install::pending_path(&prefix())) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(error).context("inspect first-install recovery gate"),
+        Ok(_) => {
+            anyhow::bail!("incomplete first installation; retry installation before maintenance")
+        }
+    }
     if mode != Mode::Check {
         crate::runtime_switch::ensure_no_pending(&prefix())?;
     }
