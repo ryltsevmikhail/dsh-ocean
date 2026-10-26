@@ -16,9 +16,9 @@ class Guards(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         self.commit='a'*40
-        self.lock=dict(product='shell',channel='stable',release='0.1.4',sequence=3,tag='v0.1.4',sourceCommit=self.commit,artifacts=[])
+        self.lock=dict(product='shell',channel='stable',release='0.1.5',sequence=4,tag='v0.1.5',sourceCommit=self.commit,artifacts=[])
         for arch in ('x86_64','aarch64'):
-            name=f'dsh-ocean-0.1.4-{arch}.tar.gz'; data=arch.encode();(self.root/name).write_bytes(data)
+            name=f'dsh-ocean-0.1.5-{arch}.tar.gz'; data=arch.encode();(self.root/name).write_bytes(data)
             self.lock['artifacts'].append(dict(target='linux-'+arch,filename=name,size=len(data),sha256=hashlib.sha256(data).hexdigest()))
     def validate(self,lock=None,commit=None):m.validate(lock or self.lock,self.root,commit or self.commit)
     def test_accepted(self):self.validate()
@@ -46,10 +46,10 @@ class Guards(unittest.TestCase):
         self.lock['artifacts'][0]['filename']='../archive.tar.gz'
         with self.assertRaises(ValueError):self.validate()
     def test_release_selection_rejects_published_duplicate_missing(self):
-        valid=dict(tag_name='v0.1.4',draft=True,id=1)
-        self.assertEqual(m.select_release([[valid]],'v0.1.4')['id'],1)
+        valid=dict(tag_name='v0.1.5',draft=True,id=1)
+        self.assertEqual(m.select_release([[valid]],'v0.1.5')['id'],1)
         for pages in ([],[[dict(valid,draft=False)]],[[valid,valid]]):
-            with self.assertRaises(ValueError):m.select_release(pages,'v0.1.4')
+            with self.assertRaises(ValueError):m.select_release(pages,'v0.1.5')
     def test_asset_identity_requires_unique(self):
         for assets in ([],[dict(name='a',id=1),dict(name='a',id=2)]):
             with self.assertRaises(ValueError):m.asset(dict(assets=assets),'a')
