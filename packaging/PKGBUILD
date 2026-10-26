@@ -1,8 +1,8 @@
 # Maintainer: DSH Ocean contributors
 pkgname=dsh-ocean
 # makepkg pkgver excludes hyphens; source archives retain Cargo SemVer.
-_source_version=0.1.3
-pkgver=0.1.3
+_source_version=0.1.4
+pkgver=0.1.4
 pkgrel=1
 pkgdesc="DSH Ocean — native desktop client for the DeepSeek Harness web UI"
 arch=('x86_64' 'aarch64')

@@ -9,6 +9,11 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+## 0.1.4
+
+- Declare curl and trusted CA certificates for signed runtime downloads in Debian and Arch packaging.
+- Document portable installation download prerequisites.
+
 ## 0.1.3
 
 Production candidate under preparation; publication and new native acceptance pending.
