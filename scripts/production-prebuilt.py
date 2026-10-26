@@ -27,7 +27,7 @@ def select_release(pages, tag):
 def validate(lock, directory, commit):
     if not re.fullmatch(r'[a-f0-9]{40}', lock['sourceCommit']) or commit != lock['sourceCommit']:
         raise ValueError('tag must identify reviewed build source')
-    expected = {'shell': ('stable', '0.1.2', 1, 'v0.1.2'), 'runtime': ('next', '0.2.0-rc.2.ocean.2', 2, 'runtime-next-v0.2.0-rc.2.ocean.2-r2')}
+    expected = {'shell': ('stable', '0.1.3', 2, 'v0.1.3'), 'runtime': ('next', '0.2.0-rc.2.ocean.2', 2, 'runtime-next-v0.2.0-rc.2.ocean.2-r2')}
     if lock['product'] not in expected or tuple(lock[k] for k in ('channel','release','sequence','tag')) != expected[lock['product']]:
         raise ValueError('unreviewed release identity')
     if sorted(x['target'] for x in lock['artifacts']) != ['linux-aarch64','linux-x86_64']:
