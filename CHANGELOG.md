@@ -9,6 +9,13 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+## 0.1.5
+
+- Add a translated Ocean window menu with Quit and Ctrl+Q, available without a tray.
+- Keep runtime installation cancellation and completion working after setup window reload.
+- Keep the native installation owner through server preparation and avoid preparation after Quit.
+- Explain explicit offline data restore in backup help and localized snapshot receipts.
+
 ## 0.1.4
 
 - Declare curl and trusted CA certificates for signed runtime downloads in Debian and Arch packaging.
