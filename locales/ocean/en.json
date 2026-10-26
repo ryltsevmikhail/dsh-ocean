@@ -176,7 +176,7 @@
   "backup.failed_title": "Profile backup failed",
   "data_snapshot.title": "DSH Ocean data snapshot",
   "data_snapshot.confirm": "Copy sessions and shared stores into a new snapshot?\n\nSessions: {session_files} file(s), {session_bytes} bytes\nShared stores: {storage_files} file(s), {storage_bytes} bytes\nTotal to copy: {total} bytes\n\nThe copies go to the configured backup folder and can be several gigabytes; make sure that folder has free space. The live data is only read, never moved or deleted, and DSH may keep writing while the copy runs, so this is a point-in-time best-effort copy rather than a frozen one.\n\nRestoring a snapshot is an explicit offline command and is not offered here.",
-  "data_snapshot.result": "Snapshot created: {files} file(s), {bytes} bytes.\n\nVerify it with `dsh-ocean --verify-data-backup <snapshot>`; the snapshot may contain conversation content, so keep the backup folder private.",
+  "data_snapshot.result": "Snapshot created: {files} file(s), {bytes} bytes.\n\nVerify it with `dsh-ocean --verify-data-backup <snapshot>`; the snapshot may contain conversation content, so keep the backup folder private.\n\nOffline restore: `dsh-ocean --restore-data <snapshot> --confirm-offline`. Stop all writers first; previous roots are retained. Restore does not migrate data schemas.",
   "data_snapshot.inconsistent": "Note: sessions or stores changed while the copy ran, so this is a best-effort point-in-time copy. Stop DSH writers for a frozen snapshot.",
   "data_snapshot.failure": "The snapshot could not be created. Existing snapshots and live data were not changed.",
   "data_snapshot.cancelled": "The snapshot was cancelled. Live data was not changed; an incomplete staging copy was removed.",

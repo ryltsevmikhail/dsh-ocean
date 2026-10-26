@@ -184,3 +184,24 @@ test('pending installer and cancellation do not block state polling', async () =
   assert.equal(cancel.classList.contains('hidden'), true);
   assert.equal(f.timers.size, 1);
 });
+
+test('reloaded page can cancel an installer started by the previous page', async () => {
+  const f = fixture();
+  Object.assign(f.state, { phase: 'idle', installing: true, updating: true, canInstall: false });
+  await f.respond();
+  assert.equal(f.elements.get('cancel-install').disabled, false);
+  f.elements.get('cancel-install').click();
+  await settle();
+  assert.equal(f.calls.filter(x => x === 'cancel_bootstrap').length, 1);
+});
+
+test('reloaded page does not prepare or duplicate installation while native operation runs', async () => {
+  const f = fixture();
+  Object.assign(f.state, { phase: 'idle', installing: true, updating: true, canInstall: false });
+  await f.respond();
+  f.elements.get('install').click();
+  f.elements.get('retry').click();
+  await f.tick();
+  assert.equal(f.calls.includes('prepare_service'), false);
+  assert.equal(f.calls.includes('start_bootstrap'), false);
+});

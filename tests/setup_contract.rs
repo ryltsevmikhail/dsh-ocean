@@ -298,4 +298,33 @@ fn setup_page_calls_the_documented_commands_and_keeps_cancel_reachable() {
             "missing {expected}: {commands}"
         );
     }
+    // A new document has no page-local installer promise. Native ownership
+    // survives the real WebKit reload through the mocked IPC boundary.
+    manager.add_script(&UserScript::new(
+        "window.__state.installing=true; window.__state.updating=true;",
+        UserContentInjectedFrames::TopFrame,
+        UserScriptInjectionTime::Start,
+        &[],
+        &[],
+    ));
+    loaded.set(false);
+    view.reload();
+    pump(&loaded, "reloaded setup page");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let ready = evaluate(&view, "String(!document.getElementById('cancel-install').disabled && !document.getElementById('cancel-install').classList.contains('hidden'))");
+        if ready == "true" {
+            break;
+        }
+        assert!(Instant::now() < deadline, "cancel unavailable after reload");
+        pump_once();
+    }
+    evaluate(
+        &view,
+        "document.getElementById('cancel-install').click(); 'cancel'",
+    );
+    let calls = evaluate(&view, "JSON.stringify(window.__calls.map(c=>c.command))");
+    assert!(calls.contains("cancel_bootstrap"), "{calls}");
+    assert!(!calls.contains("start_bootstrap"), "{calls}");
+    assert!(!calls.contains("prepare_service"), "{calls}");
 }

@@ -176,7 +176,7 @@
   "backup.failed_title": "프로필 백업 실패",
   "data_snapshot.title": "DSH Ocean 데이터 스냅샷",
   "data_snapshot.confirm": "세션과 공유 저장소를 새 스냅샷으로 복사하시겠습니까?\n\n세션: 파일 {session_files}개, {session_bytes}바이트\n공유 저장소: 파일 {storage_files}개, {storage_bytes}바이트\n복사할 총 용량: {total}바이트\n\n복사본은 설정된 백업 폴더에 저장되며 수 기가바이트에 이를 수 있습니다. 해당 폴더에 여유 공간이 충분한지 확인하세요. 사용 중인 데이터는 읽기만 하며 이동하거나 삭제하지 않습니다. 복사 중에도 DSH가 계속 기록할 수 있으므로, 이는 가능한 범위에서 최선을 다해 만드는 특정 시점의 복사본이며 변경이 중지된 상태의 복사본은 아닙니다.\n\n스냅샷 복원은 DSH를 중지한 오프라인 상태에서 명시적인 명령으로 실행해야 하며 여기에서는 제공되지 않습니다.",
-  "data_snapshot.result": "스냅샷 생성 완료: 파일 {files}개, {bytes}바이트.\n\n`dsh-ocean --verify-data-backup <snapshot>` 명령으로 검증하세요. 스냅샷에 대화 내용이 포함될 수 있으므로 백업 폴더를 비공개로 유지하세요.",
+  "data_snapshot.result": "스냅샷 생성 완료: 파일 {files}개, {bytes}바이트.\n\n`dsh-ocean --verify-data-backup <snapshot>` 명령으로 검증하세요. 스냅샷에 대화 내용이 포함될 수 있으므로 백업 폴더를 비공개로 유지하세요.\n\n오프라인 복원: `dsh-ocean --restore-data <snapshot> --confirm-offline`. 먼저 모든 쓰기 프로세스를 중지하세요. 이전 디렉터리는 보존됩니다. 데이터 스키마는 마이그레이션되지 않습니다.",
   "data_snapshot.inconsistent": "참고: 복사 중에 세션이나 저장소가 변경되었으므로, 이는 가능한 범위에서 최선을 다해 만든 특정 시점의 복사본입니다. 변경이 중지된 상태의 스냅샷을 만들려면 DSH 데이터를 기록하는 프로세스를 중지하세요.",
   "data_snapshot.failure": "스냅샷을 생성하지 못했습니다. 기존 스냅샷과 사용 중인 데이터는 변경되지 않았습니다.",
   "data_snapshot.cancelled": "스냅샷이 취소되었습니다. 사용 중인 데이터는 변경되지 않았으며, 불완전한 임시 복사본은 제거되었습니다.",

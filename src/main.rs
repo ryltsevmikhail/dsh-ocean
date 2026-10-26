@@ -52,6 +52,7 @@ fn main() {
                 }
             };
             let _ = dsh_ocean::i18n::initialize(language);
+            windows::install_app_menu(app)?;
             dsh_ocean::notification_ui::initialize(app.handle());
             match tray::install(app) {
                 Ok(tray) => app.state::<state::AppState>().set_tray(tray),
@@ -332,7 +333,7 @@ fn handle_cli() -> bool {
                    --verify-profile-backup SNAPSHOT  verify snapshot integrity\n  \
                    --list-profile-backups  read-only snapshot inventory (manifests only)\n  \
                    --prune-profile-backups --keep N [--profile NAME] --confirm-prune  delete older snapshots\n  \
-                   --backup-data [DIR]  snapshot sessions and shared stores (no restore yet)\n  \
+                   --backup-data [DIR]  snapshot sessions and shared stores (offline restore available)\n  \
                    --verify-data-backup SNAPSHOT  verify a whole-data snapshot\n  \
                    --list-data-backups [DIR]  list whole-data snapshots (metadata only)\n  \
                    --export-backup SNAPSHOT DEST.tar  export a verified snapshot as one tar\n  \
