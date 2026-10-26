@@ -280,3 +280,37 @@ dsh-web.service`); keep the pre-change unit so revoking is one copy away. Ocean
 itself never restarts the service, edits the installed unit or opens a port. This
 prepares a browser URL only; this command does not pair a device or establish
 trust by itself.
+
+
+## First DSH setup in Ocean 0.1.3
+
+The setup window installs the complete publisher-built runtime for Linux x86_64
+or ARM64. It requires HTTPS access to GitHub and system `curl`, but no preinstalled
+Node.js, npm or pnpm. The bundled public runtime key authenticates the metadata;
+release `0.2.0-rc.2.ocean.2`, channel `next`, sequence 2 and the reviewed architecture
+hashes/components are pinned by this Ocean version. A downloaded public key is
+never used as authority. The custom version is not requested from npm.
+
+Before selection, Ocean imports and checks the complete archive and runs native
+checks with isolated synthetic state. Cancellation remains available during this
+preparation. The commit boundary rejects late cancellation; interruption during
+commit leaves a journal that blocks normal starts and maintenance. Retrying setup
+recovers only its own incomplete selection, retains accepted sequence floors and
+checks the signed candidate again. An unknown selector or corrupt journal fails
+closed and requires investigation. Existing runtimes and running servers are not
+replaced by this first-install operation.
+
+After installation, the normal server setup and native localization consent apply.
+A server-start error does not mean the already verified runtime was removed.
+Bootstrap trust is bundled solely for this exact installation and does not enroll
+or replace operator updater settings. Shell remains `stable`; this DSH is `next`.
+
+First installation uses an immutable bootstrap contract embedded in this Ocean
+version: the existing runtime signature, exact metadata digest, release, sequence,
+components and both archive hashes must all match. Its reviewed bytes remain
+installable after the metadata's updater expiration date; this is an explicit
+bootstrap policy, not an expiry-error fallback. Changing any metadata or payload
+requires a newly reviewed Ocean release. GitHub assets must remain available.
+Ordinary runtime updates still enforce signature freshness, the system clock,
+sequence floors and manifest anti-equivocation. First installation never relaxes
+those updater checks or changes operator trust settings.

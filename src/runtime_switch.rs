@@ -15,6 +15,13 @@ pub struct Paths {
 }
 /// Ordinary local starts/restarts refuse any pending entry, including corrupt or dangling.
 pub fn ensure_no_pending(prefix: &Path) -> Result<()> {
+    match fs::symlink_metadata(crate::runtime_install::pending_path(prefix)) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(error).context("inspect first-install recovery gate"),
+        Ok(_) => anyhow::bail!(
+            "incomplete first installation; retry installation before runtime changes"
+        ),
+    }
     match fs::symlink_metadata(prefix.join(".runtime-pending.json")) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error).context("inspect runtime recovery gate"),

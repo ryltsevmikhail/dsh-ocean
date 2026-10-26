@@ -770,3 +770,61 @@ fn runtime_accept_requires_explicit_confirmation() {
     assert!(!f.run(&args).status.success());
     assert!(!f.root.join("state").exists());
 }
+
+#[test]
+fn retained_payload_inventory_and_receipt_cannot_be_rewritten_together() {
+    use sha2::{Digest, Sha256};
+    let mut f = Fixture::new();
+    f.bundle(None);
+    let output = f.import();
+    assert!(output.status.success(), "{}", describe(&output));
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let root = PathBuf::from(value["generation"].as_str().unwrap());
+    let verified = dsh_ocean::runtime_feed::verify(
+        &fs::read(f.root.join("manifest.json")).unwrap(),
+        &fs::read(f.root.join("signature.json")).unwrap(),
+        &dsh_ocean::release_feed::TrustedKey::from_json(
+            &fs::read(f.root.join("key.json")).unwrap(),
+        )
+        .unwrap(),
+        &dsh_ocean::release_feed::Policy {
+            channel: dsh_ocean::release_feed::Channel::Stable,
+            target: dsh_ocean::release_feed::Target::LinuxX86_64,
+            kind: dsh_ocean::release_feed::Kind::TarGz,
+            minimum_sequence: 1,
+            current_release: semver::Version::parse("0.2.0").unwrap(),
+            now: Utc::now(),
+        },
+    )
+    .unwrap();
+    let prepared = dsh_ocean::runtime_bundle::import(
+        &f.root.join("bundle.tar.gz"),
+        &verified,
+        &f.root.join("runtime-prefix"),
+    )
+    .unwrap();
+    let name = "harness/node_modules/native-addon/native.node";
+    let payload = b"coherently tampered payload";
+    fs::write(root.join(name), payload).unwrap();
+    let inventory_path = root.join(".ocean-runtime-files.json");
+    let mut inventory: Value = serde_json::from_slice(&fs::read(&inventory_path).unwrap()).unwrap();
+    inventory["files"][name]["size"] = json!(payload.len());
+    inventory["files"][name]["sha256"] = json!(hex(&Sha256::digest(payload)));
+    let inventory = serde_json::to_vec(&inventory).unwrap();
+    fs::write(&inventory_path, &inventory).unwrap();
+    let receipt_path = root.join(".ocean-runtime.json");
+    let mut receipt: Value = serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
+    receipt["filesSha256"] = json!(hex(&Sha256::digest(&inventory)));
+    receipt["filesSize"] = json!(inventory.len());
+    fs::write(receipt_path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+    assert!(
+        prepared.verify(&verified).is_err(),
+        "post-import three-way tampering must fail against in-memory authenticated expectation"
+    );
+    drop(prepared);
+    assert!(
+        !f.import().status.success(),
+        "self-consistent untrusted retained inventory must not authorize payload"
+    );
+    assert_eq!(fs::read(root.join(name)).unwrap(), payload);
+}
