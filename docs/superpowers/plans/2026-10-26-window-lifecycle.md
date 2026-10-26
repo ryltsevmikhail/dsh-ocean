@@ -37,5 +37,10 @@ Ledger:
   diff with no Important/Critical findings; no product changes after review.
   Review limit: source only, native menu/accelerator not exercised interactively.
 - Deferred verification: ARM64 build/execution, packaged install/upgrade/rollback,
-  actual native menu activation and live first-install reload. No new release
+  live first-install reload and main-window menu activation. No new release
   identity or publication was created; this is a checked source slice.
+
+- Additional x86_64 actual application test: mapped setup window in private Xvfb;
+  injected Ctrl+Q exited the actual debug binary normally (code 0). No active
+  installer; invalid remote origin refused startup. Receipt: evidence/
+  window-quit-native.json in the parent preparation directory.
