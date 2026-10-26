@@ -1,0 +1,103 @@
+name: checked production prebuilt
+
+# Accepted Linux x86_64 and aarch64 bytes only. Never bootstrap unpublished npm
+# packages, rebuild the accepted archives, alter trust or activate a server.
+on:
+  workflow_dispatch:
+    inputs:
+      product:
+        type: choice
+        options: [shell, runtime]
+        required: true
+      dry_run:
+        description: Validate staged bytes only; do not sign or upload
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-production-operation
+  cancel-in-progress: false
+
+jobs:
+  checked-prebuilt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: release-${{ inputs.product }}
+    permissions:
+      contents: write
+    env:
+      PRODUCT: ${{ inputs.product }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Validate publisher guard tests
+        run: |
+          python3 -B tests/test_production_prebuilt.py
+          python3 -B tests/test_release_operation_lock.py
+      - name: Acquire shared production operation lock
+        if: ${{ !inputs.dry_run }}
+        run: python3 -B scripts/release-operation-lock.py acquire
+      - name: Download exact reviewed inputs from the unpublished draft
+        run: |
+          set -euo pipefail
+          python3 -B scripts/production-prebuilt.py prepare
+      - name: Require recorded native and notice review before signing
+        if: ${{ !inputs.dry_run }}
+        env:
+          RELEASE_CLEARANCE: ${{ vars.OCEAN_RELEASE_CLEARANCE }}
+        run: test "$RELEASE_CLEARANCE" = owner-reviewed-native-and-license-clearance
+      - name: Install independent verifier dependencies
+        if: ${{ !inputs.dry_run }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev pkg-config
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        if: ${{ !inputs.dry_run }}
+        with:
+          toolchain: 1.90.0
+      - name: Compile independent verifier from the accepted product source
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          commit="$(jq -er .sourceCommit "$RUNNER_TEMP/lock.json")"
+          git cat-file -e "$commit^{commit}" || git fetch --no-tags origin "$commit"
+          git worktree add --detach "$RUNNER_TEMP/verifier-source" "$commit"
+          cd "$RUNNER_TEMP/verifier-source"
+          cargo build --locked --bin dsh-ocean
+      - name: Sign shell with the existing protected shell key
+        if: ${{ !inputs.dry_run && inputs.product == 'shell' }}
+        env:
+          OCEAN_RELEASE_DRAFT_APPROVED: "yes"
+          OCEAN_RELEASE_SIGNING_KEY_PEM: ${{ secrets.OCEAN_SHELL_SIGNING_KEY_PEM }}
+          OCEAN_RELEASE_KEY_ID: ${{ vars.OCEAN_SHELL_KEY_ID }}
+          OCEAN_RELEASE_PUBLIC_KEY_SHA256: ${{ vars.OCEAN_SHELL_PUBLIC_KEY_SHA256 }}
+        run: node scripts/sign-publisher-release.mjs --manifest "$RUNNER_TEMP/manifest.json" --product shell --mode publisher --output-dir "$RUNNER_TEMP/signature"
+      - name: Sign runtime with the existing protected runtime key
+        if: ${{ !inputs.dry_run && inputs.product == 'runtime' }}
+        env:
+          OCEAN_RELEASE_DRAFT_APPROVED: "yes"
+          OCEAN_RELEASE_SIGNING_KEY_PEM: ${{ secrets.OCEAN_RUNTIME_SIGNING_KEY_PEM }}
+          OCEAN_RELEASE_KEY_ID: ${{ vars.OCEAN_RUNTIME_KEY_ID }}
+          OCEAN_RELEASE_PUBLIC_KEY_SHA256: ${{ vars.OCEAN_RUNTIME_PUBLIC_KEY_SHA256 }}
+        run: node scripts/sign-publisher-release.mjs --manifest "$RUNNER_TEMP/manifest.json" --product runtime --mode publisher --output-dir "$RUNNER_TEMP/signature"
+      - name: Independently verify signature, policy and full accepted archive
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          sequence="$(jq -er .sequence "$RUNNER_TEMP/lock.json")"
+          export HOME="$RUNNER_TEMP/verify-home" DSH_HOME="$RUNNER_TEMP/verify-home/dsh" XDG_CONFIG_HOME="$RUNNER_TEMP/verify-home/config" XDG_STATE_HOME="$RUNNER_TEMP/verify-home/state" XDG_CACHE_HOME="$RUNNER_TEMP/verify-home/cache"
+          mkdir -m 700 "$HOME"
+          verifier="$RUNNER_TEMP/verifier-source/target/debug/dsh-ocean"
+          python3 -B scripts/production-prebuilt.py verify --verifier "$verifier"
+      - name: Upload checked signatures to the existing unpublished draft
+        if: ${{ !inputs.dry_run }}
+        run: python3 -B scripts/production-prebuilt.py upload
+      - name: Release only this run's shared operation lock
+        if: ${{ always() && !inputs.dry_run }}
+        run: python3 -B scripts/release-operation-lock.py release
