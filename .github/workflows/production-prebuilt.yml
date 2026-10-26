@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.product }}-production-prebuilt
+  group: release-production-operation
   cancel-in-progress: false
 
 jobs:
@@ -37,7 +37,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate publisher guard tests
-        run: python3 -B tests/test_production_prebuilt.py
+        run: |
+          python3 -B tests/test_production_prebuilt.py
+          python3 -B tests/test_release_operation_lock.py
+      - name: Acquire shared production operation lock
+        if: ${{ !inputs.dry_run }}
+        run: python3 -B scripts/release-operation-lock.py acquire
       - name: Download exact reviewed inputs from the unpublished draft
         run: |
           set -euo pipefail
@@ -93,3 +98,6 @@ jobs:
       - name: Upload checked signatures to the existing unpublished draft
         if: ${{ !inputs.dry_run }}
         run: python3 -B scripts/production-prebuilt.py upload
+      - name: Release only this run's shared operation lock
+        if: ${{ always() && !inputs.dry_run }}
+        run: python3 -B scripts/release-operation-lock.py release
