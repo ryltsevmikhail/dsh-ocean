@@ -9,6 +9,14 @@ internal refactors, and never include profile contents, tokens or credentials.
 
 ## Unreleased
 
+## 0.1.3
+
+Production candidate under preparation; publication and new native acceptance pending.
+
+- Install the reviewed custom DSH runtime from signed complete bundles during first setup, instead of requesting its unpublished version from npm.
+- Keep first installation cancellable before selection and recover interrupted selection without lowering runtime sequence floors.
+- Preserve existing runtimes, updater trust settings and localization consent.
+
 ## 0.1.2
 
 Production candidate under preparation; publication and platform acceptance pending.

@@ -22,6 +22,20 @@ fn setup_snapshot_reports_recovery_gate_and_native_busy_state() {
         std::env::set_var("DSH_OCEAN_URL", "http://127.0.0.1:3080/");
         fs::remove_file(&pending).unwrap();
         assert_eq!(snapshot()["recoveryRequired"], false);
+        let first = dsh_ocean::runtime_install::pending_path(&dsh_ocean::config::data_dir());
+        fs::write(&first, b"incomplete first install").unwrap();
+        state.invalidate_runtime_probe();
+        assert_eq!(
+            snapshot()["recoveryRequired"],
+            false,
+            "update recovery cannot handle first-install journal"
+        );
+        assert_eq!(
+            snapshot()["canInstall"],
+            true,
+            "retry installation must remain reachable"
+        );
+        fs::remove_file(first).unwrap();
         return;
     }
     use std::os::unix::fs::DirBuilderExt;

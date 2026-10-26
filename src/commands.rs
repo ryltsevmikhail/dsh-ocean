@@ -1,10 +1,7 @@
-use std::process::Stdio;
-
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use tauri::{AppHandle, Manager, State};
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader};
 
-use crate::bootstrap_supervisor::{self, Outcome};
+use crate::bootstrap_supervisor::Outcome;
 use crate::state::{AppState, SetupState};
 use crate::{bootstrap, diagnostics, service};
 
@@ -84,18 +81,14 @@ pub fn recover_runtime(window: tauri::WebviewWindow, app: AppHandle) -> Result<(
 }
 
 /// Clears the installer lifecycle state whenever the bootstrap scope ends.
-struct BootstrapLifecycle<'a>(&'a AppState);
+struct BootstrapLifecycle(AppHandle);
 
-impl<'a> BootstrapLifecycle<'a> {
-    fn new(state: &'a AppState) -> Self {
-        Self(state)
-    }
-}
-
-impl Drop for BootstrapLifecycle<'_> {
+impl Drop for BootstrapLifecycle {
     fn drop(&mut self) {
-        self.0.installer_finished();
-        self.0.set_bootstrap_pgid(None);
+        let state = self.0.state::<AppState>();
+        state.invalidate_runtime_probe();
+        state.installer_finished();
+        state.set_bootstrap_pgid(None);
     }
 }
 
@@ -200,97 +193,40 @@ pub fn quit_app(window: tauri::WebviewWindow, app: AppHandle) {
 
 async fn run_bootstrap(app: &AppHandle) -> Result<Outcome> {
     let state = app.state::<AppState>();
+    let permit = state.begin_update()?;
+    anyhow::ensure!(
+        permit.server()?.is_none(),
+        "DSH is already running; first installation refused"
+    );
     state.log(crate::i18n::text("startup.installing"));
     state.log(crate::i18n::text("startup.one_time"));
-
-    let manifest = bootstrap::manifest().context("read runtime manifest")?;
-    let arch = match std::env::consts::ARCH {
-        "x86_64" => "linux-x64",
-        "aarch64" => "linux-arm64",
-        other => anyhow::bail!("unsupported bootstrap architecture: {other}"),
-    };
-    let expected_node_sha = bootstrap::node_archive_sha256(arch)
-        .context("runtime manifest has no checksum for this architecture")?;
-
-    let script = bootstrap::install_script();
-    let mut child = tokio::process::Command::new("bash")
-        .arg("-s")
-        .process_group(0)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .env("DSH_NODE_VERSION", &manifest.node.version)
-        .env("DSH_NODE_SHA256", expected_node_sha)
-        .env("DSH_VERSION", &manifest.dsh.version)
-        .env("DSH_PNPM_VERSION", &manifest.pnpm.version)
-        .env("DSH_OCEAN_HEALTH_JS", bootstrap::health_script())
-        .kill_on_drop(true)
-        .spawn()
-        .context("spawn bootstrap script")?;
-    let state = app.state::<AppState>().inner();
-    state.installer_started();
-    state.set_bootstrap_pgid(child.id().map(|pid| pid as i32));
-    // Everything below can fail (a broken stdin pipe, a vanished stream, a wait
-    // error). The guard clears the process-group id and the installer flag on every
-    // path, so a stale pgid is never signalled at shutdown and the UI cannot stay
-    // stuck on "installing".
-    let _lifecycle = BootstrapLifecycle::new(state);
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(script.as_bytes())
-            .await
-            .context("feed bootstrap script")?;
-        stdin.shutdown().await.context("close bootstrap stdin")?;
-    }
-
-    let stdout = child.stdout.take().context("capture bootstrap stdout")?;
-    let stderr = child.stderr.take().context("capture bootstrap stderr")?;
-    let stdout_task = tauri::async_runtime::spawn(read_stream(stdout, app.clone()));
-    let stderr_task = tauri::async_runtime::spawn(read_stream(stderr, app.clone()));
-
-    let supervised = bootstrap_supervisor::supervise(
-        child,
-        app.state::<AppState>().bootstrap_cancel_flag(),
-        bootstrap_supervisor::DEFAULT_GRACE,
-    )
+    let operation = state.begin_native_installer()?;
+    let control = operation.control.clone();
+    let worker_app = app.clone();
+    let worker_control = control.clone();
+    // The worker owns the permit and all payload processes. Shutdown cancels
+    // its Control; dropping an IPC future cannot detach unowned child processes.
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        // Drop in reverse order: release runtime permit, finish installer/cache
+        // cleanup, then mark the exit-deferral operation finished LAST.
+        let _operation = operation;
+        let _lifecycle = BootstrapLifecycle(worker_app);
+        let _permit = permit;
+        crate::runtime_install::install(worker_control)
+    })
     .await
-    .context("supervise bootstrap")?;
-    // A surviving grandchild can hold the output pipes forever; never block the
-    // command (and the one-shot gate) on them.
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), stdout_task).await;
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), stderr_task).await;
-
-    match supervised.outcome() {
-        Outcome::Cancelled => {
-            if supervised.escalated {
-                state.log(crate::i18n::text("startup.forcibly_terminated"));
-            } else {
-                state.log(crate::i18n::text("startup.cooperatively_stopped"));
-            }
-            state.log(crate::i18n::text("startup.cancelled"));
-            Ok(Outcome::Cancelled)
-        }
-        Outcome::Committed => {
-            if bootstrap::detect().is_none() {
-                bail!("runtime bootstrap finished but DSH could not be detected");
-            }
+    .context("join signed runtime installation")?;
+    state.invalidate_runtime_probe();
+    match result {
+        Ok(()) => {
             state.log(crate::i18n::text("startup.installed"));
             Ok(Outcome::Committed)
         }
-        Outcome::Failed => {
-            bail!("runtime bootstrap exited with {}", supervised.status)
+        Err(_) if control.snapshot().cancel_requested => {
+            state.log(crate::i18n::text("startup.cancelled"));
+            Ok(Outcome::Cancelled)
         }
-    }
-}
-
-async fn read_stream<R>(reader: R, app: AppHandle)
-where
-    R: AsyncRead + Unpin + Send + 'static,
-{
-    let mut lines = BufReader::new(reader).lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        app.state::<AppState>().log(format!("[bootstrap] {line}"));
+        Err(error) => Err(error),
     }
 }
 

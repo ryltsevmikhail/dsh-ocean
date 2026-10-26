@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "kind": "tar.gz",
+      "nodeArchiveSha256": "ec53c915c3fdd8786c5685abd25ae3fe9fba0692307f9811d7caaadea1bcaf03",
+      "sha256": "b79d6eeeb46a791238f9c22da39b92fef707c930dfa95b40916291ff893f0c0f",
+      "size": 480260497,
+      "target": "linux-aarch64",
+      "url": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/runtime-next-v0.2.0-rc.2.ocean.2-r2/dsh-ocean-runtime-next-0.2.0-rc.2.ocean.2-2-aarch64.tar.gz"
+    },
+    {
+      "kind": "tar.gz",
+      "nodeArchiveSha256": "d9f88af72ad34f7ddf8e67289829f1698f54b6254f7d4f54b7453117ff1a3d2c",
+      "sha256": "05700ecfbbe5e70e495c05927f18903016da3faba38133fa99bcd6540eff64dd",
+      "size": 487101859,
+      "target": "linux-x86_64",
+      "url": "https://github.com/ryltsevmikhail/dsh-ocean/releases/download/runtime-next-v0.2.0-rc.2.ocean.2-r2/dsh-ocean-runtime-next-0.2.0-rc.2.ocean.2-2-x86_64.tar.gz"
+    }
+  ],
+  "channel": "next",
+  "components": {
+    "dsh": "0.2.0-rc.2.ocean.2",
+    "node": "26.12.0",
+    "pnpm": "10.34.7"
+  },
+  "expiresAt": "2026-11-09T06:00:01Z",
+  "product": "dsh-ocean-runtime",
+  "publishedAt": "2026-10-26T06:00:01Z",
+  "release": "0.2.0-rc.2.ocean.2",
+  "sequence": 2,
+  "stateScope": "web-profile-sessions-storages-v1",
+  "version": 1
+}

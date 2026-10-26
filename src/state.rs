@@ -51,6 +51,7 @@ struct BootstrapState {
     active: bool,
     installer: bool,
     cancel: bool,
+    control: Option<std::sync::Arc<crate::update_control::Control>>,
 }
 
 pub struct AppState {
@@ -81,8 +82,12 @@ impl Drop for BootstrapGuard {
     fn drop(&mut self) {
         let mut bootstrap = self.0.lock().expect("bootstrap mutex");
         bootstrap.active = false;
-        bootstrap.installer = false;
-        bootstrap.cancel = false;
+        // A dropped IPC future must not detach the native worker's cancellation
+        // handle or admit a competing installation while that worker still runs.
+        if bootstrap.control.is_none() {
+            bootstrap.installer = false;
+            bootstrap.cancel = false;
+        }
     }
 }
 
@@ -124,7 +129,7 @@ impl AppState {
     /// the service preparation that follows it).
     pub fn begin_bootstrap(&self) -> Option<BootstrapGuard> {
         let mut bootstrap = self.bootstrap.lock().expect("bootstrap mutex");
-        if bootstrap.active {
+        if bootstrap.active || bootstrap.installer {
             return None;
         }
         bootstrap.active = true;
@@ -146,8 +151,31 @@ impl AppState {
         bootstrap.cancel = false;
     }
 
+    /// The installer shares native operations' exit-deferral gate.
+    pub fn begin_native_installer(&self) -> anyhow::Result<crate::native_updates::Operation> {
+        let operation = self.updates.begin()?;
+        self.installer_started_controlled(operation.control.clone());
+        Ok(operation)
+    }
+
+    /// Bind cancellation to this exact native installer, including shutdown.
+    pub fn installer_started_controlled(
+        &self,
+        control: std::sync::Arc<crate::update_control::Control>,
+    ) {
+        let mut bootstrap = self.bootstrap.lock().expect("bootstrap mutex");
+        bootstrap.installer = true;
+        bootstrap.cancel = false;
+        if self.quitting.load(Ordering::SeqCst) {
+            bootstrap.cancel = control.cancel();
+        }
+        bootstrap.control = Some(control);
+    }
+
     pub fn installer_finished(&self) {
-        self.bootstrap.lock().expect("bootstrap mutex").installer = false;
+        let mut bootstrap = self.bootstrap.lock().expect("bootstrap mutex");
+        bootstrap.installer = false;
+        bootstrap.control = None;
     }
 
     pub fn is_installing(&self) -> bool {
@@ -160,6 +188,13 @@ impl AppState {
     pub fn request_bootstrap_cancel(&self) -> bool {
         let mut bootstrap = self.bootstrap.lock().expect("bootstrap mutex");
         if !bootstrap.installer {
+            return false;
+        }
+        if bootstrap
+            .control
+            .as_ref()
+            .is_some_and(|control| !control.cancel())
+        {
             return false;
         }
         bootstrap.cancel = true;
@@ -252,6 +287,7 @@ impl AppState {
     pub fn shutdown(&self) {
         self.quitting.store(true, Ordering::SeqCst);
         self.runtime.close();
+        self.request_bootstrap_cancel();
         // Ask a running installer to stop cooperatively so its traps can remove
         // staged work and release the runtime lock.
         if let Some(pgid) = self.bootstrap_pgid().filter(|pgid| *pgid > 1) {
@@ -325,8 +361,15 @@ impl AppState {
         })
     }
 
-    /// Detection is a subprocess call, so the setup window's poll joins a short
-    /// cache instead of spawning `dsh --version` twice per refresh.
+    /// Refresh immediately after an installation instead of waiting for the TTL.
+    pub fn invalidate_runtime_probe(&self) {
+        *self
+            .runtime_cache
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = None;
+    }
+
+    /// Detection is a subprocess call; setup polling shares a short cache.
     fn runtime_probe(&self) -> Option<bootstrap::Runtime> {
         const TTL: std::time::Duration = std::time::Duration::from_secs(3);
         let mut cache = self
@@ -381,7 +424,10 @@ impl AppState {
             can_install: probe.is_none(),
             recovery_required: config::checked_server_url()
                 .is_ok_and(|base| crate::service::permits_local_start(&base))
-                && crate::runtime_switch::ensure_no_pending(&config::data_dir()).is_err(),
+                // This prompt handles old->new update recovery. Incomplete
+                // first installation is retried through Install, its own engine.
+                && !matches!(std::fs::symlink_metadata(config::data_dir().join(".runtime-pending.json")),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound),
             updating: self.is_updating(),
             config_path: config::config_path().display().to_string(),
             diagnostics_path: config::diagnostics_dir().display().to_string(),
@@ -543,6 +589,90 @@ mod tests {
             assert!(!logs[0].contains("synthetic-private"));
         }
     }
+    #[test]
+    fn quit_waits_for_native_installer_cleanup_and_cannot_cancel_commit() {
+        for committing in [false, true] {
+            let state = AppState::default();
+            let _gate = state.begin_bootstrap().unwrap();
+            let operation = state.begin_native_installer().unwrap();
+            let control = operation.control.clone();
+            if committing {
+                control.begin_commit().unwrap();
+            }
+            assert!(
+                matches!(
+                    state.updates.request_exit(),
+                    crate::native_updates::Exit::Wait(_)
+                ),
+                "Quit must defer until installer cleanup"
+            );
+            assert_eq!(control.snapshot().cancel_requested, !committing);
+            assert!(!control.snapshot().finished);
+            state.installer_finished();
+            assert!(
+                !control.snapshot().finished,
+                "cleanup is not complete until operation drops"
+            );
+            drop(operation);
+            assert!(control.snapshot().finished);
+            assert!(matches!(
+                state.updates.request_exit(),
+                crate::native_updates::Exit::Allow
+            ));
+            assert!(state.begin_native_installer().is_err());
+        }
+    }
+
+    #[test]
+    fn dropped_ipc_keeps_native_worker_owned_and_shutdown_wins_registration_race() {
+        let state = AppState::default();
+        let gate = state.begin_bootstrap().unwrap();
+        let control = std::sync::Arc::new(crate::update_control::Control::default());
+        state.installer_started_controlled(control.clone());
+        drop(gate);
+        assert!(state.begin_bootstrap().is_none());
+        assert!(state.request_bootstrap_cancel());
+        assert!(control.snapshot().cancel_requested);
+        state.installer_finished();
+        assert!(state.begin_bootstrap().is_some());
+        state.shutdown();
+        let late = std::sync::Arc::new(crate::update_control::Control::default());
+        state.installer_started_controlled(late.clone());
+        assert!(late.snapshot().cancel_requested);
+    }
+
+    #[test]
+    fn native_installer_cancel_shutdown_and_commit_are_owned() {
+        let state = AppState::default();
+        let _gate = state.begin_bootstrap().unwrap();
+        let control = std::sync::Arc::new(crate::update_control::Control::default());
+        state.installer_started_controlled(control.clone());
+        assert!(state.request_bootstrap_cancel());
+        assert!(control.check().is_err());
+        state.installer_finished();
+        assert!(!state.request_bootstrap_cancel());
+        let committed = std::sync::Arc::new(crate::update_control::Control::default());
+        state.installer_started_controlled(committed.clone());
+        committed.begin_commit().unwrap();
+        assert!(!state.request_bootstrap_cancel());
+        assert!(!state.bootstrap_cancel_requested());
+        state.shutdown();
+        assert!(!committed.snapshot().cancel_requested);
+    }
+
+    #[test]
+    fn native_installer_shutdown_cancels_preparation_and_cache_can_be_invalidated() {
+        let state = AppState::default();
+        let _gate = state.begin_bootstrap().unwrap();
+        let control = std::sync::Arc::new(crate::update_control::Control::default());
+        state.installer_started_controlled(control.clone());
+        *state.runtime_cache.lock().unwrap() = Some((std::time::Instant::now(), None));
+        state.invalidate_runtime_probe();
+        assert!(state.runtime_cache.lock().unwrap().is_none());
+        state.shutdown();
+        assert!(control.snapshot().cancel_requested);
+    }
+
     #[test]
     fn logs_and_failure_state_redact_tokens_before_storage() {
         let state = AppState::default();

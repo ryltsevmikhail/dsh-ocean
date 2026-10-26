@@ -35,6 +35,8 @@ struct Receipt {
 }
 pub struct Prepared {
     root: PathBuf,
+    expected: checked_archive::Inventory,
+    identity: (String, String),
     // Same lock as the existing bootstrap/activation worker. Keep this guard
     // through subsequent health/activation, not merely until extract returns.
     _lock: File,
@@ -47,7 +49,13 @@ impl Prepared {
         json!({"generation":self.root,"imported":true,"activated":false,"accepted":false,"healthChecked":false,"warning":"Complete signed bytes imported and indexed only. No payload executed, package manager run, selector/floor changed or profile accessed."})
     }
     pub fn verify(&self, release: &runtime_feed::Verified) -> Result<()> {
-        verify_directory(&self.root, release)
+        anyhow::ensure!(
+            self.identity.0 == release.manifest_sha256()
+                && self.identity.1 == release.artifact().sha256,
+            "prepared runtime authority changed"
+        );
+        verify_directory(&self.root, release)?;
+        self.expected.verify(&self.root, &[RECEIPT, FILES])
     }
 }
 fn generation_name(release: &runtime_feed::Verified) -> String {
@@ -173,16 +181,19 @@ pub fn import(source: &Path, release: &runtime_feed::Verified, prefix: &Path) ->
     let generations = prefix.join("generations");
     shell_apply::ensure_prefix(&generations)?;
     let root = generations.join(generation_name(release));
-    match fs::symlink_metadata(&root) {
-        Ok(_) => {
-            verify_directory(&root, release)?;
-            return Ok(Prepared { root, _lock: lock });
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
-        Err(error) => return Err(error).context("inspect retained runtime generation"),
-    }
     let temporary = generations.join(format!(".new-runtime-{}", crate::downloads::unique_id()));
     let guard = checked_archive::NewDirectory::create(&temporary)?;
+    // Durable ownership is established before any archive/content bytes exist.
+    shell_apply::write_json_new(
+        &temporary.join(STAGING_OWNER),
+        &StagingOwner {
+            schema: 1,
+            manifest_sha256: release.manifest_sha256().into(),
+            artifact_sha256: release.artifact().sha256.clone(),
+        },
+    )?;
+    sync_directory(&temporary)?;
+    sync_directory(&generations)?;
     let staged = release_feed::stage_authenticated_artifact(
         source,
         &temporary.join("archive.tar.gz"),
@@ -202,6 +213,25 @@ pub fn import(source: &Path, release: &runtime_feed::Verified, prefix: &Path) ->
         owned(&content.join(".versions"), 4096)? == versions(release).as_bytes(),
         "runtime component version record mismatch"
     );
+    // Retained receipts/inventories are not authority. Reconstruct expectation
+    // from freshly hash-authenticated compressed bytes even on retry.
+    match fs::symlink_metadata(&root) {
+        Ok(_) => {
+            verify_directory(&root, release)?;
+            inventory.verify(&root, &[RECEIPT, FILES])?;
+            return Ok(Prepared {
+                root,
+                expected: inventory,
+                identity: (
+                    release.manifest_sha256().into(),
+                    release.artifact().sha256.clone(),
+                ),
+                _lock: lock,
+            });
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(error).context("inspect retained runtime generation"),
+    }
     let bytes = serde_json::to_vec(&inventory)?;
     anyhow::ensure!(
         bytes.len() as u64 <= MAX_FILES,
@@ -231,5 +261,70 @@ pub fn import(source: &Path, release: &runtime_feed::Verified, prefix: &Path) ->
     guard.check()?;
     shell_apply::publish_new(&content, &root)?;
     sync_directory(&generations)?;
-    Ok(Prepared { root, _lock: lock })
+    Ok(Prepared {
+        root,
+        expected: inventory,
+        identity: (
+            release.manifest_sha256().into(),
+            release.artifact().sha256.clone(),
+        ),
+        _lock: lock,
+    })
+}
+
+const STAGING_OWNER: &str = ".runtime-import-owner.json";
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StagingOwner {
+    schema: u32,
+    manifest_sha256: String,
+    artifact_sha256: String,
+}
+
+/// Caller must hold the prefix lock. Never clean foreign or ambiguous scratch.
+pub(crate) fn recover_bootstrap_scratch(path: &Path, manifest: &str, artifact: &str) -> Result<()> {
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("non-UTF8 staging name")?;
+    let suffix = name
+        .strip_prefix(".new-runtime-")
+        .context("not runtime staging")?;
+    let fields: Vec<_> = suffix.split('-').collect();
+    anyhow::ensure!(
+        fields.len() == 3
+            && fields
+                .iter()
+                .all(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+            && fields[0].parse::<u32>().is_ok_and(|v| v > 0)
+            && fields[1].parse::<u64>().is_ok()
+            && fields[2].parse::<u64>().is_ok(),
+        "foreign staging name"
+    );
+    let metadata = fs::symlink_metadata(path)?;
+    anyhow::ensure!(
+        metadata.is_dir()
+            && metadata.uid() == unsafe { libc::geteuid() }
+            && metadata.mode() & 0o077 == 0,
+        "unsafe staging directory"
+    );
+    let owner_path = path.join(STAGING_OWNER);
+    match fs::symlink_metadata(&owner_path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // The sole unmarked recovery case is a crash between mkdir/marker.
+            fs::remove_dir(path).context("nonempty unmarked staging preserved")?;
+        }
+        Err(e) => return Err(e.into()),
+        Ok(_) => {
+            let owner: StagingOwner = serde_json::from_slice(&owned(&owner_path, 4096)?)?;
+            anyhow::ensure!(
+                owner.schema == 1
+                    && owner.manifest_sha256 == manifest
+                    && owner.artifact_sha256 == artifact,
+                "foreign staging owner"
+            );
+            fs::remove_dir_all(path)?;
+        }
+    }
+    sync_directory(path.parent().context("staging parent missing")?)
 }
