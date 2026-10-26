@@ -5,6 +5,7 @@
   "language.title": "言語",
   "language.system": "システムの言語",
   "language.restart_notice": "言語の変更は Ocean の再起動後に反映されます。",
+  "language.dsh_notice": "DSH の表示言語は DSH の設定で選択します。追加言語は、Ocean が自身の DSH サーバーを起動し、組み込み辞書の使用を許可した場合に利用できます。稼働中のサーバーへの接続だけでは辞書は有効になりません。利用可能な言語はサーバーの所有者が管理します。",
   "setup.starting": "起動中…",
   "setup.retry": "再試行",
   "setup.recover": "ランタイムを復旧…",

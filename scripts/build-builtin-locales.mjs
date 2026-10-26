@@ -16,8 +16,8 @@ const manifest={
  description:'Built-in DSH Ocean UI dictionaries; application-owned composition only',
  main:'./lib/index.js',exports:{'.':'./lib/index.js','./client':'./lib/client.js','./package.json':'./package.json'},
  dsh:{client:{platform:'web',immediately:true,inject:['@deepseek-ai/dsh-client-locale','@deepseek-ai/dsh-client-modules']}},
- engines:{dsh:'0.2.0-rc.2',node:'>=22'},
- peerDependencies:{'@deepseek-ai/cordis':'~4.0.4','@deepseek-ai/dsh-client-locale':'0.2.0-rc.2','@deepseek-ai/dsh-client-modules':'0.2.0-rc.2'},
+ engines:{dsh:'0.2.0-rc.2 || 0.2.0-rc.2.ocean.2 || 0.2.1-rc.2',node:'>=22'},
+ peerDependencies:{'@deepseek-ai/cordis':'~4.0.4','@deepseek-ai/dsh-client-locale':'0.2.0-rc.2 || 0.2.0-rc.2.ocean.2 || 0.2.1-rc.2','@deepseek-ai/dsh-client-modules':'0.2.0-rc.2 || 0.2.0-rc.2.ocean.2 || 0.2.1-rc.2'},
 };
 const files={
  'package.json':JSON.stringify(manifest,null,2)+'\n',

@@ -23,13 +23,36 @@ pub fn selected_sdk(runtime: &crate::bootstrap::Runtime) -> Result<(PathBuf, Str
     struct Manifest {
         name: String,
         version: String,
+        #[serde(default)]
+        bin: serde_json::Value,
     }
     anyhow::ensure!(
         absolute(&runtime.dsh),
         "absolute selected SDK executable required"
     );
-    let executable =
+    let mut executable =
         std::fs::canonicalize(&runtime.dsh).context("resolve selected SDK executable")?;
+    // The authenticated runtime packager replaces JS-entry symlinks with this
+    // exact in-place Node shim. Never interpret arbitrary executable contents.
+    let packaged_shim = executable.ends_with("node_modules/.bin/dsh");
+    if packaged_shim {
+        const SHIM: &str = "#!/usr/bin/env node\nconst path=require('node:path');const entry=path.resolve(__dirname,\"../@deepseek-ai/dsh/lib/bin.js\");if(typeof process.execve!=='function')throw new Error('pinned Node execve required');process.execve(process.execPath,[process.execPath,entry,...process.argv.slice(2)],process.env);\n";
+        anyhow::ensure!(
+            crate::release_feed::read_input(&executable, 4096)? == SHIM.as_bytes(),
+            "unrecognized selected SDK executable shim"
+        );
+        let target = executable
+            .parent()
+            .and_then(Path::parent)
+            .context("selected SDK node_modules directory")?
+            .join("@deepseek-ai/dsh/lib/bin.js");
+        let resolved = std::fs::canonicalize(&target).context("resolve packaged SDK entry")?;
+        anyhow::ensure!(
+            resolved == target && resolved.is_file(),
+            "ambiguous packaged SDK entry"
+        );
+        executable = resolved;
+    }
     for parent in executable.ancestors().skip(1).take(16) {
         let anchor = parent.join("package.json");
         match std::fs::symlink_metadata(&anchor) {
@@ -44,6 +67,17 @@ pub fn selected_sdk(runtime: &crate::bootstrap::Runtime) -> Result<(PathBuf, Str
             manifest.name == "@deepseek-ai/dsh",
             "selected executable belongs to a different SDK package"
         );
+        if packaged_shim {
+            anyhow::ensure!(
+                manifest.version == runtime.version
+                    && matches!(
+                        manifest.bin.get("dsh").and_then(serde_json::Value::as_str),
+                        Some("lib/bin.js" | "./lib/bin.js")
+                    )
+                    && parent.join("lib/bin.js") == executable,
+                "packaged SDK manifest does not match selected runtime entry"
+            );
+        }
         return Ok((anchor, manifest.version));
     }
     anyhow::bail!("selected SDK package manifest not found")

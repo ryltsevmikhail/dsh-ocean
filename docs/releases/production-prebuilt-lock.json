@@ -1,0 +1,46 @@
+{
+  "shell": {
+    "product": "shell",
+    "channel": "stable",
+    "release": "0.1.2",
+    "sequence": 1,
+    "tag": "v0.1.2",
+    "sourceCommit": "4d21e645646d049f341dacd727c254127ba6d779",
+    "artifacts": [
+      {
+        "target": "linux-x86_64",
+        "filename": "dsh-ocean-0.1.2-x86_64.tar.gz",
+        "size": 7699546,
+        "sha256": "781f230f451e62f179195ae7d5efaadbaf97b39e35f8d040e34317fdad602110"
+      },
+      {
+        "target": "linux-aarch64",
+        "filename": "dsh-ocean-0.1.2-aarch64.tar.gz",
+        "size": 7525178,
+        "sha256": "7fc1fcfef5e8676aba10c76638d9182e4ec4285de2076cf324a20844a82f7e92"
+      }
+    ]
+  },
+  "runtime": {
+    "product": "runtime",
+    "channel": "next",
+    "release": "0.2.0-rc.2.ocean.2",
+    "sequence": 2,
+    "tag": "runtime-next-v0.2.0-rc.2.ocean.2-r2",
+    "sourceCommit": "4d21e645646d049f341dacd727c254127ba6d779",
+    "artifacts": [
+      {
+        "target": "linux-x86_64",
+        "filename": "dsh-ocean-runtime-next-0.2.0-rc.2.ocean.2-2-x86_64.tar.gz",
+        "size": 487101859,
+        "sha256": "05700ecfbbe5e70e495c05927f18903016da3faba38133fa99bcd6540eff64dd"
+      },
+      {
+        "target": "linux-aarch64",
+        "filename": "dsh-ocean-runtime-next-0.2.0-rc.2.ocean.2-2-aarch64.tar.gz",
+        "size": 480260497,
+        "sha256": "b79d6eeeb46a791238f9c22da39b92fef707c930dfa95b40916291ff893f0c0f"
+      }
+    ]
+  }
+}

@@ -47,3 +47,19 @@ fn builtin_locale_tree_is_embedded_complete_and_has_stable_content_identity() {
     assert!(id.bytes().all(|b| b.is_ascii_hexdigit()));
     assert_eq!(id, bundle_id());
 }
+#[test]
+fn embedded_manifest_covers_the_shipped_and_installed_sdk_contracts() {
+    let resource = dsh_ocean::builtin_locales::resources()
+        .iter()
+        .find(|file| file.path == "package.json")
+        .unwrap();
+    let manifest: serde_json::Value = serde_json::from_slice(resource.bytes).unwrap();
+    let expected = "0.2.0-rc.2 || 0.2.0-rc.2.ocean.2 || 0.2.1-rc.2";
+    assert_eq!(manifest["engines"]["dsh"], expected);
+    for package in [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-modules",
+    ] {
+        assert_eq!(manifest["peerDependencies"][package], expected);
+    }
+}
