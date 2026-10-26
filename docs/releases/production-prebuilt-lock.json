@@ -5,19 +5,19 @@
     "release": "0.1.4",
     "sequence": 3,
     "tag": "v0.1.4",
-    "sourceCommit": "fab5165ee10f311e0ae5e686ddbbab701f78c3b0",
+    "sourceCommit": "c653f1a958c2cdc90741be58a9222560897cf982",
     "artifacts": [
       {
         "target": "linux-x86_64",
         "filename": "dsh-ocean-0.1.4-x86_64.tar.gz",
-        "size": 7711374,
-        "sha256": "9bb75a791773ece19ac76f7796aa41bf9ca4b8815aecb09509a8a6b421211107"
+        "size": 7711383,
+        "sha256": "ebc3b894ccb0c974981dc8e3f21a274a70ab0ee522ce53a09a62e08b4756d756"
       },
       {
         "target": "linux-aarch64",
         "filename": "dsh-ocean-0.1.4-aarch64.tar.gz",
-        "size": 7543200,
-        "sha256": "1e587a7fc855f24809c2b36c330724ea3043dc42416b51a6d9f1479f3279b24b"
+        "size": 7543199,
+        "sha256": "e9249ea3b4a9e8fcb8dedf12daa9b905218d0c1c34ae038c2603f74124eaf776"
       }
     ]
   },
