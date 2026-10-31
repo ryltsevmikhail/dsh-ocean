@@ -15,6 +15,8 @@ web interface in a small Rust/Tauri 2 shell. It adds a tray, runtime discovery,
 first-run setup, server lifecycle management, native downloads and diagnostics—
 without building a second chat interface.
 
+<p align="center"><img src="assets/screenshots/ocean-chat.png" width="900" alt="DSH Ocean on Omarchy: the DeepSeek Harness chat in the native desktop window, with workspaces in the sidebar and the session panel on the right" /></p>
+
 **Independent community project; not an official DeepSeek product or endorsement.**
 Ocean and the upstream runtime have separate release cycles and licenses. DeepSeek
 names and marks belong to their respective owners.
